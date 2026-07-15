@@ -8,14 +8,34 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 export default function SettingsScreen() {
   const { user, logout } = useAuthStore();
   const [profile, setProfile] = useState(null);
+  const [online, setOnline] = useState(true);
+  const [queueLength, setQueueLength] = useState(0);
+  const [syncing, setSyncing] = useState(false);
 
-  useEffect(() => { loadProfile(); }, []);
+  useEffect(() => { loadProfile(); checkSyncStatus(); }, []);
 
   const loadProfile = async () => {
     try {
       const res = await api.get('/team/profile');
       setProfile(res.data.profile);
     } catch {}
+  };
+
+  const checkSyncStatus = () => {
+    setOnline(api.isOnline());
+    setQueueLength(api.getQueueLength());
+  };
+
+  const handleSync = async () => {
+    setSyncing(true);
+    try {
+      await api.sync();
+      showMessage({ message: 'Offline actions synced', type: 'success' });
+    } catch {
+      showMessage({ message: 'Sync failed', type: 'danger' });
+    }
+    setSyncing(false);
+    checkSyncStatus();
   };
 
   const handleLogout = () => {
@@ -44,6 +64,21 @@ export default function SettingsScreen() {
         <Text style={styles.headerTitle}>Settings</Text>
       </View>
       <ScrollView contentContainerStyle={styles.content}>
+        <View style={[styles.offlineBanner, { backgroundColor: online ? '#d1fae5' : '#fef3c7' }]}>
+          <Icon name={online ? 'wifi-check' : 'wifi-off'} size={20} color={online ? '#059669' : '#b45309'} />
+          <Text style={[styles.offlineText, { color: online ? '#059669' : '#b45309' }]}>
+            {online ? 'Online' : 'Offline Mode'}
+          </Text>
+          {!online && queueLength > 0 && (
+            <Text style={[styles.offlineText, { color: '#b45309' }]}>{queueLength} pending</Text>
+          )}
+          {!online && queueLength > 0 && (
+            <TouchableOpacity onPress={handleSync} disabled={syncing} style={styles.syncBtn}>
+              <Text style={styles.syncBtnText}>{syncing ? 'Syncing...' : 'Sync Now'}</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
         <View style={styles.profileCard}>
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>{profile?.first_name?.[0] || 'U'}</Text>
@@ -81,6 +116,10 @@ const styles = StyleSheet.create({
   header: { paddingTop: 50, paddingHorizontal: 20, paddingBottom: 16, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
   headerTitle: { fontSize: 24, fontWeight: 'bold', color: '#0f172a' },
   content: { padding: 16, paddingBottom: 40 },
+  offlineBanner: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16, borderRadius: 12, marginBottom: 16, gap: 8 },
+  offlineText: { fontSize: 14, fontWeight: '600', marginLeft: 8 },
+  syncBtn: { marginLeft: 'auto', backgroundColor: '#2563eb', paddingHorizontal: 14, paddingVertical: 6, borderRadius: 8 },
+  syncBtnText: { color: '#fff', fontSize: 13, fontWeight: '600' },
   profileCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 16, padding: 20, marginBottom: 20, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
   avatar: { width: 56, height: 56, backgroundColor: '#2563eb', borderRadius: 28, justifyContent: 'center', alignItems: 'center', marginRight: 16 },
   avatarText: { color: '#fff', fontSize: 24, fontWeight: 'bold' },

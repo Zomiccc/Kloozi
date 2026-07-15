@@ -1,0 +1,509 @@
+{
+  "workspaces": {
+    "_schema": "",
+    "_data": [
+      {
+        "id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "name": "Demo Company",
+        "slug": "demo-company",
+        "plan": "business",
+        "subscription_status": "active"
+      }
+    ]
+  },
+  "users": {
+    "_schema": "",
+    "_data": [
+      {
+        "id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "email": "admin@demo.com",
+        "password_hash": "$2a$12$qDwyUIfDTrxhvAE5UgPZAehQbxx1twGiiaaMRUqM.25uRVqn1cR26",
+        "first_name": "John",
+        "last_name": "Admin",
+        "role": "admin",
+        "status": "active",
+        "phone": "+1234567890"
+      },
+      {
+        "id": "f5906668-12b6-4695-9660-9173f76f99cb",
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "email": "manager@demo.com",
+        "password_hash": "$2a$12$qDwyUIfDTrxhvAE5UgPZAehQbxx1twGiiaaMRUqM.25uRVqn1cR26",
+        "first_name": "Sarah",
+        "last_name": "Manager",
+        "role": "sales_manager",
+        "status": "active",
+        "phone": "+1234567891"
+      },
+      {
+        "id": "51c4972e-b5e3-407d-86b2-704452d0464d",
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "email": "agent1@demo.com",
+        "password_hash": "$2a$12$qDwyUIfDTrxhvAE5UgPZAehQbxx1twGiiaaMRUqM.25uRVqn1cR26",
+        "first_name": "Mike",
+        "last_name": "Agent",
+        "role": "sales_agent",
+        "status": "active",
+        "phone": "+1234567892"
+      },
+      {
+        "id": "ce416c11-76bf-41d5-a061-cb089e919536",
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "email": "agent2@demo.com",
+        "password_hash": "$2a$12$qDwyUIfDTrxhvAE5UgPZAehQbxx1twGiiaaMRUqM.25uRVqn1cR26",
+        "first_name": "Lisa",
+        "last_name": "Agent",
+        "role": "sales_agent",
+        "status": "active",
+        "phone": "+1234567893"
+      }
+    ]
+  },
+  "lead_stages": {
+    "_schema": "",
+    "_data": [
+      {
+        "id": "62f77852-2b57-4ab7-9290-0ee78ea16ef2",
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "name": "New",
+        "sort_order": 0,
+        "is_default": 1,
+        "is_won": 0,
+        "is_lost": 0
+      },
+      {
+        "id": "beb61743-7266-4458-ae13-906af97a2e82",
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "name": "Contacted",
+        "sort_order": 1,
+        "is_default": 0,
+        "is_won": 0,
+        "is_lost": 0
+      },
+      {
+        "id": "f666a92b-052c-4a65-b3db-c35608814a3c",
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "name": "Interested",
+        "sort_order": 2,
+        "is_default": 0,
+        "is_won": 0,
+        "is_lost": 0
+      },
+      {
+        "id": "f61f7f36-6fe3-48a4-8a42-78c568122cb5",
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "name": "Negotiating",
+        "sort_order": 3,
+        "is_default": 0,
+        "is_won": 0,
+        "is_lost": 0
+      },
+      {
+        "id": "44795c35-7b2b-4b98-b080-ce1375d56bd3",
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "name": "Won",
+        "sort_order": 4,
+        "is_default": 0,
+        "is_won": 1,
+        "is_lost": 0
+      },
+      {
+        "id": "5c629a45-a561-4ad8-94e6-42702e570d57",
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "name": "Lost",
+        "sort_order": 5,
+        "is_default": 0,
+        "is_won": 0,
+        "is_lost": 1
+      }
+    ]
+  },
+  "leads": {
+    "_schema": "",
+    "_data": [
+      {
+        "id": "a14b7e58-e559-422e-8988-f00054ad3c0b",
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "first_name": "Alice",
+        "last_name": "Cooper",
+        "phone": "+15550001",
+        "email": "alice@example.com",
+        "city": "New York",
+        "budget": 75000,
+        "lead_source": "facebook",
+        "stage": "new",
+        "assigned_to": "51c4972e-b5e3-407d-86b2-704452d0464d",
+        "created_by": "08482e9f-dfc3-4628-bba0-1a9d09fac80e"
+      },
+      {
+        "id": "c0a88449-aaec-4915-bfcc-20d9d3da2c20",
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "first_name": "Bob",
+        "last_name": "Smith",
+        "phone": "+15550002",
+        "email": "bob@example.com",
+        "city": "Los Angeles",
+        "budget": 120000,
+        "lead_source": "google",
+        "stage": "contacted",
+        "assigned_to": "51c4972e-b5e3-407d-86b2-704452d0464d",
+        "created_by": "08482e9f-dfc3-4628-bba0-1a9d09fac80e"
+      },
+      {
+        "id": "61f66509-4575-477c-9d92-78a946ed252f",
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "first_name": "Carol",
+        "last_name": "Jones",
+        "phone": "+15550003",
+        "email": "carol@example.com",
+        "city": "Chicago",
+        "budget": 50000,
+        "lead_source": "website",
+        "stage": "interested",
+        "assigned_to": "ce416c11-76bf-41d5-a061-cb089e919536",
+        "created_by": "08482e9f-dfc3-4628-bba0-1a9d09fac80e"
+      },
+      {
+        "id": "0dc77b86-0a1f-4d05-982a-61b5ef15860b",
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "first_name": "David",
+        "last_name": "Wilson",
+        "phone": "+15550004",
+        "email": "david@example.com",
+        "city": "Houston",
+        "budget": 200000,
+        "lead_source": "tiktok",
+        "stage": "negotiating",
+        "assigned_to": "51c4972e-b5e3-407d-86b2-704452d0464d",
+        "created_by": "08482e9f-dfc3-4628-bba0-1a9d09fac80e"
+      },
+      {
+        "id": "3c8aeae7-5246-4af6-b693-5d8e1a4ad873",
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "first_name": "Eve",
+        "last_name": "Brown",
+        "phone": "+15550005",
+        "email": "eve@example.com",
+        "city": "Phoenix",
+        "budget": 95000,
+        "lead_source": "instagram",
+        "stage": "won",
+        "assigned_to": "ce416c11-76bf-41d5-a061-cb089e919536",
+        "created_by": "08482e9f-dfc3-4628-bba0-1a9d09fac80e"
+      },
+      {
+        "id": "fbe08e01-fa6a-4b4f-bc74-8641b53b767d",
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "first_name": "Frank",
+        "last_name": "Miller",
+        "phone": "+15550006",
+        "email": "frank@example.com",
+        "city": "Philadelphia",
+        "budget": 30000,
+        "lead_source": "manual",
+        "stage": "lost",
+        "assigned_to": "51c4972e-b5e3-407d-86b2-704452d0464d",
+        "created_by": "08482e9f-dfc3-4628-bba0-1a9d09fac80e"
+      },
+      {
+        "id": "51c415a5-2160-44cd-a117-548b657da7e0",
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "first_name": "Grace",
+        "last_name": "Davis",
+        "phone": "+15550007",
+        "email": "grace@example.com",
+        "city": "San Antonio",
+        "budget": 80000,
+        "lead_source": "facebook",
+        "stage": "new",
+        "assigned_to": "ce416c11-76bf-41d5-a061-cb089e919536",
+        "created_by": "08482e9f-dfc3-4628-bba0-1a9d09fac80e"
+      },
+      {
+        "id": "02d02e72-5770-462a-8f30-1867c5d3d549",
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "first_name": "Henry",
+        "last_name": "Garcia",
+        "phone": "+15550008",
+        "email": "henry@example.com",
+        "city": "San Diego",
+        "budget": 150000,
+        "lead_source": "google",
+        "stage": "contacted",
+        "assigned_to": "51c4972e-b5e3-407d-86b2-704452d0464d",
+        "created_by": "08482e9f-dfc3-4628-bba0-1a9d09fac80e"
+      },
+      {
+        "id": "f9b6b2e7-d7d6-4453-b3da-846a78dc4b52",
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "first_name": "Ivy",
+        "last_name": "Rodriguez",
+        "phone": "+15550009",
+        "email": "ivy@example.com",
+        "city": "Dallas",
+        "budget": 65000,
+        "lead_source": "website",
+        "stage": "interested",
+        "assigned_to": "ce416c11-76bf-41d5-a061-cb089e919536",
+        "created_by": "08482e9f-dfc3-4628-bba0-1a9d09fac80e"
+      },
+      {
+        "id": "8d800be4-8d5e-426d-bf59-44e975e70a32",
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "first_name": "Jack",
+        "last_name": "Martinez",
+        "phone": "+15550010",
+        "email": "jack@example.com",
+        "city": "San Jose",
+        "budget": 110000,
+        "lead_source": "zapier",
+        "stage": "negotiating",
+        "assigned_to": "51c4972e-b5e3-407d-86b2-704452d0464d",
+        "created_by": "08482e9f-dfc3-4628-bba0-1a9d09fac80e"
+      }
+    ]
+  },
+  "lead_activities": {
+    "_schema": "",
+    "_data": []
+  },
+  "lead_tags": {
+    "_schema": "",
+    "_data": [
+      {
+        "id": "37b0b7b6-f328-4978-bfc0-5b957b45faf2",
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "name": "VIP",
+        "color": "#ef4444"
+      },
+      {
+        "id": "23c86ee7-0cf6-4c67-b17e-ce2f197b11f6",
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "name": "Hot Lead",
+        "color": "#f97316"
+      },
+      {
+        "id": "6d990881-1cbd-4ff1-8d56-469a9f0faf30",
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "name": "Cold Lead",
+        "color": "#3b82f6"
+      }
+    ]
+  },
+  "lead_groups": {
+    "_schema": "",
+    "_data": []
+  },
+  "lead_custom_fields": {
+    "_schema": "",
+    "_data": []
+  },
+  "follow_ups": {
+    "_schema": "",
+    "_data": []
+  },
+  "calls": {
+    "_schema": "",
+    "_data": []
+  },
+  "whatsapp_messages": {
+    "_schema": "",
+    "_data": []
+  },
+  "whatsapp_templates": {
+    "_schema": "",
+    "_data": [
+      {
+        "id": "e2f435ea-ae47-445a-96ab-b1b2cc1d6e2a",
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "name": "Welcome WhatsApp",
+        "category": "intro",
+        "content": "Hi {{First_Name}}! Thank you for your interest. This is {{Agent_Name}} from {{Company_Name}}. How can I help you today?"
+      }
+    ]
+  },
+  "sms_messages": {
+    "_schema": "",
+    "_data": []
+  },
+  "sms_templates": {
+    "_schema": "",
+    "_data": [
+      {
+        "id": "678401b5-f4ee-470f-933b-65c3b32f9977",
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "name": "Welcome SMS",
+        "content": "Hi {{First_Name}}, thanks for your interest! {{Agent_Name}} from {{Company_Name}} will contact you soon."
+      }
+    ]
+  },
+  "email_templates": {
+    "_schema": "",
+    "_data": [
+      {
+        "id": "9343bc3e-9c21-4fdd-a40f-5a8e2e55e2ae",
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "name": "Welcome Email",
+        "subject": "Welcome to Demo Company, {{First_Name}}!",
+        "body": "<h2>Hello {{First_Name}}!</h2><p>Thank you for your interest. {{Agent_Name}} will be in touch with you shortly.</p><p>Best regards,<br>{{Company_Name}}</p>",
+        "category": "intro",
+        "created_by": "08482e9f-dfc3-4628-bba0-1a9d09fac80e"
+      },
+      {
+        "id": "88162004-e482-4d2c-891b-418edb83328c",
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "name": "Follow Up Email",
+        "subject": "Following up on your inquiry, {{First_Name}}",
+        "body": "<p>Hi {{First_Name}},</p><p>I wanted to follow up on your recent inquiry. Do you have any questions I can answer?</p><p>Best,<br>{{Agent_Name}}</p>",
+        "category": "follow_up",
+        "created_by": "08482e9f-dfc3-4628-bba0-1a9d09fac80e"
+      }
+    ]
+  },
+  "emails": {
+    "_schema": "",
+    "_data": []
+  },
+  "email_sequences": {
+    "_schema": "",
+    "_data": []
+  },
+  "email_sequence_steps": {
+    "_schema": "",
+    "_data": []
+  },
+  "email_sequence_enrollments": {
+    "_schema": "",
+    "_data": []
+  },
+  "email_flows": {
+    "_schema": "",
+    "_data": []
+  },
+  "email_flow_nodes": {
+    "_schema": "",
+    "_data": []
+  },
+  "email_flow_edges": {
+    "_schema": "",
+    "_data": []
+  },
+  "email_flow_enrollments": {
+    "_schema": "",
+    "_data": []
+  },
+  "email_triggers": {
+    "_schema": "",
+    "_data": []
+  },
+  "email_trigger_logs": {
+    "_schema": "",
+    "_data": []
+  },
+  "campaigns": {
+    "_schema": "",
+    "_data": []
+  },
+  "campaign_recipients": {
+    "_schema": "",
+    "_data": []
+  },
+  "content_files": {
+    "_schema": "",
+    "_data": []
+  },
+  "content_folders": {
+    "_schema": "",
+    "_data": []
+  },
+  "content_tracking": {
+    "_schema": "",
+    "_data": []
+  },
+  "notifications": {
+    "_schema": "",
+    "_data": []
+  },
+  "device_tokens": {
+    "_schema": "",
+    "_data": []
+  },
+  "integrations": {
+    "_schema": "",
+    "_data": []
+  },
+  "webhook_endpoints": {
+    "_schema": "",
+    "_data": []
+  },
+  "embed_forms": {
+    "_schema": "",
+    "_data": []
+  },
+  "subscriptions": {
+    "_schema": "",
+    "_data": [
+      {
+        "id": "9d4001a7-c893-4c07-8a60-e1452282cb80",
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "plan": "business",
+        "status": "active",
+        "agent_limit": 20
+      }
+    ]
+  },
+  "invoices": {
+    "_schema": "",
+    "_data": []
+  },
+  "audit_logs": {
+    "_schema": "",
+    "_data": []
+  },
+  "refresh_tokens": {
+    "_schema": "",
+    "_data": [
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "50f951d4425ee95562611fadf0c712a3eeb059f0c9d810780a6294fcc405171785ce2c418740cc16",
+        "expires_at": "2026-07-22T15:23:47.909Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "71c57a081ae1096a0fe76eebf6167feed822b238788eca5302dd022605d4bcb960160ce59271aed4",
+        "expires_at": "2026-07-22T15:26:59.462Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "a9d6e0fb488edd607fb6228c313960ad97f8cd22d188789293ddba2a48799fb81225024b71afec76",
+        "expires_at": "2026-07-22T15:39:00.000Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "b5648a7c361f2564a0ef0cfcac55b8d1fe31baa3327f1f92d5dcf03bcc45e83cbd1eee7dcb989c68",
+        "expires_at": "2026-07-22T15:54:00.114Z"
+      }
+    ]
+  },
+  "password_resets": {
+    "_schema": "",
+    "_data": []
+  },
+  "export_history": {
+    "_schema": "",
+    "_data": []
+  },
+  "territories": {
+    "_schema": "",
+    "_data": []
+  },
+  "lead_assignment_rules": {
+    "_schema": "",
+    "_data": []
+  },
+  "sequence_enrollments": {
+    "_schema": "",
+    "_data": []
+  }
+}

@@ -1,14 +1,14 @@
 # CRM Final Platform
 
-A complete, production-ready, mobile-first CRM SaaS platform with full feature parity with Privyr, plus a comprehensive Email Marketing System.
+A complete, production-ready, mobile-first CRM SaaS platform inspired by Privyr, plus a comprehensive Email Marketing System that goes beyond Privyr's feature set.
 
 ## Tech Stack
 
 - **Mobile App**: React Native + React Navigation + Zustand
 - **Web Dashboard**: React.js + Vite + Tailwind CSS + Recharts + React Flow
 - **Backend**: Node.js + Express.js + Socket.io
-- **Database**: PostgreSQL
-- **Cache & Queues**: Redis + BullMQ
+- **Database**: PostgreSQL (production) / JSON file DB (local dev — zero setup)
+- **Cache & Queues**: Redis + BullMQ (production) / In-memory fallback (local dev — zero setup)
 - **Email**: SendGrid
 - **WhatsApp**: Meta WhatsApp Business API
 - **SMS**: Twilio
@@ -163,7 +163,67 @@ crm/
 - Urdu ready
 - Arabic ready
 
-## Setup Instructions
+## Quick Start (Local Dev — Zero External Dependencies)
+
+The app runs **without PostgreSQL, Redis, or any API keys**. The backend uses a JSON file database and in-memory cache/queues as fallbacks.
+
+### 1. Backend
+
+```bash
+cd backend
+npm install
+
+# Create .env (minimum: JWT_SECRET and JWT_REFRESH_SECRET)
+# See backend/.env.example for all variables
+
+# Create database tables (JSON file DB)
+npm run migrate
+
+# Seed demo data
+npm run seed
+
+# Start the API server
+npm run dev
+```
+
+The API server runs on `http://localhost:5000`.
+
+> **Note**: No need to run `npm run worker` in local dev — jobs are processed inline automatically.
+
+### 2. Web Dashboard
+
+```bash
+cd web
+npm install
+npm run dev
+```
+
+The web dashboard runs on `http://localhost:3000`.
+
+### 3. Mobile App
+
+```bash
+cd mobile
+npm install
+
+# iOS
+cd ios && pod install && cd ..
+npm run ios
+
+# Android
+npm run android
+```
+
+### 4. Run Everything (from root)
+
+```bash
+npm install
+npm run dev    # Starts backend + web concurrently
+```
+
+## Production Setup
+
+For production, use PostgreSQL and Redis:
 
 ### Prerequisites
 - Node.js 18+
@@ -193,8 +253,6 @@ npm run dev
 # Start the queue workers (in another terminal)
 npm run worker
 ```
-
-The API server runs on `http://localhost:5000`.
 
 ### 2. Web Dashboard Setup
 
@@ -240,22 +298,32 @@ After running the seed, these accounts are available:
 
 ## Environment Variables
 
-See `backend/.env.example` for the complete list. Key variables:
+See `backend/.env.example` for the complete list.
 
-- `DATABASE_URL` - PostgreSQL connection string
-- `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`
-- `JWT_SECRET`, `JWT_REFRESH_SECRET`
-- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
-- `SENDGRID_API_KEY`, `SENDGRID_FROM_EMAIL`
-- `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`
-- `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_VERIFY_TOKEN`
-- `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`
-- `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_S3_BUCKET`, `AWS_S3_REGION`
-- `OPENAI_API_KEY`
-- `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`
-- `FACEBOOK_APP_ID`, `FACEBOOK_APP_SECRET`
-- `TIKTOK_APP_ID`, `TIKTOK_APP_SECRET`
-- `GOOGLE_MAPS_API_KEY`
+### Required (Local Dev)
+- `JWT_SECRET`, `JWT_REFRESH_SECRET` - For auth tokens
+
+### Required (Production)
+- `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` - PostgreSQL
+- `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD` - Redis cache/queues
+- `JWT_SECRET`, `JWT_REFRESH_SECRET` - For auth tokens
+
+### Optional (Only Needed for Specific Features)
+| Variable | Feature |
+|----------|---------|
+| `SENDGRID_API_KEY`, `SENDGRID_FROM_EMAIL` | Sending real emails |
+| `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER` | Sending real SMS |
+| `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_VERIFY_TOKEN` | WhatsApp messaging |
+| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | Payment processing |
+| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_S3_BUCKET`, `AWS_REGION` | File uploads to S3 |
+| `OPENAI_API_KEY` | AI subject line generation |
+| `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY` | Push notifications |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google OAuth login |
+| `FACEBOOK_APP_ID`, `FACEBOOK_APP_SECRET` | Facebook Lead Ads integration |
+| `TIKTOK_APP_ID`, `TIKTOK_APP_SECRET` | TikTok Lead Ads integration |
+| `GOOGLE_MAPS_API_KEY` | Google Maps integration |
+
+> **All features work in demo mode without API keys** — they return graceful "not configured" responses instead of crashing.
 
 ## API Endpoints
 
@@ -414,6 +482,98 @@ See `backend/.env.example` for the complete list. Key variables:
 - `GET /api/integrations/embed/:formKey` - Serve embed form
 - `POST /api/integrations/embed/:formKey` - Submit embed form
 - `GET /api/integrations/embed-forms/:id/code` - Get embed code
+
+## Privyr Feature Comparison
+
+### Feature Parity with Privyr
+
+| Privyr Feature | CRM Final Status | Notes |
+|----------------|-----------------|-------|
+| **Lead Capture** | | |
+| Lead Source Integrations (Facebook Ads, Google Forms, Zapier, webhooks) | ✅ Implemented | Facebook, Google, TikTok, Instagram, Zapier, custom webhooks |
+| Instant Lead Alerts | ✅ Implemented | Push notifications via Firebase + in-app notifications |
+| Privyr Lead Forms (shareable via link/QR) | ✅ Implemented | Embeddable forms with custom fields, shareable via link |
+| Lead Assignment & Distribution | ✅ Implemented | Auto-assignment rules, round-robin, territory-based |
+| AI Lead Parsing from Email | ❌ Missing | Not implemented — leads from email alerts require manual or webhook parsing |
+| Auto-Merge Duplicate Leads | ⚠️ Partial | Duplicate detection on create, but no auto-merge — returns duplicate warning |
+| Import from Phonebook | ❌ Missing | Mobile app doesn't have phonebook import |
+| Import from Excel/CSV | ✅ Implemented | CSV import with field mapping |
+| **Lead Engagement** | | |
+| Contact via WhatsApp, Text, Call, Email | ✅ Implemented | All four channels with template support |
+| Follow-Up Sequences (multi-step drips) | ✅ Implemented | Email sequences with configurable delays + WhatsApp/SMS sequences |
+| Message/File/Page Templates | ✅ Implemented | Email, WhatsApp, and SMS templates with variable personalization |
+| File & Page Tracking (view notifications) | ✅ Implemented | S3 file upload + tracking pixel + open analytics |
+| File/Page Branding & Personalization | ⚠️ Partial | Personalization via variables; no custom branding/logo overlay on files |
+| Bulk Calling | ⚠️ Partial | Call list with priority sorting, but no sequential bulk dial mode |
+| Bulk Messaging | ✅ Implemented | Bulk send for WhatsApp, SMS, and email via campaigns |
+| WhatsApp Auto-Responder (24/7 auto-reply) | ⚠️ Partial | Webhook handler exists for incoming WhatsApp, but no auto-responder logic for new leads |
+| WhatsApp Campaigns | ✅ Implemented | Bulk WhatsApp campaigns with template support |
+| WhatsApp Contact Import | ❌ Missing | No auto-import of leads from WhatsApp conversations |
+| WhatsApp Chat Monitoring | ❌ Missing | No manager visibility into agent WhatsApp conversations |
+| Automated WhatsApp Sequences | ⚠️ Partial | Sequence enrollments exist but no WhatsApp-specific sequence steps |
+| Meta Conversions API | ✅ Implemented | Send conversion data back to Meta for ad optimization |
+| Facebook Pixel & Google Tag Manager | ❌ Missing | Not integrated into embed forms |
+| **Lead Management** | | |
+| Activity Timeline | ✅ Implemented | Auto-logged for all channels (email, WhatsApp, SMS, calls, notes) |
+| Client Notes & Groups | ✅ Implemented | Notes on leads + lead groups |
+| Custom Client Fields | ✅ Implemented | Custom fields with dropdown options |
+| Custom Dropdown Options | ✅ Implemented | Supported in custom fields |
+| Timeline Attachments | ❌ Missing | Cannot attach files to activity timeline entries |
+| Activity Geolocation | ❌ Missing | No GPS location logging on activities |
+| Lead Stages/Pipeline | ✅ Implemented | Customizable stages (New, Contacted, Interested, Negotiating, Won, Lost) |
+| Lead Tags | ✅ Implemented | Create and assign tags with colors |
+| Lead Scoring | ✅ Implemented | Auto-calculated based on activity, engagement, recency |
+| Lead Search & Filters | ✅ Implemented | Search by name/phone/email/city, filter by stage/source/agent/tag/budget/date |
+| **Team Features** | | |
+| Team Dashboard & Analytics | ✅ Implemented | Agent performance, team activity feed, conversion analytics |
+| Team Member Invitations | ✅ Implemented | Email invitations with role assignment |
+| Role-Based Permissions | ✅ Implemented | Super Admin, Admin, Sales Manager, Sales Agent |
+| Subteam Hierarchy | ❌ Missing | No nested sub-team structure |
+| Lead Transfer Between Agents | ✅ Implemented | Bulk transfer with assignment |
+| Territory Management | ✅ Implemented | Assign territories to agents |
+| Assignment Rules | ✅ Implemented | Custom rules + round-robin distribution |
+| Custom Branding of App | ❌ Missing | No white-label/branding customization |
+| **Other** | | |
+| Multi-Language Support | ⚠️ Partial | English base, Urdu/ Arabic config ready but no translations |
+| Mobile App (iOS + Android) | ✅ Implemented | React Native app with 5 tabs |
+| Web Dashboard | ✅ Implemented | Full React dashboard with all features |
+| Real-Time Updates | ✅ Implemented | Socket.io for live notifications |
+| Offline Mode | ❌ Missing | Mobile app requires internet connection |
+
+### Features in CRM Final That Privyr Does NOT Have
+
+| Feature | Description |
+|---------|-------------|
+| **Visual Email Flow Builder** | Drag-and-drop email automation builder with IF/ELSE conditions (React Flow) |
+| **Email Triggers** | Event-based email triggers (lead created, stage changed, etc.) |
+| **A/B Testing for Campaigns** | Split test email templates with variant B and winner declaration |
+| **AI Subject Line Generation** | OpenAI GPT-4o powered subject line suggestions |
+| **Re-engagement Engine** | Automatic detection of cold leads (no email open in 30 days) and re-engagement campaigns |
+| **Stripe Billing & Subscriptions** | Full SaaS billing with checkout, customer portal, and webhook handling |
+| **Super Admin Panel** | Multi-tenant super admin stats across all workspaces |
+| **Email Open/Click Tracking** | Tracking pixel + SendGrid webhook integration for detailed email analytics |
+| **Comprehensive Analytics Suite** | Lead analytics, conversion analytics, pipeline analytics, agent performance — beyond Privyr's basic dashboard |
+| **Custom Webhook System** | Create custom webhook endpoints with field mapping for any lead source |
+
+### Summary
+
+- **Total Privyr features checked**: 35+
+- **Fully implemented**: 22
+- **Partially implemented**: 6
+- **Missing from CRM Final**: 9
+- **Features CRM Final has that Privyr doesn't**: 10
+
+### Missing Features — Priority for Implementation
+
+1. **WhatsApp Auto-Responder** — Auto-reply to new leads on WhatsApp 24/7 (high value, medium effort)
+2. **WhatsApp Chat Monitoring** — Manager visibility into agent WhatsApp conversations (high value, high effort)
+3. **WhatsApp Contact Import** — Auto-create leads from new WhatsApp conversations (medium value, medium effort)
+4. **Activity Geolocation** — Log GPS when interacting with leads (low value, low effort)
+5. **Timeline Attachments** — Attach files to activity timeline (low value, low effort)
+6. **Auto-Merge Duplicate Leads** — Auto-merge instead of just warning (low value, low effort)
+7. **AI Lead Parsing from Email** — Extract leads from email alerts (medium value, high effort)
+8. **Phonebook Import** — Import contacts from phone (low value, low effort for mobile)
+9. **Subteam Hierarchy** — Nested team structure (low value, medium effort)
 
 ## License
 

@@ -1,60 +1,35 @@
-const Redis = require('ioredis');
-const config = require('./index');
+const logger = require('../utils/logger');
 
-const redisConfig = {
-  host: config.redis.host,
-  port: config.redis.port,
-  retryStrategy: (times) => Math.min(times * 50, 2000),
-};
+const memCache = new Map();
 
-if (config.redis.password) {
-  redisConfig.password = config.redis.password;
-}
-
-const redis = new Redis(redisConfig);
-
-redis.on('error', (err) => {
-  console.error('Redis error:', err.message);
-});
-
-redis.on('connect', () => {
-  console.log('Redis connected');
-});
+logger.info('Using in-memory cache (Redis not available)');
 
 async function cacheGet(key) {
-  try {
-    const data = await redis.get(key);
-    return data ? JSON.parse(data) : null;
-  } catch {
+  const entry = memCache.get(key);
+  if (!entry) return null;
+  if (entry.expiresAt && Date.now() > entry.expiresAt) {
+    memCache.delete(key);
     return null;
   }
+  return entry.value;
 }
 
 async function cacheSet(key, value, ttl = 300) {
-  try {
-    await redis.setex(key, ttl, JSON.stringify(value));
-  } catch (err) {
-    console.error('Redis cache set error:', err.message);
-  }
+  memCache.set(key, {
+    value,
+    expiresAt: Date.now() + (ttl * 1000),
+  });
 }
 
 async function cacheDel(key) {
-  try {
-    await redis.del(key);
-  } catch (err) {
-    console.error('Redis cache del error:', err.message);
-  }
+  memCache.delete(key);
 }
 
 async function cacheDelPattern(pattern) {
-  try {
-    const keys = await redis.keys(pattern);
-    if (keys.length > 0) {
-      await redis.del(...keys);
-    }
-  } catch (err) {
-    console.error('Redis cache delPattern error:', err.message);
+  const regex = new RegExp(pattern.replace(/\*/g, '.*'));
+  for (const key of memCache.keys()) {
+    if (regex.test(key)) memCache.delete(key);
   }
 }
 
-module.exports = { redis, cacheGet, cacheSet, cacheDel, cacheDelPattern };
+module.exports = { redis: null, cacheGet, cacheSet, cacheDel, cacheDelPattern };

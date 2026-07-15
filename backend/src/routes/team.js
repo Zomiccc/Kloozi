@@ -21,6 +21,11 @@ router.delete('/territories/:id', requireManagerOrAbove, teamController.removeTe
 router.get('/assignment-rules', requireManagerOrAbove, teamController.getAssignmentRules);
 router.put('/assignment-rules', requireManagerOrAbove, teamController.updateAssignmentRules);
 
+router.get('/subteams', requireManagerOrAbove, teamController.getSubteams);
+router.post('/subteams', requireManagerOrAbove, teamController.createSubteam);
+router.post('/subteams/assign', requireManagerOrAbove, teamController.assignToSubteam);
+router.get('/subteams/:subteam_id/members', requireManagerOrAbove, teamController.getSubteamMembers);
+
 router.get('/profile', teamController.getProfile);
 router.put('/profile', teamController.updateProfile);
 router.post('/device-token', teamController.registerDeviceToken);

@@ -15,5 +15,7 @@ router.post('/send', contentController.sendFile);
 router.get('/:file_id/analytics', contentController.getFileAnalytics);
 router.get('/folders', contentController.getFolders);
 router.post('/folders', contentController.createFolder);
+router.get('/branding', contentController.getBranding);
+router.put('/branding', contentController.updateBranding);
 
 module.exports = router;

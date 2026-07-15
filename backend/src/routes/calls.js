@@ -8,5 +8,7 @@ router.use(authenticate);
 router.post('/log', callController.logCall);
 router.get('/', callController.getCalls);
 router.get('/call-list', callController.getCallList);
+router.post('/bulk/start', callController.startBulkCall);
+router.post('/bulk/log', callController.logBulkCall);
 
 module.exports = router;

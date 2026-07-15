@@ -270,3 +270,73 @@ exports.deleteAccount = async (req, res, next) => {
     res.json({ message: 'Account deletion requested. Your data will be removed within 30 days.' });
   } catch (err) { next(err); }
 };
+
+exports.getSubteams = async (req, res, next) => {
+  try {
+    const result = await db.query(
+      `SELECT st.id, st.name, st.parent_team_id, st.created_at,
+              (SELECT COUNT(*) FROM users WHERE subteam_id = st.id AND status = 'active') as member_count,
+              (SELECT COUNT(*) FROM leads l JOIN users u ON l.assigned_to = u.id WHERE u.subteam_id = st.id) as lead_count
+       FROM subteams st WHERE st.workspace_id = $1 ORDER BY st.name`,
+      [req.workspaceId]
+    );
+
+    const teams = result.rows;
+    const tree = teams.filter(t => !t.parent_team_id).map(t => ({
+      ...t,
+      children: teams.filter(c => c.parent_team_id === t.id),
+    }));
+
+    res.json({ subteams: tree, all: teams });
+  } catch (err) { next(err); }
+};
+
+exports.createSubteam = async (req, res, next) => {
+  try {
+    const { name, parent_team_id } = req.body;
+    if (!name) return res.status(400).json({ error: 'Subteam name required' });
+
+    if (parent_team_id) {
+      const parentResult = await db.query('SELECT id FROM subteams WHERE id = $1 AND workspace_id = $2', [parent_team_id, req.workspaceId]);
+      if (parentResult.rows.length === 0) return res.status(404).json({ error: 'Parent team not found' });
+    }
+
+    const result = await db.query(
+      'INSERT INTO subteams (workspace_id, name, parent_team_id) VALUES ($1, $2, $3) RETURNING *',
+      [req.workspaceId, name, parent_team_id || null]
+    );
+    res.status(201).json({ subteam: result.rows[0] });
+  } catch (err) { next(err); }
+};
+
+exports.assignToSubteam = async (req, res, next) => {
+  try {
+    const { user_id, subteam_id } = req.body;
+
+    const userResult = await db.query('SELECT id FROM users WHERE id = $1 AND workspace_id = $2', [user_id, req.workspaceId]);
+    if (userResult.rows.length === 0) return res.status(404).json({ error: 'User not found' });
+
+    if (subteam_id) {
+      const teamResult = await db.query('SELECT id FROM subteams WHERE id = $1 AND workspace_id = $2', [subteam_id, req.workspaceId]);
+      if (teamResult.rows.length === 0) return res.status(404).json({ error: 'Subteam not found' });
+    }
+
+    await db.query('UPDATE users SET subteam_id = $1 WHERE id = $2 AND workspace_id = $3', [subteam_id || null, user_id, req.workspaceId]);
+    res.json({ message: 'User assigned to subteam' });
+  } catch (err) { next(err); }
+};
+
+exports.getSubteamMembers = async (req, res, next) => {
+  try {
+    const { subteam_id } = req.params;
+    const result = await db.query(
+      `SELECT u.id, u.email, u.first_name, u.last_name, u.role, u.status, u.designation,
+              (SELECT COUNT(*) FROM leads WHERE assigned_to = u.id) as lead_count,
+              (SELECT COUNT(*) FROM leads WHERE assigned_to = u.id AND stage = 'won') as won_count
+       FROM users u WHERE u.workspace_id = $1 AND u.subteam_id = $2 AND u.status != 'deleted'
+       ORDER BY u.first_name`,
+      [req.workspaceId, subteam_id]
+    );
+    res.json({ members: result.rows });
+  } catch (err) { next(err); }
+};

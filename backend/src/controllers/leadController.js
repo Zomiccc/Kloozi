@@ -1,6 +1,6 @@
 const db = require('../config/database');
 const logger = require('../utils/logger');
-const { logActivity, updateLeadScore } = require('../utils/activityLog');
+const { logActivity, addTimelineEntry, updateLeadScore } = require('../utils/activityLog');
 const { sendPushNotification, notifyManagers } = require('../utils/notifications');
 const { cacheGet, cacheSet, cacheDel, cacheDelPattern } = require('../config/redis');
 const { parse } = require('csv-parse');
@@ -11,6 +11,8 @@ exports.createLead = async (req, res, next) => {
   try {
     const wsId = req.workspaceId;
     const { first_name, last_name, phone, email, city, budget, lead_source, notes, custom_fields, tags, assigned_to } = req.body;
+
+    const autoMerge = req.body.auto_merge === true;
 
     if (phone || email) {
       let dupQuery = 'SELECT id, first_name, last_name, phone, email FROM leads WHERE workspace_id = $1 AND (';
@@ -27,6 +29,33 @@ exports.createLead = async (req, res, next) => {
       dupQuery += conditions.join(' OR ') + ')';
       const dupResult = await db.query(dupQuery, dupParams);
       if (dupResult.rows.length > 0) {
+        if (autoMerge) {
+          const existing = dupResult.rows[0];
+          const updateFields = [];
+          const updateParams = [];
+          let idx = 1;
+          if (first_name && !existing.first_name) { updateFields.push(`first_name = $${idx++}`); updateParams.push(first_name); }
+          if (last_name && !existing.last_name) { updateFields.push(`last_name = $${idx++}`); updateParams.push(last_name); }
+          if (email && !existing.email) { updateFields.push(`email = $${idx++}`); updateParams.push(email); }
+          if (city && !existing.city) { updateFields.push(`city = $${idx++}`); updateParams.push(city); }
+          if (budget && !existing.budget) { updateFields.push(`budget = $${idx++}`); updateParams.push(budget); }
+          if (notes) { updateFields.push(`notes = COALESCE(notes || ' | ', '') || $${idx++}`); updateParams.push(notes); }
+          if (tags && tags.length > 0) { updateFields.push(`tags = ARRAY(SELECT DISTINCT unnest(tags || $${idx++}::text[]))`); updateParams.push(tags); }
+          if (custom_fields && custom_fields.length > 0) {
+            updateFields.push(`custom_fields = $${idx++}`);
+            updateParams.push(JSON.stringify(custom_fields));
+          }
+          if (updateFields.length > 0) {
+            updateFields.push(`updated_at = NOW()`);
+            updateParams.push(existing.id, wsId);
+            await db.query(`UPDATE leads SET ${updateFields.join(', ')} WHERE id = $${idx++} AND workspace_id = $${idx++}`, updateParams);
+          }
+          await logActivity(wsId, existing.id, req.user.id, 'lead_merged', `Lead auto-merged from new submission (source: ${lead_source || 'manual'})`, { merged_source: lead_source });
+          await updateLeadScore(existing.id);
+          await cacheDelPattern(`leads:${wsId}:*`);
+          const mergedResult = await db.query('SELECT * FROM leads WHERE id = $1 AND workspace_id = $2', [existing.id, wsId]);
+          return res.json({ message: 'Lead auto-merged with existing duplicate', lead: mergedResult.rows[0], merged: true });
+        }
         return res.status(409).json({
           error: 'Potential duplicate lead found',
           duplicate: dupResult.rows[0],
@@ -620,6 +649,156 @@ exports.getExportHistory = async (req, res, next) => {
       [req.workspaceId]
     );
     res.json({ exports: result.rows });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.importPhonebook = async (req, res, next) => {
+  try {
+    const wsId = req.workspaceId;
+    const { contacts } = req.body;
+
+    if (!contacts || !Array.isArray(contacts) || contacts.length === 0) {
+      return res.status(400).json({ error: 'Contacts array required' });
+    }
+
+    const stageResult = await db.query('SELECT id FROM lead_stages WHERE workspace_id = $1 AND is_default = true LIMIT 1', [wsId]);
+    const stageId = stageResult.rows[0]?.id;
+
+    let successCount = 0;
+    let duplicateCount = 0;
+    let failedCount = 0;
+
+    for (const contact of contacts) {
+      try {
+        if (!contact.phone && !contact.name) {
+          failedCount++;
+          continue;
+        }
+
+        const nameParts = (contact.name || '').trim().split(' ');
+        const firstName = contact.first_name || nameParts[0] || 'Unknown';
+        const lastName = contact.last_name || nameParts.slice(1).join(' ') || '';
+
+        const dupCheck = await db.query(
+          'SELECT id FROM leads WHERE workspace_id = $1 AND phone = $2',
+          [wsId, contact.phone]
+        );
+
+        if (dupCheck.rows.length > 0) {
+          duplicateCount++;
+          continue;
+        }
+
+        const agentsResult = await db.query(
+          `SELECT u.id FROM users u WHERE u.workspace_id = $1 AND u.role = $2 AND u.status = $3
+           ORDER BY (SELECT COUNT(*) FROM leads WHERE assigned_to = u.id) ASC LIMIT 1`,
+          [wsId, 'sales_agent', 'active']
+        );
+
+        await db.query(
+          `INSERT INTO leads (workspace_id, first_name, last_name, phone, email, city, lead_source, notes, stage, stage_id, assigned_to, created_by)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+          [wsId, firstName, lastName, contact.phone, contact.email || null,
+           contact.city || null, 'phonebook', contact.notes || null, 'new', stageId,
+           agentsResult.rows[0]?.id || req.user.id, req.user.id]
+        );
+        successCount++;
+      } catch (err) {
+        failedCount++;
+      }
+    }
+
+    await cacheDelPattern(`leads:${wsId}:*`);
+    res.json({ message: 'Phonebook import completed', successCount, duplicateCount, failedCount });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.mergeLeads = async (req, res, next) => {
+  try {
+    const wsId = req.workspaceId;
+    const { primary_id, secondary_id } = req.body;
+
+    if (!primary_id || !secondary_id || primary_id === secondary_id) {
+      return res.status(400).json({ error: 'Valid primary_id and secondary_id required' });
+    }
+
+    const primaryResult = await db.query('SELECT * FROM leads WHERE id = $1 AND workspace_id = $2', [primary_id, wsId]);
+    const secondaryResult = await db.query('SELECT * FROM leads WHERE id = $1 AND workspace_id = $2', [secondary_id, wsId]);
+
+    if (primaryResult.rows.length === 0 || secondaryResult.rows.length === 0) {
+      return res.status(404).json({ error: 'One or both leads not found' });
+    }
+
+    const primary = primaryResult.rows[0];
+    const secondary = secondaryResult.rows[0];
+
+    const updateFields = [];
+    const updateParams = [];
+    let idx = 1;
+
+    if (!primary.first_name && secondary.first_name) { updateFields.push(`first_name = $${idx++}`); updateParams.push(secondary.first_name); }
+    if (!primary.last_name && secondary.last_name) { updateFields.push(`last_name = $${idx++}`); updateParams.push(secondary.last_name); }
+    if (!primary.email && secondary.email) { updateFields.push(`email = $${idx++}`); updateParams.push(secondary.email); }
+    if (!primary.city && secondary.city) { updateFields.push(`city = $${idx++}`); updateParams.push(secondary.city); }
+    if (!primary.budget && secondary.budget) { updateFields.push(`budget = $${idx++}`); updateParams.push(secondary.budget); }
+    if (secondary.notes) { updateFields.push(`notes = COALESCE(notes || ' | ', '') || $${idx++}`); updateParams.push(secondary.notes); }
+
+    const mergedTags = [...new Set([...(primary.tags || []), ...(secondary.tags || [])])];
+    if (mergedTags.length > 0) { updateFields.push(`tags = $${idx++}`); updateParams.push(mergedTags); }
+
+    const mergedCustomFields = [...(primary.custom_fields || []), ...(secondary.custom_fields || [])];
+    if (mergedCustomFields.length > 0) { updateFields.push(`custom_fields = $${idx++}`); updateParams.push(JSON.stringify(mergedCustomFields)); }
+
+    if (updateFields.length > 0) {
+      updateFields.push(`updated_at = NOW()`);
+      updateParams.push(primary_id, wsId);
+      await db.query(`UPDATE leads SET ${updateFields.join(', ')} WHERE id = $${idx++} AND workspace_id = $${idx++}`, updateParams);
+    }
+
+    await db.query('UPDATE lead_activities SET lead_id = $1 WHERE lead_id = $2 AND workspace_id = $3', [primary_id, secondary_id, wsId]);
+    await db.query('UPDATE calls SET lead_id = $1 WHERE lead_id = $2 AND workspace_id = $3', [primary_id, secondary_id, wsId]);
+    await db.query('UPDATE emails SET lead_id = $1 WHERE lead_id = $2 AND workspace_id = $3', [primary_id, secondary_id, wsId]);
+    await db.query('UPDATE whatsapp_messages SET lead_id = $1 WHERE lead_id = $2 AND workspace_id = $3', [primary_id, secondary_id, wsId]);
+    await db.query('UPDATE sms_messages SET lead_id = $1 WHERE lead_id = $2 AND workspace_id = $3', [primary_id, secondary_id, wsId]);
+    await db.query('UPDATE follow_ups SET lead_id = $1 WHERE lead_id = $2 AND workspace_id = $3', [primary_id, secondary_id, wsId]);
+
+    await db.query('DELETE FROM leads WHERE id = $1 AND workspace_id = $2', [secondary_id, wsId]);
+
+    await logActivity(wsId, primary_id, req.user.id, 'lead_merged', `Merged lead ${secondary.first_name} ${secondary.last_name} into this lead`, { merged_lead_id: secondary_id });
+    await updateLeadScore(primary_id);
+    await cacheDelPattern(`leads:${wsId}:*`);
+
+    const mergedResult = await db.query('SELECT * FROM leads WHERE id = $1 AND workspace_id = $2', [primary_id, wsId]);
+    res.json({ message: 'Leads merged successfully', lead: mergedResult.rows[0] });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.addTimelineEntry = async (req, res, next) => {
+  try {
+    const wsId = req.workspaceId;
+    const { id } = req.params;
+    const { type, description, attachments, latitude, longitude } = req.body;
+
+    if (!type || !description) {
+      return res.status(400).json({ error: 'Type and description required' });
+    }
+
+    const leadResult = await db.query('SELECT id FROM leads WHERE id = $1 AND workspace_id = $2', [id, wsId]);
+    if (leadResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Lead not found' });
+    }
+
+    await addTimelineEntry(wsId, id, req.user.id, type, description, attachments || [], latitude || null, longitude || null);
+    await updateLeadScore(id);
+    await cacheDelPattern(`leads:${wsId}:*`);
+
+    res.status(201).json({ message: 'Timeline entry added' });
   } catch (err) {
     next(err);
   }

@@ -1,16 +1,25 @@
 const db = require('../config/database');
 const { logActivity } = require('../utils/activityLog');
+const crypto = require('crypto');
 
 exports.logCall = async (req, res, next) => {
   try {
-    const { lead_id, phone_number, outcome, notes, duration_seconds, follow_up_scheduled } = req.body;
+    const { lead_id, phone_number, outcome, notes, duration_seconds, follow_up_scheduled, latitude, longitude, attachments } = req.body;
     const result = await db.query(
       `INSERT INTO calls (workspace_id, lead_id, user_id, phone_number, outcome, notes, duration_seconds, follow_up_scheduled)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
       [req.workspaceId, lead_id, req.user.id, phone_number, outcome, notes, duration_seconds || 0, follow_up_scheduled]
     );
 
-    await logActivity(req.workspaceId, lead_id, req.user.id, 'call', `Call logged: ${outcome}`, { outcome, duration: duration_seconds });
+    const activityMetadata = { outcome, duration: duration_seconds };
+    if (latitude && longitude) {
+      activityMetadata.latitude = latitude;
+      activityMetadata.longitude = longitude;
+    }
+    if (attachments && Array.isArray(attachments) && attachments.length > 0) {
+      activityMetadata.attachments = attachments;
+    }
+    await logActivity(req.workspaceId, lead_id, req.user.id, 'call', `Call logged: ${outcome}`, activityMetadata);
 
     if (follow_up_scheduled) {
       await db.query(
@@ -65,5 +74,68 @@ exports.getCallList = async (req, res, next) => {
       params
     );
     res.json({ callList: result.rows });
+  } catch (err) { next(err); }
+};
+
+exports.startBulkCall = async (req, res, next) => {
+  try {
+    const { lead_ids } = req.body;
+    if (!lead_ids || lead_ids.length === 0) {
+      return res.status(400).json({ error: 'No leads selected for bulk calling' });
+    }
+
+    let conditions = ['workspace_id = $1 AND phone IS NOT NULL AND id IN ('];
+    let params = [req.workspaceId];
+    const placeholders = lead_ids.map((_, i) => `$${i + 2}`).join(',');
+    conditions[0] += placeholders + ')';
+    params.push(...lead_ids);
+
+    if (req.user.role === 'sales_agent') {
+      conditions.push('assigned_to = $' + (params.length + 1));
+      params.push(req.user.id);
+    }
+
+    const result = await db.query(
+      `SELECT id, first_name, last_name, phone, stage, city, score, notes FROM leads WHERE ${conditions.join(' AND ')} ORDER BY follow_up_date ASC NULLS LAST, score DESC`,
+      params
+    );
+
+    if (result.rows.length === 0) {
+      return res.json({ message: 'No callable leads found', session: null });
+    }
+
+    const sessionId = crypto.randomUUID();
+    res.json({
+      session: {
+        id: sessionId,
+        total: result.rows.length,
+        currentIndex: 0,
+        leads: result.rows,
+      },
+    });
+  } catch (err) { next(err); }
+};
+
+exports.logBulkCall = async (req, res, next) => {
+  try {
+    const { lead_id, phone_number, outcome, notes, duration_seconds, latitude, longitude, attachments } = req.body;
+
+    const result = await db.query(
+      `INSERT INTO calls (workspace_id, lead_id, user_id, phone_number, outcome, notes, duration_seconds)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [req.workspaceId, lead_id, req.user.id, phone_number, outcome, notes, duration_seconds || 0]
+    );
+
+    const activityMetadata = { outcome, duration: duration_seconds, bulk_call: true };
+    if (latitude && longitude) {
+      activityMetadata.latitude = latitude;
+      activityMetadata.longitude = longitude;
+    }
+    if (attachments && Array.isArray(attachments) && attachments.length > 0) {
+      activityMetadata.attachments = attachments;
+    }
+    await logActivity(req.workspaceId, lead_id, req.user.id, 'call', `Bulk call: ${outcome}`, activityMetadata);
+
+    res.status(201).json({ call: result.rows[0] });
   } catch (err) { next(err); }
 };

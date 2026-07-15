@@ -120,22 +120,28 @@ async function handleWhatsAppWebhook(payload) {
         const text = msg.text?.body || '';
 
         const leadResult = await db.query(
-          `SELECT l.id, l.workspace_id FROM leads l WHERE REPLACE(REPLACE(l.phone, '+', ''), ' ', '') LIKE $1`,
+          `SELECT l.id, l.workspace_id, l.first_name, l.last_name FROM leads l WHERE REPLACE(REPLACE(l.phone, '+', ''), ' ', '') LIKE $1`,
           [`%${fromPhone}%`]
         );
 
+        let leadId;
+        let workspaceId;
+
         if (leadResult.rows.length > 0) {
           const lead = leadResult.rows[0];
+          leadId = lead.id;
+          workspaceId = lead.workspace_id;
+
           await db.query(
             `INSERT INTO whatsapp_messages (workspace_id, lead_id, direction, message_text, status, wa_message_id, sent_at)
              VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
-            [lead.workspace_id, lead.id, 'inbound', text, 'delivered', msg.id]
+            [workspaceId, lead.id, 'inbound', text, 'delivered', msg.id]
           );
 
           await db.query(
             `INSERT INTO lead_activities (workspace_id, lead_id, type, description, metadata)
              VALUES ($1, $2, $3, $4, $5)`,
-            [lead.workspace_id, lead.id, 'whatsapp_received', `WhatsApp message received: ${text}`, JSON.stringify({ from: fromPhone })]
+            [workspaceId, lead.id, 'whatsapp_received', `WhatsApp message received: ${text}`, JSON.stringify({ from: fromPhone })]
           );
 
           const { sendPushNotification } = require('../utils/notifications');
@@ -145,6 +151,30 @@ async function handleWhatsAppWebhook(payload) {
               type: 'whatsapp_reply', leadId: lead.id
             });
           }
+        } else {
+          const newLead = await importWhatsAppContact(fromPhone, text, changes?.value?.contacts);
+          if (newLead) {
+            leadId = newLead.id;
+            workspaceId = newLead.workspace_id;
+
+            await db.query(
+              `INSERT INTO whatsapp_messages (workspace_id, lead_id, direction, message_text, status, wa_message_id, sent_at)
+               VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
+              [workspaceId, leadId, 'inbound', text, 'delivered', msg.id]
+            );
+
+            await db.query(
+              `INSERT INTO lead_activities (workspace_id, lead_id, type, description, metadata)
+               VALUES ($1, $2, $3, $4, $5)`,
+              [workspaceId, leadId, 'whatsapp_received', `First WhatsApp message: ${text}`, JSON.stringify({ from: fromPhone, auto_imported: true })]
+            );
+
+            await sendAutoResponder(workspaceId, leadId, fromPhone);
+          }
+        }
+
+        if (leadId && workspaceId) {
+          await processWhatsAppSequences(workspaceId, leadId, text);
         }
       }
     }
@@ -152,6 +182,145 @@ async function handleWhatsAppWebhook(payload) {
   } catch (err) {
     logger.error('WhatsApp webhook error:', err.message);
     return { success: false, error: err.message };
+  }
+}
+
+async function importWhatsAppContact(fromPhone, messageText, contactsInfo) {
+  try {
+    const cleanPhone = fromPhone.replace(/\D/g, '');
+    const name = contactsInfo?.[0]?.name;
+    const firstName = name?.first_name || (messageText ? messageText.split(' ')[0] : 'WhatsApp');
+    const lastName = name?.last_name || '';
+
+    const wsResult = await db.query('SELECT id FROM workspaces LIMIT 1');
+    if (wsResult.rows.length === 0) return null;
+    const workspaceId = wsResult.rows[0].id;
+
+    const stageResult = await db.query('SELECT id FROM lead_stages WHERE workspace_id = $1 AND is_default = true LIMIT 1', [workspaceId]);
+    const stageId = stageResult.rows[0]?.id;
+
+    const agentsResult = await db.query(
+      `SELECT u.id FROM users u WHERE u.workspace_id = $1 AND u.role = $2 AND u.status = $3
+       ORDER BY (SELECT COUNT(*) FROM leads WHERE assigned_to = u.id) ASC LIMIT 1`,
+      [workspaceId, 'sales_agent', 'active']
+    );
+
+    const leadResult = await db.query(
+      `INSERT INTO leads (workspace_id, first_name, last_name, phone, lead_source, notes, stage, stage_id, assigned_to)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id, workspace_id`,
+      [workspaceId, firstName, lastName, '+' + cleanPhone, 'whatsapp', `Auto-imported from WhatsApp: "${messageText}"`, 'new', stageId, agentsResult.rows[0]?.id || null]
+    );
+
+    const lead = leadResult.rows[0];
+    const { updateLeadScore } = require('../utils/activityLog');
+    await updateLeadScore(lead.id);
+
+    const { sendPushNotification } = require('../utils/notifications');
+    if (agentsResult.rows[0]?.id) {
+      await sendPushNotification(agentsResult.rows[0].id, 'New WhatsApp Lead', `Auto-imported: ${firstName} ${lastName}`, { type: 'new_lead', leadId: lead.id, source: 'whatsapp' });
+    }
+
+    return lead;
+  } catch (err) {
+    logger.error('WhatsApp contact import error:', err.message);
+    return null;
+  }
+}
+
+async function sendAutoResponder(workspaceId, leadId, fromPhone) {
+  try {
+    const settingsResult = await db.query(
+      'SELECT * FROM whatsapp_auto_responder WHERE workspace_id = $1 AND is_enabled = true',
+      [workspaceId]
+    );
+
+    if (settingsResult.rows.length === 0) return;
+
+    const settings = settingsResult.rows[0];
+    const leadResult = await db.query('SELECT first_name, last_name FROM leads WHERE id = $1', [leadId]);
+    const lead = leadResult.rows[0];
+    if (!lead) return;
+
+    const { replaceVariables } = require('../utils/variables');
+    const messageText = replaceVariables(settings.message_template, {
+      first_name: lead.first_name,
+      last_name: lead.last_name,
+    });
+
+    const result = await sendWhatsAppMessage({ to: fromPhone, message: messageText });
+
+    await db.query(
+      `INSERT INTO whatsapp_messages (workspace_id, lead_id, direction, message_text, status, wa_message_id, sent_at)
+       VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
+      [workspaceId, leadId, 'outbound', messageText, result.success ? 'sent' : 'failed', result.messageId || null]
+    );
+
+    await db.query(
+      `INSERT INTO lead_activities (workspace_id, lead_id, type, description, metadata)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [workspaceId, leadId, 'whatsapp_sent', 'Auto-responder sent', JSON.stringify({ auto_responder: true })]
+    );
+  } catch (err) {
+    logger.error('Auto-responder error:', err.message);
+  }
+}
+
+async function processWhatsAppSequences(workspaceId, leadId, incomingText) {
+  try {
+    const enrollments = await db.query(
+      `SELECT se.*, s.name as sequence_name FROM whatsapp_sequence_enrollments se
+       JOIN whatsapp_sequences s ON se.sequence_id = s.id
+       WHERE se.lead_id = $1 AND se.workspace_id = $2 AND se.status = 'active'`,
+      [leadId, workspaceId]
+    );
+
+    for (const enrollment of enrollments.rows) {
+      const steps = await db.query(
+        `SELECT * FROM whatsapp_sequence_steps WHERE sequence_id = $1 ORDER BY step_number`,
+        [enrollment.sequence_id]
+      );
+
+      const currentStep = steps.rows.find(s => s.step_number === enrollment.current_step);
+      if (currentStep && currentStep.trigger_type === 'inbound_reply') {
+        const nextStepNumber = enrollment.current_step + 1;
+        const nextStep = steps.rows.find(s => s.step_number === nextStepNumber);
+
+        if (nextStep) {
+          const leadResult = await db.query('SELECT * FROM leads WHERE id = $1', [leadId]);
+          const lead = leadResult.rows[0];
+          const { replaceVariables } = require('../utils/variables');
+
+          let messageText = nextStep.message;
+          if (nextStep.template_id) {
+            const tplResult = await db.query('SELECT * FROM whatsapp_templates WHERE id = $1 AND workspace_id = $2', [nextStep.template_id, workspaceId]);
+            if (tplResult.rows.length > 0) {
+              messageText = replaceVariables(tplResult.rows[0].content, {
+                first_name: lead.first_name, last_name: lead.last_name, phone: lead.phone, city: lead.city,
+              });
+            }
+          }
+
+          const sendResult = await sendWhatsAppMessage({ to: lead.phone, message: messageText });
+          await db.query(
+            `INSERT INTO whatsapp_messages (workspace_id, lead_id, direction, message_text, status, sent_at)
+             VALUES ($1, $2, $3, $4, $5, NOW())`,
+            [workspaceId, leadId, 'outbound', messageText, sendResult.success ? 'sent' : 'failed']
+          );
+
+          await db.query(
+            'UPDATE whatsapp_sequence_enrollments SET current_step = $1 WHERE id = $2',
+            [nextStepNumber, enrollment.id]
+          );
+        } else {
+          await db.query(
+            'UPDATE whatsapp_sequence_enrollments SET status = $1 WHERE id = $2',
+            ['completed', enrollment.id]
+          );
+        }
+      }
+    }
+  } catch (err) {
+    logger.error('WhatsApp sequence processing error:', err.message);
   }
 }
 

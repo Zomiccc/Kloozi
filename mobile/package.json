@@ -28,7 +28,8 @@
     "react-native-flash-message": "^0.4.2",
     "react-native-image-picker": "^7.1.0",
     "react-native-document-picker": "^9.1.1",
-    "react-native-reanimated-carousel": "^3.5.1"
+    "react-native-reanimated-carousel": "^3.5.1",
+    "@react-native-community/netinfo": "^11.3.0"
   },
   "devDependencies": {
     "@babel/core": "^7.23.7",

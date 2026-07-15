@@ -3,7 +3,7 @@ const router = express.Router();
 const { authenticate, requireAdminOrAbove } = require('../middleware/auth');
 const integrationController = require('../controllers/integrationController');
 
-router.get('/embed/:formKey', integrationController.handleEmbedForm);
+router.get('/embed/:formKey', integrationController.serveEmbedForm);
 router.post('/embed/:formKey', integrationController.handleEmbedForm);
 router.post('/webhook/:workspaceId/:type/:secret', integrationController.handleWebhook);
 
@@ -19,5 +19,6 @@ router.post('/webhooks', requireAdminOrAbove, integrationController.createWebhoo
 router.get('/embed-forms', requireAdminOrAbove, integrationController.getEmbedForms);
 router.post('/embed-forms', requireAdminOrAbove, integrationController.createEmbedForm);
 router.get('/embed-forms/:id/code', requireAdminOrAbove, integrationController.getEmbedCode);
+router.post('/parse-lead-from-email', integrationController.parseLeadFromEmail);
 
 module.exports = router;
