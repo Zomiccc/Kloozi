@@ -1,0 +1,18 @@
+const express = require('express');
+const router = express.Router();
+const { authenticate, requireManagerOrAbove } = require('../middleware/auth');
+const analyticsController = require('../controllers/analyticsController');
+
+router.use(authenticate);
+
+router.get('/dashboard', analyticsController.getDashboard);
+router.get('/leads', analyticsController.getLeadAnalytics);
+router.get('/conversion', analyticsController.getConversionAnalytics);
+router.get('/pipeline', analyticsController.getPipelineAnalytics);
+router.get('/agents', requireManagerOrAbove, analyticsController.getAgentPerformance);
+
+router.get('/notifications', analyticsController.getNotifications);
+router.put('/notifications/:id/read', analyticsController.markNotificationRead);
+router.put('/notifications/read-all', analyticsController.markAllNotificationsRead);
+
+module.exports = router;

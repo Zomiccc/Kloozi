@@ -1,0 +1,36 @@
+{
+  "name": "crm-final-web",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.21.1",
+    "axios": "^1.6.2",
+    "socket.io-client": "^4.7.2",
+    "recharts": "^2.10.3",
+    "lucide-react": "^0.294.0",
+    "clsx": "^2.0.0",
+    "tailwind-merge": "^2.1.0",
+    "date-fns": "^3.0.0",
+    "react-hot-toast": "^2.4.1",
+    "reactflow": "^11.10.1",
+    "@react-flow/node-resizer": "^2.1.1",
+    "zustand": "^4.4.7",
+    "react-quill": "^2.0.0",
+    "js-cookie": "^3.0.5"
+  },
+  "devDependencies": {
+    "vite": "^5.0.10",
+    "@vitejs/plugin-react": "^4.2.1",
+    "tailwindcss": "^3.4.0",
+    "postcss": "^8.4.32",
+    "autoprefixer": "^10.4.16",
+    "vite-plugin-proxy": "^0.5.0"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  }
+}
