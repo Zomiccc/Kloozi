@@ -19,7 +19,7 @@ const navItems = [
   { to: '/sms-campaigns', label: 'SMS Campaigns', icon: Smartphone },
   { to: '/content', label: 'Content Library', icon: FolderOpen },
   { to: '/team', label: 'Team Management', icon: Users2 },
-  { to: '/integrations', label: 'Integrations', icon: Plug },
+  { to: '/automations', label: 'Automations', icon: Plug },
   { to: '/analytics', label: 'Analytics & Reports', icon: BarChart3 },
   { to: '/settings', label: 'Settings', icon: SettingsIcon },
   { to: '/billing', label: 'Billing', icon: CreditCard },

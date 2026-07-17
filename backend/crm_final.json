@@ -261,12 +261,37 @@
         "stage": "negotiating",
         "assigned_to": "51c4972e-b5e3-407d-86b2-704452d0464d",
         "created_by": "08482e9f-dfc3-4628-bba0-1a9d09fac80e"
+      },
+      {
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "first_name": "Plugin",
+        "last_name": "Test",
+        "phone": "+19999999999",
+        "email": "plugin@test.com",
+        "city": "",
+        "budget": null,
+        "lead_source": "wordpress",
+        "stage": "new",
+        "stage_id": "62f77852-2b57-4ab7-9290-0ee78ea16ef2",
+        "assigned_to": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "created_by": null,
+        "notes": "Test from WordPress plugin"
       }
     ]
   },
   "lead_activities": {
     "_schema": "",
-    "_data": []
+    "_data": [
+      {
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "lead_id": null,
+        "user_id": null,
+        "type": "lead_created",
+        "description": "Lead captured from wordpress",
+        "metadata": "{}",
+        "created_at": null
+      }
+    ]
   },
   "lead_tags": {
     "_schema": "",
@@ -483,6 +508,46 @@
         "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
         "token": "b5648a7c361f2564a0ef0cfcac55b8d1fe31baa3327f1f92d5dcf03bcc45e83cbd1eee7dcb989c68",
         "expires_at": "2026-07-22T15:54:00.114Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "305519e28d759b483e8d0f6f1c9d07ebe0ec7ca5307af146271aa3588e80cb30aad051ecd34333c6",
+        "expires_at": "2026-07-22T16:09:29.638Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "6c1c1e7d628074fff4138366ccaddf611d7f04e6eefecf29050746c239056d69f5d738524d8bd834",
+        "expires_at": "2026-07-23T09:48:16.789Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "a35b1d422ec1965a8ffc3f40ea01a76d35b2aeaaf4de5465d01c617d2aa9e79e82c434d8263e0d65",
+        "expires_at": "2026-07-23T17:41:46.876Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "ac6f8a9c893a72e514bbf64c39cbe5d9a1d185d3ec795d996e490a14b9f7ad634e99afb41445a5b2",
+        "expires_at": "2026-07-23T17:41:50.401Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "10a627959f5c6d99e8a003a84eb51fe81b69a07b3ed7f445ebde3cd816a20cf7005f874d7de306b7",
+        "expires_at": "2026-07-24T07:38:54.730Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "6c6abca341cfbb80c7c141189059882cfa6ba89081bdc5095d8857974e6ec587e060b955e54d2c52",
+        "expires_at": "2026-07-24T07:54:15.063Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "0bef97c4016ab57aba0c694d337c3851e73089142b98c1d14857d047c88619cd587fc4dd2c6a133e",
+        "expires_at": "2026-07-24T08:10:15.055Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "b52b5db4d6ab97b5965cf19d0b3b82263d7d756d9d6691ce6169a829bf9579dec1360e8520d71073",
+        "expires_at": "2026-07-24T10:05:49.086Z"
       }
     ]
   },

@@ -16,6 +16,7 @@ const useAuthStore = create((set, get) => ({
       }
       localStorage.setItem('accessToken', res.data.accessToken);
       localStorage.setItem('refreshToken', res.data.refreshToken);
+      if (res.data.user?.workspaceId) localStorage.setItem('workspaceId', res.data.user.workspaceId);
       set({ user: res.data.user, isAuthenticated: true, loading: false });
       return res.data;
     } catch (err) {
@@ -30,6 +31,7 @@ const useAuthStore = create((set, get) => ({
       const res = await API.post('/auth/signup', data);
       localStorage.setItem('accessToken', res.data.accessToken);
       localStorage.setItem('refreshToken', res.data.refreshToken);
+      if (res.data.user?.workspaceId) localStorage.setItem('workspaceId', res.data.user.workspaceId);
       set({ user: res.data.user, isAuthenticated: true, loading: false });
       return res.data;
     } catch (err) {
@@ -44,6 +46,7 @@ const useAuthStore = create((set, get) => ({
       const res = await API.post('/auth/verify-2fa', { userId, code });
       localStorage.setItem('accessToken', res.data.accessToken);
       localStorage.setItem('refreshToken', res.data.refreshToken);
+      if (res.data.user?.workspaceId) localStorage.setItem('workspaceId', res.data.user.workspaceId);
       set({ user: res.data.user, isAuthenticated: true, loading: false });
       return res.data;
     } catch (err) {
@@ -59,6 +62,7 @@ const useAuthStore = create((set, get) => ({
     } catch {}
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
+    localStorage.removeItem('workspaceId');
     set({ user: null, isAuthenticated: false });
   },
 

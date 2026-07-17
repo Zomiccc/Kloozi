@@ -103,6 +103,11 @@ module.exports = {
     appSecret: process.env.TIKTOK_APP_SECRET || '',
   },
 
+  linkedin: {
+    clientId: process.env.LINKEDIN_CLIENT_ID || '',
+    clientSecret: process.env.LINKEDIN_CLIENT_SECRET || '',
+  },
+
   sentry: {
     dsn: process.env.SENTRY_DSN || '',
   },

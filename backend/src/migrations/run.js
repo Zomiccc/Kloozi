@@ -776,6 +776,8 @@ async function runMigrations() {
     'export_history', 'territories', 'lead_assignment_rules', 'sequence_enrollments',
     'whatsapp_auto_responder', 'whatsapp_sequences', 'whatsapp_sequence_steps',
     'whatsapp_sequence_enrollments', 'workspace_branding', 'subteams',
+    'lead_automation_rules', 'lead_distribution_config', 'whatsapp_chat_assistant_rules',
+    'outgoing_webhooks', 'outgoing_webhook_logs', 'lead_form_pages', 'meta_capi_config',
   ];
 
   for (const name of tableNames) {

@@ -1,8 +1,31 @@
 const db = require('../config/database');
 const crypto = require('crypto');
+const axios = require('axios');
 const { logActivity } = require('../utils/activityLog');
 const { sendPushNotification } = require('../utils/notifications');
 const { updateLeadScore } = require('../utils/activityLog');
+const logger = require('../utils/logger');
+
+async function fireOutgoingWebhooks(workspaceId, event, data) {
+  try {
+    const whRes = await db.query('SELECT * FROM outgoing_webhooks WHERE workspace_id = $1 AND is_active = true', [workspaceId]);
+    for (const wh of whRes.rows) {
+      const events = wh.events || [];
+      if (events.length > 0 && !events.includes(event) && !events.includes('*')) continue;
+      const payload = { event, timestamp: new Date().toISOString(), data };
+      try {
+        const response = await axios.post(wh.url, payload, { timeout: 10000 });
+        await db.query('INSERT INTO outgoing_webhook_logs (webhook_id, event, payload, response_code, status) VALUES ($1,$2,$3,$4,$5)',
+          [wh.id, event, JSON.stringify(payload), response.status, 'success']);
+      } catch (err) {
+        await db.query('INSERT INTO outgoing_webhook_logs (webhook_id, event, payload, response_code, status, error_message) VALUES ($1,$2,$3,$4,$5,$6)',
+          [wh.id, event, JSON.stringify(payload), err.response?.status || 0, 'failed', err.message]);
+      }
+    }
+  } catch (err) {
+    logger.error('Fire outgoing webhooks error:', err.message);
+  }
+}
 
 exports.getIntegrations = async (req, res, next) => {
   try {
@@ -99,6 +122,79 @@ exports.handleWebhook = async (req, res, next) => {
     }
 
     res.json({ success: true, leadId });
+  } catch (err) { next(err); }
+};
+
+// Token-based webhook — used by WordPress plugin, Google Forms add-on, etc.
+exports.handleTokenWebhook = async (req, res, next) => {
+  try {
+    const token = req.params.token;
+    const type = req.params.type || 'webhook';
+
+    // Look up workspace by account_token
+    const wsResult = await db.query('SELECT id FROM workspaces WHERE account_token = $1', [token]);
+    if (wsResult.rows.length === 0) {
+      return res.status(401).json({ error: 'Invalid account token' });
+    }
+
+    const workspaceId = wsResult.rows[0].id;
+    const data = req.body || {};
+
+    // Build lead data from common field names
+    const leadData = {
+      first_name: data.first_name || data.name || data.firstName || '',
+      last_name: data.last_name || data.lastName || '',
+      phone: data.phone || data.phone_number || data.phoneNumber || data.mobile || '',
+      email: data.email || data.email_address || data.emailAddress || '',
+      city: data.city || data.location || '',
+      budget: data.budget || data.price || null,
+      notes: data.notes || data.message || data.comments || data.note || '',
+      lead_source: data.source || type,
+    };
+
+    // Also check custom field mapping if provided
+    if (data.fields && typeof data.fields === 'object') {
+      for (const [key, val] of Object.entries(data.fields)) {
+        if (!leadData[key] && val) leadData[key] = val;
+      }
+    }
+
+    if (!leadData.first_name && !leadData.phone && !leadData.email) {
+      return res.status(400).json({ error: 'At least one of name, phone, or email is required' });
+    }
+
+    // Split full name into first/last if only name provided
+    if (!leadData.first_name && data.name) {
+      const parts = data.name.trim().split(/\s+/);
+      leadData.first_name = parts[0] || '';
+      leadData.last_name = parts.slice(1).join(' ') || '';
+    }
+
+    const stageResult = await db.query('SELECT id FROM lead_stages WHERE workspace_id = $1 AND is_default = true LIMIT 1', [workspaceId]);
+    const agentsResult = await db.query(
+      `SELECT u.id FROM users u WHERE u.workspace_id = $1 AND u.role = $2 AND u.status = $3
+       ORDER BY (SELECT COUNT(*) FROM leads WHERE assigned_to = u.id) ASC LIMIT 1`,
+      [workspaceId, 'sales_agent', 'active']
+    );
+
+    const leadResult = await db.query(
+      `INSERT INTO leads (workspace_id, first_name, last_name, phone, email, city, budget, lead_source, stage, stage_id, assigned_to, created_by, notes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id`,
+      [workspaceId, leadData.first_name, leadData.last_name, leadData.phone, leadData.email, leadData.city,
+       leadData.budget, leadData.lead_source, 'new', stageResult.rows[0]?.id, agentsResult.rows[0]?.id, null, leadData.notes]
+    );
+
+    const leadId = leadResult.rows[0].id;
+    await logActivity(workspaceId, leadId, null, 'lead_created', `Lead captured from ${leadData.lead_source}`);
+    await updateLeadScore(leadId);
+
+    if (agentsResult.rows[0]?.id) {
+      await sendPushNotification(agentsResult.rows[0].id, `New ${leadData.lead_source} Lead`, `New lead: ${leadData.first_name || 'Unknown'}`, { type: 'new_lead', leadId, source: leadData.lead_source });
+    }
+
+    await fireOutgoingWebhooks(workspaceId, 'lead.created', { leadId, ...leadData });
+
+    res.json({ success: true, leadId, message: 'Lead created successfully' });
   } catch (err) { next(err); }
 };
 

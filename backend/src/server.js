@@ -23,6 +23,7 @@ const analyticsRoutes = require('./routes/analytics');
 const teamRoutes = require('./routes/team');
 const billingRoutes = require('./routes/billing');
 const integrationRoutes = require('./routes/integrations');
+const automationRoutes = require('./routes/automations');
 const { getTranslations, getAvailableLanguages } = require('./utils/i18n');
 
 const app = express();
@@ -57,6 +58,7 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/team', teamRoutes);
 app.use('/api/billing', billingRoutes);
 app.use('/api/integrations', integrationRoutes);
+app.use('/api/automations', automationRoutes);
 
 app.get('/api/translations/:lang', (req, res) => {
   res.json({ translations: getTranslations(req.params.lang) });

@@ -22,10 +22,25 @@ import WhatsAppCampaigns from './pages/WhatsAppCampaigns';
 import SMSCampaigns from './pages/SMSCampaigns';
 import ContentLibrary from './pages/ContentLibrary';
 import TeamManagement from './pages/TeamManagement';
-import Integrations from './pages/Integrations';
+import Automations from './pages/Automations';
 import Analytics from './pages/Analytics';
 import Settings from './pages/Settings';
 import Billing from './pages/Billing';
+
+import FacebookIntegration from './pages/integrations/FacebookIntegration';
+import WhatsAppIntegration from './pages/integrations/WhatsAppIntegration';
+import WordPressIntegration from './pages/integrations/WordPressIntegration';
+import GoogleFormsIntegration from './pages/integrations/GoogleFormsIntegration';
+import TikTokIntegration from './pages/integrations/TikTokIntegration';
+import LinkedInIntegration from './pages/integrations/LinkedInIntegration';
+import ZapierIntegration from './pages/integrations/ZapierIntegration';
+import LeadFormsBuilder from './pages/integrations/LeadFormsBuilder';
+import MetaCAPIIntegration from './pages/integrations/MetaCAPIIntegration';
+import ChatAssistantRules from './pages/integrations/ChatAssistantRules';
+import AutomationRules from './pages/integrations/AutomationRules';
+import LeadDistribution from './pages/integrations/LeadDistribution';
+import OutgoingWebhooks from './pages/integrations/OutgoingWebhooks';
+import DuplicateMerge from './pages/integrations/DuplicateMerge';
 
 function ProtectedRoute({ children }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -66,7 +81,28 @@ export default function App() {
           <Route path="sms-campaigns" element={<SMSCampaigns />} />
           <Route path="content" element={<ContentLibrary />} />
           <Route path="team" element={<TeamManagement />} />
-          <Route path="integrations" element={<Integrations />} />
+          <Route path="automations" element={<Automations />} />
+          <Route path="automations/facebook" element={<FacebookIntegration />} />
+          <Route path="automations/whatsapp-chats" element={<WhatsAppIntegration />} />
+          <Route path="automations/whatsapp-auto-responder" element={<WhatsAppIntegration />} />
+          <Route path="automations/whatsapp-sequences" element={<WhatsAppIntegration />} />
+          <Route path="automations/whatsapp-contact-import" element={<WhatsAppIntegration />} />
+          <Route path="automations/whatsapp-widget" element={<WhatsAppIntegration />} />
+          <Route path="automations/whatsapp-ai-agent" element={<WhatsAppIntegration />} />
+          <Route path="automations/chat-monitoring" element={<WhatsAppIntegration />} />
+          <Route path="automations/wordpress" element={<WordPressIntegration />} />
+          <Route path="automations/google-forms" element={<GoogleFormsIntegration />} />
+          <Route path="automations/google-ads" element={<GoogleFormsIntegration />} />
+          <Route path="automations/tiktok" element={<TikTokIntegration />} />
+          <Route path="automations/linkedin" element={<LinkedInIntegration />} />
+          <Route path="automations/zapier" element={<ZapierIntegration />} />
+          <Route path="automations/lead-forms" element={<LeadFormsBuilder />} />
+          <Route path="automations/meta-capi" element={<MetaCAPIIntegration />} />
+          <Route path="automations/chat-assistant" element={<ChatAssistantRules />} />
+          <Route path="automations/rules" element={<AutomationRules />} />
+          <Route path="automations/distribution" element={<LeadDistribution />} />
+          <Route path="automations/outgoing-webhooks" element={<OutgoingWebhooks />} />
+          <Route path="automations/duplicate-merge" element={<DuplicateMerge />} />
           <Route path="analytics" element={<Analytics />} />
           <Route path="settings" element={<Settings />} />
           <Route path="billing" element={<Billing />} />

@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import API from '../lib/api';
 import toast from 'react-hot-toast';
 import {
   Plus, Search, Filter, Download, Upload, Trash2, Phone, Mail, MessageSquare,
-  ChevronLeft, ChevronRight, Tag, X
+  ChevronLeft, ChevronRight, Tag, X, Users
 } from 'lucide-react';
 
 export default function Leads() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState({ page: 1, total: 0, totalPages: 0 });
@@ -18,13 +19,24 @@ export default function Leads() {
   const [showImport, setShowImport] = useState(false);
   const [selected, setSelected] = useState([]);
   const [showBulk, setShowBulk] = useState(false);
+  const [tab, setTab] = useState('all');
+  const [expandedLead, setExpandedLead] = useState(null);
 
-  useEffect(() => { loadLeads(); }, [pagination.page, filters]);
+  useEffect(() => { loadLeads(); }, [pagination.page, filters, tab]);
+
+  useEffect(() => {
+    if (searchParams.get('import') === 'true') setShowImport(true);
+    if (searchParams.get('export') === 'true') handleExport();
+  }, [searchParams]);
 
   const loadLeads = async () => {
     setLoading(true);
     try {
-      const res = await API.get('/leads', { params: { page: pagination.page, limit: 50, ...filters } });
+      const params = { page: pagination.page, limit: 50, ...filters };
+      if (tab === 'uncontacted') params.stage = 'new';
+      if (tab === 'follow_ups') params.follow_up_due = 'true';
+      if (tab === 'viewed_content') params.recently_viewed = 'true';
+      const res = await API.get('/leads', { params });
       setLeads(res.data.leads);
       setPagination({ page: res.data.pagination.page, total: res.data.pagination.total, totalPages: res.data.pagination.totalPages });
     } catch (err) {
@@ -81,12 +93,24 @@ export default function Leads() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-4">
-        <h1 className="text-2xl font-bold text-dark-900">Leads</h1>
+        <h1 className="text-2xl font-bold text-dark-900">Clients</h1>
         <div className="flex gap-2">
           <button onClick={() => setShowImport(true)} className="btn btn-secondary flex items-center gap-2"><Upload size={16} /> Import</button>
           <button onClick={handleExport} className="btn btn-secondary flex items-center gap-2"><Download size={16} /> Export</button>
-          <button onClick={() => setShowAdd(true)} className="btn btn-primary flex items-center gap-2"><Plus size={16} /> Add Lead</button>
+          <button onClick={() => setShowAdd(true)} className="btn btn-primary flex items-center gap-2"><Plus size={16} /> Add New Client</button>
         </div>
+      </div>
+
+      {/* Tab bar */}
+      <div className="flex gap-1 border-b border-dark-100">
+        {[
+          { key: 'all', label: 'All Clients' },
+          { key: 'uncontacted', label: 'Uncontacted' },
+          { key: 'follow_ups', label: 'Follow Ups' },
+          { key: 'viewed_content', label: 'Recently Viewed Content' },
+        ].map(t => (
+          <button key={t.key} onClick={() => setTab(t.key)} className={`px-4 py-2.5 text-sm font-medium ${tab === t.key ? 'text-primary-600 border-b-2 border-primary-600' : 'text-dark-400 hover:text-dark-600'}`}>{t.label}</button>
+        ))}
       </div>
 
       {/* Search & Filter bar */}
@@ -130,9 +154,13 @@ export default function Leads() {
         {loading ? (
           <div className="flex items-center justify-center h-64"><div className="animate-spin w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full" /></div>
         ) : leads.length === 0 ? (
-          <div className="text-center py-16 text-dark-400">
-            <p className="text-lg">No leads found</p>
-            <p className="text-sm mt-1">Add a lead or adjust your filters</p>
+          <div className="text-center py-16">
+            <div className="w-16 h-16 bg-primary-50 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Users size={32} className="text-primary-400" />
+            </div>
+            <p className="text-lg font-medium text-dark-700">Welcome to your Client List</p>
+            <p className="text-sm text-dark-400 mt-2 max-w-md mx-auto">New leads from your lead sources such as Facebook, Google, and your website will appear here, alongside any contacts you've manually added or imported.</p>
+            <button className="text-sm text-primary-600 font-medium mt-3 hover:underline">LEARN MORE</button>
           </div>
         ) : (
           <table className="w-full">
@@ -140,12 +168,10 @@ export default function Leads() {
               <tr>
                 <th className="p-3 text-left"><input type="checkbox" onChange={(e) => setSelected(e.target.checked ? leads.map(l => l.id) : [])} checked={selected.length === leads.length && leads.length > 0} /></th>
                 <th className="p-3 text-left text-xs font-medium text-dark-500 uppercase">Name</th>
-                <th className="p-3 text-left text-xs font-medium text-dark-500 uppercase">Phone</th>
-                <th className="p-3 text-left text-xs font-medium text-dark-500 uppercase">Stage</th>
-                <th className="p-3 text-left text-xs font-medium text-dark-500 uppercase">Source</th>
-                <th className="p-3 text-left text-xs font-medium text-dark-500 uppercase">Budget</th>
-                <th className="p-3 text-left text-xs font-medium text-dark-500 uppercase">Score</th>
-                <th className="p-3 text-left text-xs font-medium text-dark-500 uppercase">Agent</th>
+                <th className="p-3 text-left text-xs font-medium text-dark-500 uppercase">Phone Number</th>
+                <th className="p-3 text-left text-xs font-medium text-dark-500 uppercase">Email</th>
+                <th className="p-3 text-left text-xs font-medium text-dark-500 uppercase">Date Added</th>
+                <th className="p-3 text-left text-xs font-medium text-dark-500 uppercase">Last Activity</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-dark-50">
@@ -154,13 +180,29 @@ export default function Leads() {
                   <td className="p-3" onClick={(e) => e.stopPropagation()}>
                     <input type="checkbox" checked={selected.includes(lead.id)} onChange={(e) => setSelected(e.target.checked ? [...selected, lead.id] : selected.filter(id => id !== lead.id))} />
                   </td>
-                  <td className="p-3"><div className="font-medium text-dark-900">{lead.first_name} {lead.last_name}</div><div className="text-xs text-dark-400">{lead.city}</div></td>
+                  <td className="p-3">
+                    <div className="flex items-center gap-2">
+                      <button onClick={(e) => { e.stopPropagation(); setExpandedLead(expandedLead === lead.id ? null : lead.id); }} className="text-dark-400 hover:text-dark-600">
+                        {expandedLead === lead.id ? '▼' : '▶'}
+                      </button>
+                      <div>
+                        <div className="font-medium text-dark-900">{lead.first_name} {lead.last_name}</div>
+                        {lead.stage === 'new' && <span className="badge bg-blue-100 text-blue-700 text-xs">NEW LEAD</span>}
+                      </div>
+                    </div>
+                    {expandedLead === lead.id && (
+                      <div className="mt-2 ml-6 text-xs text-dark-400 space-y-1">
+                        <p>City: {lead.city || '-'}</p>
+                        <p>Budget: {lead.budget ? `$${parseInt(lead.budget).toLocaleString()}` : '-'}</p>
+                        <p>Source: {lead.lead_source}</p>
+                        <p>Score: {lead.score}</p>
+                      </div>
+                    )}
+                  </td>
                   <td className="p-3 text-sm text-dark-600">{lead.phone || '-'}</td>
-                  <td className="p-3"><span className={`badge ${stageColors[lead.stage] || 'bg-dark-100 text-dark-600'}`}>{lead.stage}</span></td>
-                  <td className="p-3 text-sm text-dark-600 capitalize">{lead.lead_source}</td>
-                  <td className="p-3 text-sm text-dark-600">{lead.budget ? `$${parseInt(lead.budget).toLocaleString()}` : '-'}</td>
-                  <td className="p-3"><span className={`badge ${lead.score >= 70 ? 'bg-green-100 text-green-700' : lead.score >= 40 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>{lead.score}</span></td>
-                  <td className="p-3 text-sm text-dark-600">{lead.agent_first_name ? `${lead.agent_first_name} ${lead.agent_last_name}` : 'Unassigned'}</td>
+                  <td className="p-3 text-sm text-dark-600">{lead.email || '-'}</td>
+                  <td className="p-3 text-sm text-dark-600">{new Date(lead.created_at).toLocaleDateString()}</td>
+                  <td className="p-3 text-sm text-dark-600">{lead.last_activity ? new Date(lead.last_activity).toLocaleDateString() : '-'}</td>
                 </tr>
               ))}
             </tbody>
@@ -193,7 +235,7 @@ function AddLeadModal({ onClose, onSubmit }) {
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold">Add New Lead</h2>
+          <h2 className="text-xl font-bold">Add New Client</h2>
           <button onClick={onClose}><X size={20} /></button>
         </div>
         <form onSubmit={(e) => { e.preventDefault(); onSubmit(form); }} className="space-y-3">
@@ -260,16 +302,36 @@ function ImportModal({ onClose, onSubmit }) {
     reader.readAsText(file);
   };
 
+  const downloadTemplate = () => {
+    const csv = 'first_name,last_name,phone,email,city,budget,lead_source,notes\nJohn,Doe,+1234567890,john@example.com,New York,500000,manual,Interested in 2BHK\n';
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'crm_final_template.csv'; a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const leadFields = ['first_name', 'last_name', 'phone', 'email', 'city', 'budget', 'lead_source', 'notes'];
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold">Import Leads from CSV</h2>
+          <h2 className="text-xl font-bold">Import Clients from CSV</h2>
           <button onClick={onClose}><X size={20} /></button>
         </div>
         <div className="space-y-4">
+          <div className="bg-blue-50 rounded-lg p-4">
+            <p className="text-sm font-medium text-blue-800">Instructions:</p>
+            <ul className="text-xs text-blue-700 mt-1 space-y-1">
+              <li>1. Download the CSV template (optional)</li>
+              <li>2. Fill in your client data following the template format</li>
+              <li>3. Upload the CSV file below</li>
+              <li>4. Map your columns to CRM fields</li>
+              <li>5. Click Import — duplicates are auto-skipped</li>
+            </ul>
+            <button onClick={downloadTemplate} className="text-xs text-blue-600 font-medium mt-2 hover:underline flex items-center gap-1"><Download size={12} /> Download CSV Template</button>
+          </div>
           <input type="file" accept=".csv" onChange={handleFile} className="input" />
           {headers.length > 0 && (
             <div className="space-y-2">
