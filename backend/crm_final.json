@@ -7,7 +7,8 @@
         "name": "Demo Company",
         "slug": "demo-company",
         "plan": "business",
-        "subscription_status": "active"
+        "subscription_status": "active",
+        "account_token": "6472f5ec937f8e6d0378b7fe538f5440"
       }
     ]
   },
@@ -134,7 +135,9 @@
         "lead_source": "facebook",
         "stage": "new",
         "assigned_to": "51c4972e-b5e3-407d-86b2-704452d0464d",
-        "created_by": "08482e9f-dfc3-4628-bba0-1a9d09fac80e"
+        "created_by": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "notes": "Hi",
+        "score": 5
       },
       {
         "id": "c0a88449-aaec-4915-bfcc-20d9d3da2c20",
@@ -148,7 +151,8 @@
         "lead_source": "google",
         "stage": "contacted",
         "assigned_to": "51c4972e-b5e3-407d-86b2-704452d0464d",
-        "created_by": "08482e9f-dfc3-4628-bba0-1a9d09fac80e"
+        "created_by": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "score": 5
       },
       {
         "id": "61f66509-4575-477c-9d92-78a946ed252f",
@@ -162,7 +166,8 @@
         "lead_source": "website",
         "stage": "interested",
         "assigned_to": "ce416c11-76bf-41d5-a061-cb089e919536",
-        "created_by": "08482e9f-dfc3-4628-bba0-1a9d09fac80e"
+        "created_by": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "score": 5
       },
       {
         "id": "0dc77b86-0a1f-4d05-982a-61b5ef15860b",
@@ -176,7 +181,8 @@
         "lead_source": "tiktok",
         "stage": "negotiating",
         "assigned_to": "51c4972e-b5e3-407d-86b2-704452d0464d",
-        "created_by": "08482e9f-dfc3-4628-bba0-1a9d09fac80e"
+        "created_by": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "score": 5
       },
       {
         "id": "3c8aeae7-5246-4af6-b693-5d8e1a4ad873",
@@ -190,7 +196,8 @@
         "lead_source": "instagram",
         "stage": "won",
         "assigned_to": "ce416c11-76bf-41d5-a061-cb089e919536",
-        "created_by": "08482e9f-dfc3-4628-bba0-1a9d09fac80e"
+        "created_by": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "score": 5
       },
       {
         "id": "fbe08e01-fa6a-4b4f-bc74-8641b53b767d",
@@ -204,7 +211,8 @@
         "lead_source": "manual",
         "stage": "lost",
         "assigned_to": "51c4972e-b5e3-407d-86b2-704452d0464d",
-        "created_by": "08482e9f-dfc3-4628-bba0-1a9d09fac80e"
+        "created_by": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "score": 5
       },
       {
         "id": "51c415a5-2160-44cd-a117-548b657da7e0",
@@ -218,7 +226,8 @@
         "lead_source": "facebook",
         "stage": "new",
         "assigned_to": "ce416c11-76bf-41d5-a061-cb089e919536",
-        "created_by": "08482e9f-dfc3-4628-bba0-1a9d09fac80e"
+        "created_by": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "score": 5
       },
       {
         "id": "02d02e72-5770-462a-8f30-1867c5d3d549",
@@ -232,7 +241,8 @@
         "lead_source": "google",
         "stage": "contacted",
         "assigned_to": "51c4972e-b5e3-407d-86b2-704452d0464d",
-        "created_by": "08482e9f-dfc3-4628-bba0-1a9d09fac80e"
+        "created_by": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "score": 5
       },
       {
         "id": "f9b6b2e7-d7d6-4453-b3da-846a78dc4b52",
@@ -246,7 +256,8 @@
         "lead_source": "website",
         "stage": "interested",
         "assigned_to": "ce416c11-76bf-41d5-a061-cb089e919536",
-        "created_by": "08482e9f-dfc3-4628-bba0-1a9d09fac80e"
+        "created_by": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "score": 5
       },
       {
         "id": "8d800be4-8d5e-426d-bf59-44e975e70a32",
@@ -260,7 +271,8 @@
         "lead_source": "zapier",
         "stage": "negotiating",
         "assigned_to": "51c4972e-b5e3-407d-86b2-704452d0464d",
-        "created_by": "08482e9f-dfc3-4628-bba0-1a9d09fac80e"
+        "created_by": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "score": 5
       },
       {
         "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
@@ -275,7 +287,351 @@
         "stage_id": "62f77852-2b57-4ab7-9290-0ee78ea16ef2",
         "assigned_to": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
         "created_by": null,
-        "notes": "Test from WordPress plugin"
+        "notes": "Test from WordPress plugin",
+        "score": 5
+      },
+      {
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "first_name": "Real",
+        "last_name": "Test",
+        "phone": "+1234567890",
+        "email": "real@test.com",
+        "city": "",
+        "budget": null,
+        "lead_source": "wordpress",
+        "stage": "new",
+        "stage_id": "62f77852-2b57-4ab7-9290-0ee78ea16ef2",
+        "assigned_to": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "created_by": null,
+        "notes": "This is a real lead from WordPress",
+        "score": 5
+      },
+      {
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "first_name": "Real",
+        "last_name": "Test",
+        "phone": "+1234567890",
+        "email": "real@test.com",
+        "city": "",
+        "budget": null,
+        "lead_source": "wordpress",
+        "stage": "new",
+        "stage_id": "62f77852-2b57-4ab7-9290-0ee78ea16ef2",
+        "assigned_to": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "created_by": null,
+        "notes": "",
+        "score": 5
+      },
+      {
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "first_name": "Zapier",
+        "last_name": "Test",
+        "phone": "+10000000000",
+        "email": "zapier@test.com",
+        "city": "",
+        "budget": null,
+        "lead_source": "zapier",
+        "stage": "new",
+        "stage_id": "62f77852-2b57-4ab7-9290-0ee78ea16ef2",
+        "assigned_to": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "created_by": null,
+        "notes": "Test from Zapier",
+        "score": 5
+      },
+      {
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "first_name": "Zapier",
+        "last_name": "Test",
+        "phone": "+10000000000",
+        "email": "zapier@test.com",
+        "city": "",
+        "budget": null,
+        "lead_source": "zapier",
+        "stage": "new",
+        "stage_id": "62f77852-2b57-4ab7-9290-0ee78ea16ef2",
+        "assigned_to": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "created_by": null,
+        "notes": "Test from Zapier",
+        "score": 5
+      },
+      {
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "first_name": "Google",
+        "last_name": "Test",
+        "phone": "+10000000000",
+        "email": "googleforms@test.com",
+        "city": "",
+        "budget": null,
+        "lead_source": "google_forms",
+        "stage": "new",
+        "stage_id": "62f77852-2b57-4ab7-9290-0ee78ea16ef2",
+        "assigned_to": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "created_by": null,
+        "notes": "Test from Google Forms",
+        "score": 5
+      },
+      {
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "first_name": "Google",
+        "last_name": "Test",
+        "phone": "+10000000000",
+        "email": "googleforms@test.com",
+        "city": "",
+        "budget": null,
+        "lead_source": "google_forms",
+        "stage": "new",
+        "stage_id": "62f77852-2b57-4ab7-9290-0ee78ea16ef2",
+        "assigned_to": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "created_by": null,
+        "notes": "Test from Google Forms",
+        "score": 5
+      },
+      {
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "first_name": "Ha",
+        "last_name": "Ha",
+        "phone": "",
+        "email": "",
+        "city": "",
+        "budget": "",
+        "lead_source": "tiktok",
+        "notes": "",
+        "custom_fields": "[]",
+        "tags": [],
+        "stage": "new",
+        "stage_id": "62f77852-2b57-4ab7-9290-0ee78ea16ef2",
+        "assigned_to": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "created_by": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "score": 5
+      },
+      {
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "first_name": "sas",
+        "last_name": "",
+        "phone": "",
+        "email": "",
+        "city": "",
+        "budget": "",
+        "lead_source": "manual",
+        "notes": "",
+        "custom_fields": "[]",
+        "tags": [],
+        "stage": "new",
+        "stage_id": "62f77852-2b57-4ab7-9290-0ee78ea16ef2",
+        "assigned_to": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "created_by": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "score": 5
+      },
+      {
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "first_name": "Google",
+        "last_name": "Test",
+        "phone": "+10000000000",
+        "email": "googleforms@test.com",
+        "city": "",
+        "budget": null,
+        "lead_source": "google_forms",
+        "stage": "new",
+        "stage_id": "62f77852-2b57-4ab7-9290-0ee78ea16ef2",
+        "assigned_to": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "created_by": null,
+        "notes": "Test from Google Forms",
+        "score": 5
+      },
+      {
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "first_name": "Alice",
+        "last_name": "Cooper",
+        "phone": "+15550001",
+        "email": "alice@example.com",
+        "city": "New York",
+        "budget": 75000,
+        "lead_source": "facebook",
+        "notes": null,
+        "stage": "new",
+        "stage_id": null,
+        "assigned_to": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "created_by": "08482e9f-dfc3-4628-bba0-1a9d09fac80e"
+      },
+      {
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "first_name": "Bob",
+        "last_name": "Smith",
+        "phone": "+15550002",
+        "email": "bob@example.com",
+        "city": "Los Angeles",
+        "budget": 120000,
+        "lead_source": "google",
+        "notes": null,
+        "stage": "new",
+        "stage_id": null,
+        "assigned_to": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "created_by": "08482e9f-dfc3-4628-bba0-1a9d09fac80e"
+      },
+      {
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "first_name": "Carol",
+        "last_name": "Jones",
+        "phone": "+15550003",
+        "email": "carol@example.com",
+        "city": "Chicago",
+        "budget": 50000,
+        "lead_source": "website",
+        "notes": null,
+        "stage": "new",
+        "stage_id": null,
+        "assigned_to": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "created_by": "08482e9f-dfc3-4628-bba0-1a9d09fac80e"
+      },
+      {
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "first_name": "David",
+        "last_name": "Wilson",
+        "phone": "+15550004",
+        "email": "david@example.com",
+        "city": "Houston",
+        "budget": 200000,
+        "lead_source": "tiktok",
+        "notes": null,
+        "stage": "new",
+        "stage_id": null,
+        "assigned_to": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "created_by": "08482e9f-dfc3-4628-bba0-1a9d09fac80e"
+      },
+      {
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "first_name": "Eve",
+        "last_name": "Brown",
+        "phone": "+15550005",
+        "email": "eve@example.com",
+        "city": "Phoenix",
+        "budget": 95000,
+        "lead_source": "instagram",
+        "notes": null,
+        "stage": "new",
+        "stage_id": null,
+        "assigned_to": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "created_by": "08482e9f-dfc3-4628-bba0-1a9d09fac80e"
+      },
+      {
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "first_name": "Frank",
+        "last_name": "Miller",
+        "phone": "+15550006",
+        "email": "frank@example.com",
+        "city": "Philadelphia",
+        "budget": 30000,
+        "lead_source": "manual",
+        "notes": null,
+        "stage": "new",
+        "stage_id": null,
+        "assigned_to": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "created_by": "08482e9f-dfc3-4628-bba0-1a9d09fac80e"
+      },
+      {
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "first_name": "Grace",
+        "last_name": "Davis",
+        "phone": "+15550007",
+        "email": "grace@example.com",
+        "city": "San Antonio",
+        "budget": 80000,
+        "lead_source": "facebook",
+        "notes": null,
+        "stage": "new",
+        "stage_id": null,
+        "assigned_to": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "created_by": "08482e9f-dfc3-4628-bba0-1a9d09fac80e"
+      },
+      {
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "first_name": "Henry",
+        "last_name": "Garcia",
+        "phone": "+15550008",
+        "email": "henry@example.com",
+        "city": "San Diego",
+        "budget": 150000,
+        "lead_source": "google",
+        "notes": null,
+        "stage": "new",
+        "stage_id": null,
+        "assigned_to": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "created_by": "08482e9f-dfc3-4628-bba0-1a9d09fac80e"
+      },
+      {
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "first_name": "Ivy",
+        "last_name": "Rodriguez",
+        "phone": "+15550009",
+        "email": "ivy@example.com",
+        "city": "Dallas",
+        "budget": 65000,
+        "lead_source": "website",
+        "notes": null,
+        "stage": "new",
+        "stage_id": null,
+        "assigned_to": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "created_by": "08482e9f-dfc3-4628-bba0-1a9d09fac80e"
+      },
+      {
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "first_name": "Jack",
+        "last_name": "Martinez",
+        "phone": "+15550010",
+        "email": "jack@example.com",
+        "city": "San Jose",
+        "budget": 110000,
+        "lead_source": "zapier",
+        "notes": null,
+        "stage": "new",
+        "stage_id": null,
+        "assigned_to": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "created_by": "08482e9f-dfc3-4628-bba0-1a9d09fac80e"
+      },
+      {
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "first_name": "Plugin",
+        "last_name": "Test",
+        "phone": "+19999999999",
+        "email": "plugin@test.com",
+        "city": "",
+        "budget": null,
+        "lead_source": "wordpress",
+        "notes": null,
+        "stage": "new",
+        "stage_id": null,
+        "assigned_to": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "created_by": "08482e9f-dfc3-4628-bba0-1a9d09fac80e"
+      },
+      {
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "first_name": "Real",
+        "last_name": "Test",
+        "phone": "+1234567890",
+        "email": "real@test.com",
+        "city": "",
+        "budget": null,
+        "lead_source": "wordpress",
+        "notes": null,
+        "stage": "new",
+        "stage_id": null,
+        "assigned_to": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "created_by": "08482e9f-dfc3-4628-bba0-1a9d09fac80e"
+      },
+      {
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "first_name": "Real",
+        "last_name": "Test",
+        "phone": "+1234567890",
+        "email": "real@test.com",
+        "city": "",
+        "budget": null,
+        "lead_source": "wordpress",
+        "notes": null,
+        "stage": "new",
+        "stage_id": null,
+        "assigned_to": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "created_by": "08482e9f-dfc3-4628-bba0-1a9d09fac80e"
       }
     ]
   },
@@ -288,6 +644,123 @@
         "user_id": null,
         "type": "lead_created",
         "description": "Lead captured from wordpress",
+        "metadata": "{}",
+        "created_at": null
+      },
+      {
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "lead_id": null,
+        "user_id": null,
+        "type": "lead_created",
+        "description": "Lead captured from wordpress",
+        "metadata": "{}",
+        "created_at": null
+      },
+      {
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "lead_id": null,
+        "user_id": null,
+        "type": "lead_created",
+        "description": "Lead captured from wordpress",
+        "metadata": "{}",
+        "created_at": null
+      },
+      {
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "lead_id": "a14b7e58-e559-422e-8988-f00054ad3c0b",
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "type": "lead_qualified",
+        "description": "Lead marked as qualified",
+        "metadata": "{}",
+        "created_at": null
+      },
+      {
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "lead_id": "a14b7e58-e559-422e-8988-f00054ad3c0b",
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "type": "lead_qualified",
+        "description": "Lead marked as qualified",
+        "metadata": "{}",
+        "created_at": null
+      },
+      {
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "lead_id": "a14b7e58-e559-422e-8988-f00054ad3c0b",
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "type": "lead_qualified",
+        "description": "Lead marked as qualified",
+        "metadata": "{}",
+        "created_at": null
+      },
+      {
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "lead_id": null,
+        "user_id": null,
+        "type": "lead_created",
+        "description": "Lead captured from zapier",
+        "metadata": "{}",
+        "created_at": null
+      },
+      {
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "lead_id": null,
+        "user_id": null,
+        "type": "lead_created",
+        "description": "Lead captured from zapier",
+        "metadata": "{}",
+        "created_at": null
+      },
+      {
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "lead_id": null,
+        "user_id": null,
+        "type": "lead_created",
+        "description": "Lead captured from google_forms",
+        "metadata": "{}",
+        "created_at": null
+      },
+      {
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "lead_id": null,
+        "user_id": null,
+        "type": "lead_created",
+        "description": "Lead captured from google_forms",
+        "metadata": "{}",
+        "created_at": null
+      },
+      {
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "lead_id": null,
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "type": "lead_created",
+        "description": "Lead created: Ha Ha",
+        "metadata": "{}",
+        "created_at": null
+      },
+      {
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "lead_id": null,
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "type": "lead_created",
+        "description": "Lead created: sas ",
+        "metadata": "{}",
+        "created_at": null
+      },
+      {
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "lead_id": "a14b7e58-e559-422e-8988-f00054ad3c0b",
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "type": "stage_change",
+        "description": "Stage changed to new",
+        "metadata": "{\"new_stage\":\"new\"}",
+        "created_at": null
+      },
+      {
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "lead_id": null,
+        "user_id": null,
+        "type": "lead_created",
+        "description": "Lead captured from google_forms",
         "metadata": "{}",
         "created_at": null
       }
@@ -334,7 +807,34 @@
   },
   "whatsapp_messages": {
     "_schema": "",
-    "_data": []
+    "_data": [
+      {
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "lead_id": "undefined",
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "direction": "outbound",
+        "message_text": "Hello",
+        "template_name": null,
+        "media_url": null,
+        "media_type": null,
+        "status": "failed",
+        "wa_message_id": null,
+        "sent_at": null
+      },
+      {
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "lead_id": "undefined",
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "direction": "outbound",
+        "message_text": "Hello",
+        "template_name": null,
+        "media_url": null,
+        "media_type": null,
+        "status": "failed",
+        "wa_message_id": null,
+        "sent_at": null
+      }
+    ]
   },
   "whatsapp_templates": {
     "_schema": "",
@@ -383,6 +883,16 @@
         "body": "<p>Hi {{First_Name}},</p><p>I wanted to follow up on your recent inquiry. Do you have any questions I can answer?</p><p>Best,<br>{{Agent_Name}}</p>",
         "category": "follow_up",
         "created_by": "08482e9f-dfc3-4628-bba0-1a9d09fac80e"
+      },
+      {
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "name": "test",
+        "subject": "test",
+        "body": "tsert",
+        "category": "intro",
+        "variables": "[]",
+        "is_draft": false,
+        "created_by": "08482e9f-dfc3-4628-bba0-1a9d09fac80e"
       }
     ]
   },
@@ -392,11 +902,29 @@
   },
   "email_sequences": {
     "_schema": "",
-    "_data": []
+    "_data": [
+      {
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "name": "sd",
+        "type": "post_meeting",
+        "description": "dsa",
+        "created_by": "08482e9f-dfc3-4628-bba0-1a9d09fac80e"
+      }
+    ]
   },
   "email_sequence_steps": {
     "_schema": "",
-    "_data": []
+    "_data": [
+      {
+        "sequence_id": null,
+        "template_id": "test",
+        "step_number": 1,
+        "delay_hours": 0,
+        "delay_days": 1,
+        "condition_type": null,
+        "condition_value": "{}"
+      }
+    ]
   },
   "email_sequence_enrollments": {
     "_schema": "",
@@ -404,7 +932,14 @@
   },
   "email_flows": {
     "_schema": "",
-    "_data": []
+    "_data": [
+      {
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "name": "wddwa",
+        "description": "wad",
+        "created_by": "08482e9f-dfc3-4628-bba0-1a9d09fac80e"
+      }
+    ]
   },
   "email_flow_nodes": {
     "_schema": "",
@@ -428,11 +963,227 @@
   },
   "campaigns": {
     "_schema": "",
-    "_data": []
+    "_data": [
+      {
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "name": "New Propery Launch",
+        "type": "bulk",
+        "channel": "whatsapp",
+        "template_id": null,
+        "subject": null,
+        "body": null,
+        "recipients_count": 15,
+        "status": "draft",
+        "scheduled_at": null,
+        "created_by": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "filter_config": "{}",
+        "ab_test_enabled": false,
+        "ab_variant_b_template_id": null,
+        "ab_split_percentage": 50
+      },
+      {
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "name": "sms",
+        "type": "bulk",
+        "channel": "sms",
+        "template_id": "678401b5-f4ee-470f-933b-65c3b32f9977",
+        "subject": "",
+        "body": "b",
+        "recipients_count": 15,
+        "status": "draft",
+        "scheduled_at": "",
+        "created_by": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "filter_config": "{}",
+        "ab_test_enabled": false,
+        "ab_variant_b_template_id": null,
+        "ab_split_percentage": 50
+      }
+    ]
   },
   "campaign_recipients": {
     "_schema": "",
-    "_data": []
+    "_data": [
+      {
+        "campaign_id": null,
+        "lead_id": "a14b7e58-e559-422e-8988-f00054ad3c0b",
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "variant": "a"
+      },
+      {
+        "campaign_id": null,
+        "lead_id": "c0a88449-aaec-4915-bfcc-20d9d3da2c20",
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "variant": "a"
+      },
+      {
+        "campaign_id": null,
+        "lead_id": "61f66509-4575-477c-9d92-78a946ed252f",
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "variant": "a"
+      },
+      {
+        "campaign_id": null,
+        "lead_id": "0dc77b86-0a1f-4d05-982a-61b5ef15860b",
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "variant": "a"
+      },
+      {
+        "campaign_id": null,
+        "lead_id": "3c8aeae7-5246-4af6-b693-5d8e1a4ad873",
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "variant": "a"
+      },
+      {
+        "campaign_id": null,
+        "lead_id": "fbe08e01-fa6a-4b4f-bc74-8641b53b767d",
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "variant": "a"
+      },
+      {
+        "campaign_id": null,
+        "lead_id": "51c415a5-2160-44cd-a117-548b657da7e0",
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "variant": "a"
+      },
+      {
+        "campaign_id": null,
+        "lead_id": "02d02e72-5770-462a-8f30-1867c5d3d549",
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "variant": "a"
+      },
+      {
+        "campaign_id": null,
+        "lead_id": "f9b6b2e7-d7d6-4453-b3da-846a78dc4b52",
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "variant": "a"
+      },
+      {
+        "campaign_id": null,
+        "lead_id": "8d800be4-8d5e-426d-bf59-44e975e70a32",
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "variant": "a"
+      },
+      {
+        "campaign_id": null,
+        "lead_id": null,
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "variant": "a"
+      },
+      {
+        "campaign_id": null,
+        "lead_id": null,
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "variant": "a"
+      },
+      {
+        "campaign_id": null,
+        "lead_id": null,
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "variant": "a"
+      },
+      {
+        "campaign_id": null,
+        "lead_id": null,
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "variant": "a"
+      },
+      {
+        "campaign_id": null,
+        "lead_id": null,
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "variant": "a"
+      },
+      {
+        "campaign_id": null,
+        "lead_id": "a14b7e58-e559-422e-8988-f00054ad3c0b",
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "variant": "a"
+      },
+      {
+        "campaign_id": null,
+        "lead_id": "c0a88449-aaec-4915-bfcc-20d9d3da2c20",
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "variant": "a"
+      },
+      {
+        "campaign_id": null,
+        "lead_id": "61f66509-4575-477c-9d92-78a946ed252f",
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "variant": "a"
+      },
+      {
+        "campaign_id": null,
+        "lead_id": "0dc77b86-0a1f-4d05-982a-61b5ef15860b",
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "variant": "a"
+      },
+      {
+        "campaign_id": null,
+        "lead_id": "3c8aeae7-5246-4af6-b693-5d8e1a4ad873",
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "variant": "a"
+      },
+      {
+        "campaign_id": null,
+        "lead_id": "fbe08e01-fa6a-4b4f-bc74-8641b53b767d",
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "variant": "a"
+      },
+      {
+        "campaign_id": null,
+        "lead_id": "51c415a5-2160-44cd-a117-548b657da7e0",
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "variant": "a"
+      },
+      {
+        "campaign_id": null,
+        "lead_id": "02d02e72-5770-462a-8f30-1867c5d3d549",
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "variant": "a"
+      },
+      {
+        "campaign_id": null,
+        "lead_id": "f9b6b2e7-d7d6-4453-b3da-846a78dc4b52",
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "variant": "a"
+      },
+      {
+        "campaign_id": null,
+        "lead_id": "8d800be4-8d5e-426d-bf59-44e975e70a32",
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "variant": "a"
+      },
+      {
+        "campaign_id": null,
+        "lead_id": null,
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "variant": "a"
+      },
+      {
+        "campaign_id": null,
+        "lead_id": null,
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "variant": "a"
+      },
+      {
+        "campaign_id": null,
+        "lead_id": null,
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "variant": "a"
+      },
+      {
+        "campaign_id": null,
+        "lead_id": null,
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "variant": "a"
+      },
+      {
+        "campaign_id": null,
+        "lead_id": null,
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "variant": "a"
+      }
+    ]
   },
   "content_files": {
     "_schema": "",
@@ -456,7 +1207,54 @@
   },
   "integrations": {
     "_schema": "",
-    "_data": []
+    "_data": [
+      {
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "type": "facebook",
+        "is_connected": true,
+        "credentials": "{\"pages\":[\"1\"]}",
+        "config": "{}",
+        "field_mapping": "{}"
+      },
+      {
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "type": "whatsapp",
+        "is_connected": true,
+        "credentials": "{\"phone\":\"32411321123\",\"mode\":\"coexistence\"}",
+        "config": "{}",
+        "field_mapping": "{}"
+      },
+      {
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "type": "facebook",
+        "is_connected": true,
+        "credentials": "{}",
+        "config": "{}",
+        "field_mapping": "{}"
+      },
+      {
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "type": "facebook",
+        "is_connected": true,
+        "credentials": "{}",
+        "config": "{}",
+        "field_mapping": "{}"
+      },
+      {
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "type": "{\"accessToken\":\"EAAY4bG1e0scBSD025zx7vIwq45ssQdZAHZCq2hTiWyyf0A6SBxSDZCdDW6MZAz1sx6hja0RJA7aRaaK4fn2BJyqZAKDtoj9KdQUB3hZCeDZCjtdZB6Q3eu70RXZA3JFZAM0ITsIX02CX4uRTu1sfEh7YmrmlOGkvcAB5HdpEXTFvlXcZBiDzlEORMXKBOwfCM7c8ZBmTYhTj2x1AbiwfpBEuJNQU01hh9ZCpIihlk1xLMQVx0Pd7EduVwhGYcBZCmu0JRzONlwhjCWQHjEx9Pr4wM53sQnluCtEZAVr1mart8qczE2EcpoA1C6gGvgRCshqlsPtg1v5mtWyDyIZD\",\"pages\":[]}",
+        "is_connected": "{}",
+        "credentials": null,
+        "config": null
+      },
+      {
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "type": "{\"accessToken\":\"EAAY4bG1e0scBSMWkiZAAYXbCQ1YeVKGWyvsZA5yKWqcoLcvrLSFGppgJZCL2Py64VKEl9lmJI6SCchxWVCJ80nnX8tGTNdU6AZA7OenPrmg30ZAvkZB5NT1vZCFCDCSYo1xcscwExeFU2ErKszuTALC4r94HAWIyhyNjsUOMlvk8ajZBcsXfu4kXCflbdIreBTuQEDh7DuB367pOhBEj2rczhl9ZCLYIrPGdVscHWcHus1Mt70SmWkorGRXaRDoAXf3PU3MBNpXffEZBZCA4N9ZBDrvxyLgy2DY9pvrhrZBrHTJ8j6xV0KJKsHj7bHZC71vPpWNnyN0TqGDQIZD\",\"pages\":[]}",
+        "is_connected": "{}",
+        "credentials": null,
+        "config": null
+      }
+    ]
   },
   "webhook_endpoints": {
     "_schema": "",
@@ -548,16 +1346,334 @@
         "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
         "token": "b52b5db4d6ab97b5965cf19d0b3b82263d7d756d9d6691ce6169a829bf9579dec1360e8520d71073",
         "expires_at": "2026-07-24T10:05:49.086Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "9f792241ad97d3c33df6cb85d32fe9bb41e3f4e86571de4eb964fe49cafe21534d34e7e6f688c056",
+        "expires_at": "2026-07-27T10:06:43.284Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "ad3f322f359f4265098409a3e13dffa2206bba5706a200c44a129e5e56151e9dae09c8913847e07f",
+        "expires_at": "2026-07-27T10:07:07.121Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "06031d85b81515624b166f48c7ce6ec035bd945e6c0b47826d23ec7c3cfc186abc98668ef5a2d01e",
+        "expires_at": "2026-07-27T11:39:10.868Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "cd7ad1bda326e3926278422fb0c5c507396dcc4d26f06d409e7c43c3d74bad7de5833365204e19b2",
+        "expires_at": "2026-07-27T11:40:01.962Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "3b9396ecc9a81cf407eae01a01f67178f0096a1591c12407619d2a30855a7ced8d7e4d234f17a018",
+        "expires_at": "2026-07-27T11:43:34.798Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "2ea719f0ea8d63b4642cd6394c24657c61f81a94d964683cfa0ae6e69b746ea962e10aa6f8093fda",
+        "expires_at": "2026-07-27T11:46:50.724Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "5c249a874e95ca8ee2981627336b552ddf1bdb2b179abb8d478fbff0e86930a90ec6e240ed71bcad",
+        "expires_at": "2026-07-27T11:46:56.910Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "d9157fa599f2edcfa397ca92dc70267aa1fd9b2dc15d3e77d8a0f5bce3a077f50681a4fe351546a1",
+        "expires_at": "2026-07-27T11:47:14.300Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "58172c915699492e187b35df32cfb5ad9662632cd92735516d025aee628dd8a4b4cc00108e13ae3c",
+        "expires_at": "2026-07-27T11:50:42.521Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "8aff0c8cf9231462713b22289c992e928cf423a439b7177b358038bcc9cd3686b676054f05fe9470",
+        "expires_at": "2026-07-27T11:50:51.647Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "d51511325973c2a2f639e8407d0b430dc074f994066a235baca46e932dbaac40fa9826464f1bfd0b",
+        "expires_at": "2026-07-27T11:55:34.790Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "a79ab8eb7978f1abdc7c7ff1df9db1be50741243f0451a2b5a1d9ccbe20bdb4c4585d23e00b322d9",
+        "expires_at": "2026-07-27T11:59:22.218Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "a2b45fa7dab1e31e136262dd087b8742ff78854cbaabfbbab71563026c1317aae08140040fc1faa0",
+        "expires_at": "2026-07-27T12:00:05.718Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "e89827475c4069f0bc675dd5035c74f733adf1a9d37259c61125d2f7278e6e6602e332de8cd1975e",
+        "expires_at": "2026-07-27T12:00:21.213Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "490fffad6721ba2582e3a0af1d01e8290d8d1f3b92d6a093149aefc8a8717f3af5055d188fa11410",
+        "expires_at": "2026-07-27T12:04:51.006Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "ec8f761a7f3f31b721f807bfd0b6a3e2d39ef4914d7e0e424dae0e0c4e756c9be027b388a0d52555",
+        "expires_at": "2026-07-27T12:05:01.245Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "6646f16e3002b4df1decf330e85c819486c269103af12d40bfd0984d62f91c041b06c22ec753b37c",
+        "expires_at": "2026-07-27T12:05:53.089Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "79313326efddea55bfe42c97ea95bcbc80a473971c1731baeb1b3b2c889b1efacc989fdd565cf411",
+        "expires_at": "2026-07-27T12:21:09.243Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "4c59d0dc17c0656bb772c16cfa9f6304496a85bcfbbfc44b1c431531d46062cbc1fcf3efb8cd086e",
+        "expires_at": "2026-07-27T12:36:09.211Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "e3439e9801a978f32350d0384ffc6607f7601dcce0d7044d389ef2fcda2cdfe4a8d051c13caa4f04",
+        "expires_at": "2026-07-27T12:51:09.216Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "409619cf08bd831ee527eac8c2c41929c288c0eaf1258a5a582c89b882120bdd376ec8b7b0d9749c",
+        "expires_at": "2026-07-27T13:06:09.235Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "d29c3f6aecf40b17493db325525d7ccb896fdd2ae9ae72638828b6a3be6c1233faaa6e002f51ec8b",
+        "expires_at": "2026-07-27T13:12:01.903Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "ac9dee14e1ee11cf8d44ed0c74541d7a19e04ec8c4cf17bbf2b6a80a531c341d85fb429d398625ae",
+        "expires_at": "2026-07-27T13:27:09.190Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "4db648875c63da13b5f9ed39f63ee4b63231d898ac84dbca3edc9e81244c18ebfb5684845c7451c5",
+        "expires_at": "2026-07-27T13:42:09.232Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "7679f0e8633922097f6ebb3f79bd5241074ec29e41b8c344655b25e553a89a2024fb39d7c140e566",
+        "expires_at": "2026-07-27T14:15:06.624Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "9c74a998b7ec7fd3d825009354c38f14a42794aaaa9507550ad6c8e2e32bfac69f97589ba54de903",
+        "expires_at": "2026-07-27T14:30:08.116Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "d8f73b76a7d4f8276152bb7c68911bd166de1d85f6565c359059f4550343d6a0cfae493d1032123d",
+        "expires_at": "2026-07-27T14:45:09.218Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "1aa8e36d0364b2c74ae8530e031275aca5402ca5af39fab496cae07fe78a9c890c842d5723e38371",
+        "expires_at": "2026-07-29T09:26:25.617Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "276837ad77531dc10d0d2f8c21c1276644da3da8652e3ebf93f8515352a91167f0aff92651136218",
+        "expires_at": "2026-07-29T09:42:10.752Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "ded316718011f870f274f6420de0f22568b6226fd192a7faccd1c6d2e3094229db0138d37b3ffb32",
+        "expires_at": "2026-07-29T09:57:11.257Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "1e9bda142f4d04c52e05bdfa5f33d378969b01cdc7df750ea085201bd48a2bd235b1d20009099073",
+        "expires_at": "2026-07-29T10:13:10.661Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "e9f78cea371b15c8e6881fbe73a79c4d51472084479d375b2529e3a4509a0f4e30769ada6a28777a",
+        "expires_at": "2026-07-29T10:28:10.987Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "8388b514b8cb6816f5d38547bd42da8eb004b1bf60c58ea61c8afd6138d955258284978ba2cada0c",
+        "expires_at": "2026-07-29T10:43:10.624Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "d6910db29de1f263012a5cd39cd0f4ba8b94fe918cd0a641a6296fc2a1ef5f19e1753bce6dfca00f",
+        "expires_at": "2026-07-29T10:58:10.677Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "05dfe0643f7b98892a9bf1148189acf50c9a6a3527bf1764d5bc9fb4fc775f422b4a22ef42926ad8",
+        "expires_at": "2026-07-29T11:13:10.619Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "043dc4e5efbfbf05f6dea65d9055ad8885f781ccd1fbd154d113aba59f72017560f48c45ba49593d",
+        "expires_at": "2026-07-29T11:22:45.147Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "da80d171a4dc0903e963ba872b1834f38a1a8c0e54c78903147cea662021b71f3d4f7fcd0f1eef1b",
+        "expires_at": "2026-07-29T11:22:45.157Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "8ef725944095d65a0a06c1e3cebe424f1d9191e75db2a81149ff9fb6e03e89918686489e30e70acb",
+        "expires_at": "2026-07-29T11:22:51.266Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "4ef4b70d5a99ac647b91803c256716f23615bcf1d10aa4767aaf402e99988b1eaf37f173e9156ca4",
+        "expires_at": "2026-07-29T11:39:52.470Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "81fc5535869688053454d09b1384ffd478e9c3b783bddf84b1084b882f681312422bcfc062259899",
+        "expires_at": "2026-07-29T11:46:13.149Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "88bf397a0af0cb3cf1be48119479372d41ff7f2e2d6dd0d4866cd6284a4da2cfc45ac9173a4e79aa",
+        "expires_at": "2026-07-29T11:56:16.790Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "1c240db992b4d0e03076c1b2a34ecc8b8cd3171a664c129b9b4a790fd1d41553d596492eea021af8",
+        "expires_at": "2026-07-29T12:11:38.550Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "597e26cdcd7f2cc5c264eb99ff22a4b9be76570f26e8d4f557cdb3f7b603f69293b952449b67b0f1",
+        "expires_at": "2026-07-29T12:26:39.517Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "fa5054ab99d3e18d8983954dfb29845c9d21b10fe250155cb7b5091c9d797cf8a77d67f3ba4d7b27",
+        "expires_at": "2026-07-29T12:41:52.248Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "52819aa4189d7623d7f86ef30ae0746ac13011d22f1be930b002c1c42e11b8415cfd2d353e649f48",
+        "expires_at": "2026-07-29T12:57:03.595Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "6911da1d727538c3fea284ecc8a65a62653aee7b6ed91997968640731dccdad6bcb0bea2b4d9f86b",
+        "expires_at": "2026-07-29T13:12:10.791Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "c79d35cdc498589f2e40abe3dfb0c8a45660d182dcb005f541f865ff6e63df86cfa41d39dc9e776f",
+        "expires_at": "2026-07-29T13:27:10.661Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "c090806daef5c8c827d7d6d4a7b18f55de2fdc9376da330d3bf344694ea2274940076ab7ddbe98ef",
+        "expires_at": "2026-07-29T13:42:10.647Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "16b9118f922680ec2ada0c912c1f7cd65dda507d73556c2b206ab9c845189e32b4a560b77d5fcc30",
+        "expires_at": "2026-07-29T14:08:21.131Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "d737705edcbda10959c2dec16137c9e78eb68fac0f265b89e15ec4e1ff5d776b33ddb45c383d1105",
+        "expires_at": "2026-07-29T14:23:37.555Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "657281571fd59975eb4a4b307c52af0d1d1730f0afac87ebc791fe8349e8b533cae14ccdda7e8816",
+        "expires_at": "2026-07-29T14:38:06.158Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "fc5804b9f649ccc9d1b11eb931d45ff5e7e928d0ff84a50bb857c33c532dbd65889faf8d4005c920",
+        "expires_at": "2026-07-29T14:53:23.578Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "5ce2b99182c9e966ee6f77470428a307c12064549d70e165190f72c6e1fbd75bb8e1561cdd9b55ae",
+        "expires_at": "2026-07-29T15:09:10.592Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "4b152326932b1c53c03d8f695a9eedf17217fb2cba04cc73fdd6d28026243cede64b1e6a2b475f87",
+        "expires_at": "2026-07-29T15:24:10.594Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "9f50c51e3a6ddb2ac2f4d3dbf5081601ecb849274c8c7767365059536d1eafb13f2f7da1da81bbed",
+        "expires_at": "2026-07-29T15:39:10.694Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "f1c64c64f8e8d55bdf73e0826fd8cdcb8c076d90871007fcdc56277ac08c597077847c10d3a6a3e5",
+        "expires_at": "2026-07-29T15:49:47.632Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "777822ede753592e54d291ab856b751580977e5b6975825629585ff80ec39ae9d810b968fb7748d2",
+        "expires_at": "2026-07-29T16:05:10.621Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "d5cfc59cefc4ee891078a66db70defe9071c49b0e7be15320093860a6c01d6aeb7c7b4e9ec857c83",
+        "expires_at": "2026-07-29T16:05:10.634Z"
+      },
+      {
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "token": "7f351e069bbef114480c16c0fbe67f76a6d14ab9033bd4b5e032a007b3c3728cd47c92d71c9d62f5",
+        "expires_at": "2026-07-30T12:23:19.334Z"
       }
     ]
   },
   "password_resets": {
     "_schema": "",
-    "_data": []
+    "_data": [
+      {
+        "email": "ashir.qureshi.aqq@gmail.com",
+        "token": "9ee21ff0181915e7f4f4003d928e822e854124b040eb15834eaf276fb674436c",
+        "expires_at": "2026-07-22T12:39:43.859Z"
+      }
+    ]
   },
   "export_history": {
     "_schema": "",
-    "_data": []
+    "_data": [
+      {
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "type": "leads",
+        "filter_config": "{}",
+        "fields": "[\"first_name\",\"last_name\",\"phone\",\"email\",\"city\",\"budget\",\"lead_source\",\"stage\",\"created_at\"]",
+        "row_count": 13
+      },
+      {
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "user_id": "08482e9f-dfc3-4628-bba0-1a9d09fac80e",
+        "type": "leads",
+        "filter_config": "{}",
+        "fields": "[\"first_name\",\"last_name\",\"phone\",\"email\",\"city\",\"budget\",\"lead_source\",\"stage\",\"created_at\"]",
+        "row_count": 33
+      }
+    ]
   },
   "territories": {
     "_schema": "",
@@ -570,5 +1686,73 @@
   "sequence_enrollments": {
     "_schema": "",
     "_data": []
+  },
+  "lead_form_pages": {
+    "_schema": "",
+    "_data": [
+      {
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "name": "Contact",
+        "form_key": "6c7b93df698c9114",
+        "title": "Contact",
+        "description": "",
+        "fields": "[{\"name\":\"first_name\",\"label\":\"First Name\",\"type\":\"text\",\"required\":true},{\"name\":\"phone\",\"label\":\"Phone\",\"type\":\"phone\",\"required\":true},{\"name\":\"email\",\"label\":\"Email\",\"type\":\"email\",\"required\":false}]",
+        "branding": "{\"logo_url\":\"\",\"primary_color\":\"#2563eb\"}",
+        "assigned_to": null,
+        "redirect_url": "",
+        "thank_you_message": "Thank you! We will contact you soon."
+      },
+      {
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "name": "Ahir Website",
+        "form_key": "24b31c5e04d928e8",
+        "title": "Contact me",
+        "description": "no description",
+        "fields": "[{\"name\":\"first_name\",\"label\":\"First Name\",\"type\":\"text\",\"required\":true},{\"name\":\"phone\",\"label\":\"Phone\",\"type\":\"phone\",\"required\":true},{\"name\":\"email\",\"label\":\"Email\",\"type\":\"email\",\"required\":true}]",
+        "branding": "{\"logo_url\":\"https://www.bucketlistly.blog/posts/best-free-travel-images\",\"primary_color\":\"#2563eb\"}",
+        "assigned_to": null,
+        "redirect_url": "https://www.dreamstime.com/travel-photography-woman-camera-beach-perspective-shooting-scenic-recording-nature-freedom-lens-girl-image320648581",
+        "thank_you_message": "Thank you! We will contact you soon."
+      }
+    ]
+  },
+  "whatsapp_chat_assistant_rules": {
+    "_schema": "",
+    "_data": [
+      {
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "name": "testr",
+        "trigger_condition": "no_reply_5min",
+        "trigger_value": "price",
+        "action_type": "send_template",
+        "action_value": "ja",
+        "is_active": true,
+        "priority": 0
+      }
+    ]
+  },
+  "whatsapp_sequences": {
+    "_schema": "",
+    "_data": [
+      {
+        "workspace_id": "19818961-7744-4c16-9b73-2d3b24a62b04",
+        "name": "dad",
+        "description": "da",
+        "created_by": "08482e9f-dfc3-4628-bba0-1a9d09fac80e"
+      }
+    ]
+  },
+  "whatsapp_sequence_steps": {
+    "_schema": "",
+    "_data": [
+      {
+        "sequence_id": null,
+        "step_number": 1,
+        "template_id": null,
+        "message": "da",
+        "delay_hours": 0,
+        "trigger_type": "immediate"
+      }
+    ]
   }
 }

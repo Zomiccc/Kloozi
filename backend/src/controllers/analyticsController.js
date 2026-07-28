@@ -3,106 +3,113 @@ const db = require('../config/database');
 exports.getDashboard = async (req, res, next) => {
   try {
     const wsId = req.workspaceId;
-    const { date_from, date_to } = req.query;
 
-    let dateFilter = '';
-    let params = [wsId];
-    if (date_from && date_to) {
-      dateFilter = ' AND created_at BETWEEN $2 AND $3';
-      params.push(date_from, date_to);
-    }
+    const leadsRes = await db.query('SELECT * FROM leads WHERE workspace_id = $1', [wsId]);
+    const leads = leadsRes.rows || [];
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+    const yesterday = new Date(now.getTime() - 86400000);
+    const yesterdayStr = yesterday.toISOString().split('T')[0];
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 86400000);
 
-    const leadStats = await db.query(
-      `SELECT
-         COUNT(*) as total_leads,
-         COUNT(CASE WHEN created_at::date = CURRENT_DATE THEN 1 END) as leads_today,
-         COUNT(CASE WHEN created_at::date = CURRENT_DATE - 1 THEN 1 END) as leads_yesterday,
-         COUNT(CASE WHEN stage = 'won' THEN 1 END) as won,
-         COUNT(CASE WHEN stage = 'lost' THEN 1 END) as lost,
-         COUNT(CASE WHEN stage = 'new' THEN 1 END) as new_leads,
-         COUNT(CASE WHEN stage = 'contacted' THEN 1 END) as contacted,
-         COUNT(CASE WHEN stage = 'interested' THEN 1 END) as interested,
-         COUNT(CASE WHEN stage = 'negotiating' THEN 1 END) as negotiating
-       FROM leads WHERE workspace_id = $1`,
-      [wsId]
-    );
+    const stats = {
+      total: leads.length,
+      today: leads.filter(l => l.created_at && l.created_at.split('T')[0] === todayStr).length,
+      yesterday: leads.filter(l => l.created_at && l.created_at.split('T')[0] === yesterdayStr).length,
+      won: leads.filter(l => l.stage === 'won').length,
+      lost: leads.filter(l => l.stage === 'lost').length,
+      new: leads.filter(l => l.stage === 'new').length,
+      contacted: leads.filter(l => l.stage === 'contacted').length,
+      interested: leads.filter(l => l.stage === 'interested').length,
+      negotiating: leads.filter(l => l.stage === 'negotiating').length,
+    };
 
-    const leadsBySource = await db.query(
-      `SELECT lead_source, COUNT(*) as count FROM leads WHERE workspace_id = $1 GROUP BY lead_source ORDER BY count DESC`,
-      [wsId]
-    );
+    const sourceMap = {};
+    leads.forEach(l => {
+      const src = l.lead_source || 'unknown';
+      sourceMap[src] = (sourceMap[src] || 0) + 1;
+    });
+    const leadsBySource = Object.entries(sourceMap).map(([lead_source, count]) => ({ lead_source, count })).sort((a, b) => b.count - a.count);
 
-    const leadsByCity = await db.query(
-      `SELECT city, COUNT(*) as count FROM leads WHERE workspace_id = $1 AND city IS NOT NULL GROUP BY city ORDER BY count DESC LIMIT 10`,
-      [wsId]
-    );
+    const cityMap = {};
+    leads.forEach(l => {
+      if (l.city) {
+        cityMap[l.city] = (cityMap[l.city] || 0) + 1;
+      }
+    });
+    const leadsByCity = Object.entries(cityMap).map(([city, count]) => ({ city, count })).sort((a, b) => b.count - a.count).slice(0, 10);
 
-    const leadsByAgent = await db.query(
-      `SELECT u.id, u.first_name, u.last_name, COUNT(l.id) as lead_count,
-              COUNT(CASE WHEN l.stage = 'won' THEN 1 END) as won_count
-       FROM users u LEFT JOIN leads l ON u.id = l.assigned_to
-       WHERE u.workspace_id = $1 GROUP BY u.id, u.first_name, u.last_name ORDER BY lead_count DESC`,
-      [wsId]
-    );
+    const usersRes = await db.query('SELECT * FROM users WHERE workspace_id = $1', [wsId]);
+    const users = usersRes.rows || [];
+    const agentMap = {};
+    users.forEach(u => {
+      agentMap[u.id] = { id: u.id, first_name: u.first_name, last_name: u.last_name, lead_count: 0, won_count: 0 };
+    });
+    leads.forEach(l => {
+      if (l.assigned_to && agentMap[l.assigned_to]) {
+        agentMap[l.assigned_to].lead_count++;
+        if (l.stage === 'won') agentMap[l.assigned_to].won_count++;
+      }
+    });
+    const leadsByAgent = Object.values(agentMap).sort((a, b) => b.lead_count - a.lead_count);
 
-    const conversionRate = await db.query(
-      `SELECT
-         COUNT(CASE WHEN stage IN ('won', 'lost') THEN 1 END) as total_closed,
-         COUNT(CASE WHEN stage = 'won' THEN 1 END) as total_won
-       FROM leads WHERE workspace_id = $1`,
-      [wsId]
-    );
+    const totalClosed = stats.won + stats.lost;
+    const conversionRate = totalClosed > 0 ? ((stats.won / totalClosed) * 100).toFixed(1) : '0.0';
 
-    const stuckLeads = await db.query(
-      `SELECT COUNT(*) as count FROM leads WHERE workspace_id = $1 AND last_activity_at < NOW() - INTERVAL '7 days' AND stage NOT IN ('won', 'lost')`,
-      [wsId]
-    );
+    const stuckLeads = leads.filter(l => {
+      if (l.stage === 'won' || l.stage === 'lost') return false;
+      if (!l.last_activity_at) return true;
+      return new Date(l.last_activity_at) < sevenDaysAgo;
+    }).length;
 
-    const callsToday = await db.query(
-      `SELECT COUNT(*) as count FROM calls WHERE workspace_id = $1 AND created_at::date = CURRENT_DATE`,
-      [wsId]
-    );
+    let callsToday = 0;
+    try {
+      const callsRes = await db.query('SELECT * FROM calls WHERE workspace_id = $1', [wsId]);
+      callsToday = (callsRes.rows || []).filter(c => c.created_at && c.created_at.split('T')[0] === todayStr).length;
+    } catch {}
 
-    const followUpsToday = await db.query(
-      `SELECT COUNT(*) as total, COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed
-       FROM follow_ups WHERE workspace_id = $1 AND due_date::date = CURRENT_DATE`,
-      [wsId]
-    );
+    let followUpsToday = { total: 0, completed: 0 };
+    try {
+      const fuRes = await db.query('SELECT * FROM follow_ups WHERE workspace_id = $1', [wsId]);
+      const fus = (fuRes.rows || []).filter(f => f.due_date && f.due_date.split('T')[0] === todayStr);
+      followUpsToday = { total: fus.length, completed: fus.filter(f => f.status === 'completed').length };
+    } catch {}
 
-    const emailsToday = await db.query(
-      `SELECT COUNT(*) as count FROM emails WHERE workspace_id = $1 AND sent_at::date = CURRENT_DATE`,
-      [wsId]
-    );
+    let emailsToday = 0;
+    try {
+      const emRes = await db.query('SELECT * FROM emails WHERE workspace_id = $1', [wsId]);
+      emailsToday = (emRes.rows || []).filter(e => e.sent_at && e.sent_at.split('T')[0] === todayStr).length;
+    } catch {}
 
-    const leadTrend = await db.query(
-      `SELECT created_at::date as date, COUNT(*) as count FROM leads WHERE workspace_id = $1 AND created_at > NOW() - INTERVAL '30 days' GROUP BY date ORDER BY date`,
-      [wsId]
-    );
-
-    const cr = conversionRate.rows[0];
-    const totalClosed = parseInt(cr.total_closed) || 1;
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 86400000);
+    const trendMap = {};
+    leads.filter(l => l.created_at && new Date(l.created_at) > thirtyDaysAgo).forEach(l => {
+      const d = l.created_at.split('T')[0];
+      trendMap[d] = (trendMap[d] || 0) + 1;
+    });
+    const leadTrend = Object.entries(trendMap).map(([date, count]) => ({ date, count })).sort((a, b) => a.date.localeCompare(b.date));
 
     res.json({
       leadStats: {
-        totalLeads: parseInt(leadStats.rows[0].total_leads),
-        leadsToday: parseInt(leadStats.rows[0].leads_today),
-        leadsYesterday: parseInt(leadStats.rows[0].leads_yesterday),
-        won: parseInt(leadStats.rows[0].won),
-        lost: parseInt(leadStats.rows[0].lost),
-        newLeads: parseInt(leadStats.rows[0].new_leads),
-        contacted: parseInt(leadStats.rows[0].contacted),
-        interested: parseInt(leadStats.rows[0].interested),
-        negotiating: parseInt(leadStats.rows[0].negotiating),
+        totalLeads: stats.total,
+        leadsToday: stats.today,
+        leadsYesterday: stats.yesterday,
+        won: stats.won,
+        lost: stats.lost,
+        newLeads: stats.new,
+        contacted: stats.contacted,
+        interested: stats.interested,
+        negotiating: stats.negotiating,
       },
-      leadsBySource: leadsBySource.rows,
-      leadsByCity: leadsByCity.rows,
-      leadsByAgent: leadsByAgent.rows,
-      conversionRate: ((parseInt(cr.total_won) / totalClosed) * 100).toFixed(1),
-      stuckLeads: parseInt(stuckLeads.rows[0].count),
-      callsToday: parseInt(callsToday.rows[0].count),
-      followUpsToday: { total: parseInt(followUpsToday.rows[0].total), completed: parseInt(followUpsToday.rows[0].completed) },
-      emailsToday: parseInt(emailsToday.rows[0].count),
-      leadTrend: leadTrend.rows,
+      leadsBySource,
+      leadsByCity,
+      leadsByAgent,
+      conversionRate,
+      stuckLeads,
+      callsToday,
+      followUpsToday,
+      emailsToday,
+      leadTrend,
     });
   } catch (err) { next(err); }
 };
@@ -110,100 +117,301 @@ exports.getDashboard = async (req, res, next) => {
 exports.getLeadAnalytics = async (req, res, next) => {
   try {
     const wsId = req.workspaceId;
-    const { date_from, date_to } = req.query;
-    let dateFilter = '';
-    let params = [wsId];
-    if (date_from && date_to) {
-      dateFilter = ' AND created_at BETWEEN $2 AND $3';
-      params.push(date_from, date_to);
-    }
+    const leadsRes = await db.query('SELECT * FROM leads WHERE workspace_id = $1', [wsId]);
+    const leads = leadsRes.rows || [];
 
-    const bySource = await db.query(`SELECT lead_source, COUNT(*) as count FROM leads WHERE workspace_id = $1${dateFilter} GROUP BY lead_source ORDER BY count DESC`, params);
-    const byCity = await db.query(`SELECT city, COUNT(*) as count FROM leads WHERE workspace_id = $1 AND city IS NOT NULL${dateFilter} GROUP BY city ORDER BY count DESC`, params);
-    const byBudget = await db.query(`SELECT CASE WHEN budget < 10000 THEN '0-10k' WHEN budget < 50000 THEN '10k-50k' WHEN budget < 100000 THEN '50k-100k' WHEN budget >= 100000 THEN '100k+' END as range, COUNT(*) as count FROM leads WHERE workspace_id = $1 AND budget IS NOT NULL${dateFilter} GROUP BY range ORDER BY range`, params);
-    const byAgent = await db.query(`SELECT u.first_name, u.last_name, COUNT(l.id) as count FROM users u LEFT JOIN leads l ON u.id = l.assigned_to WHERE u.workspace_id = $1 GROUP BY u.id ORDER BY count DESC`, [wsId]);
-    const trend = await db.query(`SELECT created_at::date as date, COUNT(*) as count FROM leads WHERE workspace_id = $1${dateFilter} GROUP BY date ORDER BY date`, params);
+    const sourceMap = {};
+    leads.forEach(l => { const s = l.lead_source || 'unknown'; sourceMap[s] = (sourceMap[s] || 0) + 1; });
+    const bySource = Object.entries(sourceMap).map(([lead_source, count]) => ({ lead_source, count })).sort((a, b) => b.count - a.count);
 
-    res.json({ bySource: bySource.rows, byCity: byCity.rows, byBudget: byBudget.rows, byAgent: byAgent.rows, trend: trend.rows });
+    const cityMap = {};
+    leads.forEach(l => { if (l.city) { cityMap[l.city] = (cityMap[l.city] || 0) + 1; } });
+    const byCity = Object.entries(cityMap).map(([city, count]) => ({ city, count })).sort((a, b) => b.count - a.count);
+
+    const budgetMap = { '0-10k': 0, '10k-50k': 0, '50k-100k': 0, '100k+': 0 };
+    leads.forEach(l => {
+      const b = Number(l.budget);
+      if (!b) return;
+      if (b < 10000) budgetMap['0-10k']++;
+      else if (b < 50000) budgetMap['10k-50k']++;
+      else if (b < 100000) budgetMap['50k-100k']++;
+      else budgetMap['100k+']++;
+    });
+    const byBudget = Object.entries(budgetMap).map(([range, count]) => ({ range, count }));
+
+    const usersRes = await db.query('SELECT * FROM users WHERE workspace_id = $1', [wsId]);
+    const agentMap = {};
+    (usersRes.rows || []).forEach(u => { agentMap[u.id] = { first_name: u.first_name, last_name: u.last_name, count: 0 }; });
+    leads.forEach(l => { if (l.assigned_to && agentMap[l.assigned_to]) agentMap[l.assigned_to].count++; });
+    const byAgent = Object.values(agentMap).sort((a, b) => b.count - a.count);
+
+    const trendMap = {};
+    leads.forEach(l => { if (l.created_at) { const d = l.created_at.split('T')[0]; trendMap[d] = (trendMap[d] || 0) + 1; } });
+    const trend = Object.entries(trendMap).map(([date, count]) => ({ date, count })).sort((a, b) => a.date.localeCompare(b.date));
+
+    res.json({ bySource, byCity, byBudget, byAgent, trend });
   } catch (err) { next(err); }
 };
 
 exports.getConversionAnalytics = async (req, res, next) => {
   try {
     const wsId = req.workspaceId;
-    const bySource = await db.query(
-      `SELECT lead_source,
-         COUNT(CASE WHEN stage = 'won' THEN 1 END) as won,
-         COUNT(CASE WHEN stage = 'lost' THEN 1 END) as lost,
-         COUNT(*) as total
-       FROM leads WHERE workspace_id = $1 GROUP BY lead_source`,
-      [wsId]
-    );
-    const byAgent = await db.query(
-      `SELECT u.first_name, u.last_name,
-         COUNT(CASE WHEN l.stage = 'won' THEN 1 END) as won,
-         COUNT(CASE WHEN l.stage = 'lost' THEN 1 END) as lost,
-         COUNT(l.id) as total
-       FROM users u LEFT JOIN leads l ON u.id = l.assigned_to WHERE u.workspace_id = $1 GROUP BY u.id`,
-      [wsId]
-    );
-    const avgTimeToClose = await db.query(
-      `SELECT AVG(EXTRACT(EPOCH FROM (updated_at - created_at))/86400) as avg_days FROM leads WHERE workspace_id = $1 AND stage = 'won'`,
-      [wsId]
-    );
+    const leadsRes = await db.query('SELECT * FROM leads WHERE workspace_id = $1', [wsId]);
+    const leads = leadsRes.rows || [];
+    const usersRes = await db.query('SELECT * FROM users WHERE workspace_id = $1', [wsId]);
+    const users = usersRes.rows || [];
 
-    res.json({
-      bySource: bySource.rows.map(r => ({ ...r, conversionRate: ((parseInt(r.won) / (parseInt(r.total) || 1)) * 100).toFixed(1) })),
-      byAgent: byAgent.rows.map(r => ({ ...r, conversionRate: ((parseInt(r.won) / (parseInt(r.total) || 1)) * 100).toFixed(1) })),
-      avgTimeToClose: avgTimeToClose.rows[0].avg_days ? parseFloat(avgTimeToClose.rows[0].avg_days).toFixed(1) : 0,
+    const srcMap = {};
+    leads.forEach(l => {
+      const s = l.lead_source || 'unknown';
+      if (!srcMap[s]) srcMap[s] = { won: 0, lost: 0, total: 0 };
+      srcMap[s].total++;
+      if (l.stage === 'won') srcMap[s].won++;
+      if (l.stage === 'lost') srcMap[s].lost++;
     });
+    const bySource = Object.entries(srcMap).map(([lead_source, v]) => ({
+      lead_source, ...v,
+      conversionRate: ((v.won / (v.total || 1)) * 100).toFixed(1)
+    }));
+
+    const agentMap = {};
+    users.forEach(u => { agentMap[u.id] = { first_name: u.first_name, last_name: u.last_name, won: 0, lost: 0, total: 0 }; });
+    leads.forEach(l => {
+      if (l.assigned_to && agentMap[l.assigned_to]) {
+        agentMap[l.assigned_to].total++;
+        if (l.stage === 'won') agentMap[l.assigned_to].won++;
+        if (l.stage === 'lost') agentMap[l.assigned_to].lost++;
+      }
+    });
+    const byAgent = Object.values(agentMap).map(v => ({
+      ...v, conversionRate: ((v.won / (v.total || 1)) * 100).toFixed(1)
+    }));
+
+    const wonLeads = leads.filter(l => l.stage === 'won');
+    let avgDays = 0;
+    if (wonLeads.length > 0) {
+      const totalDays = wonLeads.reduce((sum, l) => {
+        if (l.created_at && l.updated_at) {
+          return sum + (new Date(l.updated_at) - new Date(l.created_at)) / 86400000;
+        }
+        return sum;
+      }, 0);
+      avgDays = (totalDays / wonLeads.length).toFixed(1);
+    }
+
+    res.json({ bySource, byAgent, avgTimeToClose: parseFloat(avgDays) });
   } catch (err) { next(err); }
 };
 
 exports.getPipelineAnalytics = async (req, res, next) => {
   try {
     const wsId = req.workspaceId;
-    const stages = await db.query(
-      `SELECT s.name, s.color, COUNT(l.id) as count FROM lead_stages s LEFT JOIN leads l ON s.id = l.stage_id AND l.workspace_id = $1 WHERE s.workspace_id = $1 GROUP BY s.id, s.name, s.color ORDER BY s.sort_order`,
-      [wsId]
-    );
-    const movedThisWeek = await db.query(
-      `SELECT COUNT(DISTINCT lead_id) as count FROM lead_activities WHERE workspace_id = $1 AND type = 'stage_change' AND created_at > NOW() - INTERVAL '7 days'`,
-      [wsId]
-    );
-    const stuck = await db.query(
-      `SELECT COUNT(*) as count FROM leads WHERE workspace_id = $1 AND last_activity_at < NOW() - INTERVAL '7 days' AND stage NOT IN ('won', 'lost')`,
-      [wsId]
-    );
-    res.json({ stages: stages.rows, movedThisWeek: parseInt(movedThisWeek.rows[0].count), stuckLeads: parseInt(stuck.rows[0].count) });
+    const stagesRes = await db.query('SELECT * FROM lead_stages WHERE workspace_id = $1', [wsId]);
+    const stages = stagesRes.rows || [];
+    const leadsRes = await db.query('SELECT * FROM leads WHERE workspace_id = $1', [wsId]);
+    const leads = leadsRes.rows || [];
+    const sevenDaysAgo = new Date(Date.now() - 7 * 86400000);
+
+    const stageData = stages.map(s => ({
+      name: s.name, color: s.color,
+      count: leads.filter(l => l.stage_id === s.id).length
+    }));
+
+    let movedThisWeek = 0;
+    try {
+      const actRes = await db.query('SELECT * FROM lead_activities WHERE workspace_id = $1', [wsId]);
+      movedThisWeek = (actRes.rows || []).filter(a => a.type === 'stage_change' && a.created_at && new Date(a.created_at) > sevenDaysAgo).length;
+    } catch {}
+
+    const stuckLeads = leads.filter(l => {
+      if (l.stage === 'won' || l.stage === 'lost') return false;
+      if (!l.last_activity_at) return true;
+      return new Date(l.last_activity_at) < sevenDaysAgo;
+    }).length;
+
+    res.json({ stages: stageData, movedThisWeek, stuckLeads });
   } catch (err) { next(err); }
 };
 
 exports.getAgentPerformance = async (req, res, next) => {
   try {
     const wsId = req.workspaceId;
-    const { date_from, date_to } = req.query;
-    let dateFilter = '';
-    let params = [wsId];
-    if (date_from && date_to) {
-      dateFilter = ' AND created_at BETWEEN $2 AND $3';
-      params.push(date_from, date_to);
+    const usersRes = await db.query('SELECT * FROM users WHERE workspace_id = $1', [wsId]);
+    const users = usersRes.rows || [];
+    const leadsRes = await db.query('SELECT * FROM leads WHERE workspace_id = $1', [wsId]);
+    const leads = leadsRes.rows || [];
+
+    let calls = [], emails = [], whatsapp = [], sms = [];
+    try { calls = (await db.query('SELECT * FROM calls WHERE workspace_id = $1', [wsId])).rows || []; } catch {}
+    try { emails = (await db.query('SELECT * FROM emails WHERE workspace_id = $1', [wsId])).rows || []; } catch {}
+    try { whatsapp = (await db.query('SELECT * FROM whatsapp_messages WHERE workspace_id = $1', [wsId])).rows || []; } catch {}
+    try { sms = (await db.query('SELECT * FROM sms_messages WHERE workspace_id = $1', [wsId])).rows || []; } catch {}
+
+    const agents = users.map(u => {
+      const userLeads = leads.filter(l => l.assigned_to === u.id);
+      return {
+        id: u.id,
+        first_name: u.first_name,
+        last_name: u.last_name,
+        calls: calls.filter(c => c.user_id === u.id).length,
+        emails: emails.filter(e => e.user_id === u.id).length,
+        whatsapp: whatsapp.filter(w => w.user_id === u.id).length,
+        sms: sms.filter(s => s.user_id === u.id).length,
+        won: userLeads.filter(l => l.stage === 'won').length,
+        lost: userLeads.filter(l => l.stage === 'lost').length,
+        total_leads: userLeads.length,
+      };
+    }).sort((a, b) => b.total_leads - a.total_leads);
+
+    res.json({ agents });
+  } catch (err) { next(err); }
+};
+
+exports.getAIInsight = async (req, res, next) => {
+  try {
+    const wsId = req.workspaceId;
+    const leadsRes = await db.query('SELECT * FROM leads WHERE workspace_id = $1', [wsId]);
+    const leads = leadsRes.rows || [];
+    const todayStr = new Date().toISOString().split('T')[0];
+    const yesterdayStr = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+
+    const totalLeads = leads.length;
+    const newLeads = leads.filter(l => l.stage === 'new').length;
+    const wonLeads = leads.filter(l => l.stage === 'won').length;
+    const lostLeads = leads.filter(l => l.stage === 'lost').length;
+    const leadsToday = leads.filter(l => l.created_at && l.created_at.split('T')[0] === todayStr).length;
+    const leadsYesterday = leads.filter(l => l.created_at && l.created_at.split('T')[0] === yesterdayStr).length;
+    const stuckLeads = leads.filter(l => {
+      if (l.stage === 'won' || l.stage === 'lost') return false;
+      if (!l.last_activity_at) return true;
+      return new Date(l.last_activity_at) < new Date(Date.now() - 7 * 86400000);
+    }).length;
+
+    const sourceMap = {};
+    leads.forEach(l => { const s = l.lead_source || 'unknown'; sourceMap[s] = (sourceMap[s] || 0) + 1; });
+    const topSource = Object.entries(sourceMap).sort((a, b) => b[1] - a[1])[0];
+
+    const totalClosed = wonLeads + lostLeads;
+    const conversionRate = totalClosed > 0 ? ((wonLeads / totalClosed) * 100).toFixed(1) : '0.0';
+
+    const insights = [];
+
+    if (stuckLeads > 0) {
+      insights.push({
+        type: 'warning',
+        title: 'Stuck Leads Need Attention',
+        text: `${stuckLeads} leads have been stuck for 7+ days with no activity. Consider launching a re-engagement campaign or assigning follow-up tasks.`,
+      });
     }
 
-    const result = await db.query(
-      `SELECT u.id, u.first_name, u.last_name,
-         (SELECT COUNT(*) FROM calls WHERE user_id = u.id AND workspace_id = $1${dateFilter}) as calls,
-         (SELECT COUNT(*) FROM emails WHERE user_id = u.id AND workspace_id = $1${dateFilter}) as emails,
-         (SELECT COUNT(*) FROM whatsapp_messages WHERE user_id = u.id AND workspace_id = $1${dateFilter}) as whatsapp,
-         (SELECT COUNT(*) FROM sms_messages WHERE user_id = u.id AND workspace_id = $1${dateFilter}) as sms,
-         (SELECT COUNT(*) FROM leads WHERE assigned_to = u.id AND workspace_id = $1 AND stage = 'won') as won,
-         (SELECT COUNT(*) FROM leads WHERE assigned_to = u.id AND workspace_id = $1 AND stage = 'lost') as lost,
-         (SELECT COUNT(*) FROM leads WHERE assigned_to = u.id AND workspace_id = $1) as total_leads
-       FROM users u WHERE u.workspace_id = $1 ORDER BY total_leads DESC`,
-      [wsId]
-    );
+    if (leadsToday > 0 && leadsYesterday > 0) {
+      const change = ((leadsToday - leadsYesterday) / leadsYesterday * 100).toFixed(0);
+      if (change > 0) {
+        insights.push({
+          type: 'positive',
+          title: 'Lead Intake Rising',
+          text: `Lead intake is up ${change}% compared to yesterday. Keep the momentum going by increasing ad spend on top sources.`,
+        });
+      } else {
+        insights.push({
+          type: 'warning',
+          title: 'Lead Intake Declining',
+          text: `Lead intake is down ${Math.abs(change)}% compared to yesterday. Review your ad campaigns and lead sources.`,
+        });
+      }
+    }
 
-    res.json({ agents: result.rows });
+    if (topSource) {
+      insights.push({
+        type: 'info',
+        title: 'Top Performing Source',
+        text: `${topSource[0]} is your top lead source with ${topSource[1]} leads (${((topSource[1] / totalLeads) * 100).toFixed(0)}% of total).`,
+      });
+    }
+
+    if (conversionRate > 0) {
+      insights.push({
+        type: conversionRate > 20 ? 'positive' : 'info',
+        title: 'Conversion Rate',
+        text: `Your conversion rate is ${conversionRate}%. ${conversionRate > 20 ? 'Great performance!' : 'There\'s room for improvement — focus on lead quality and follow-up speed.'}`,
+      });
+    }
+
+    if (newLeads > totalLeads * 0.3) {
+      insights.push({
+        type: 'warning',
+        title: 'Many New Leads Uncontacted',
+        text: `${newLeads} leads (${((newLeads / totalLeads) * 100).toFixed(0)}%) are still in "New" stage. Contact them promptly before they go cold.`,
+      });
+    }
+
+    if (insights.length === 0) {
+      insights.push({
+        type: 'info',
+        title: 'Get Started',
+        text: 'Start adding leads to see AI-powered insights about your sales pipeline.',
+      });
+    }
+
+    let aiPowered = false;
+    try {
+      const config = require('../config');
+      if (config.openai.apiKey && totalLeads > 0) {
+        const OpenAI = require('openai');
+        const openai = new OpenAI({ apiKey: config.openai.apiKey });
+        const completion = await openai.chat.completions.create({
+          model: 'gpt-4o',
+          messages: [
+            { role: 'system', content: 'You are a sales analytics expert. Given lead data, provide 3 actionable insights as JSON array with "type" (positive/warning/info), "title", and "text" fields.' },
+            { role: 'user', content: `Total leads: ${totalLeads}, New: ${newLeads}, Won: ${wonLeads}, Lost: ${lostLeads}, Today: ${leadsToday}, Yesterday: ${leadsYesterday}, Stuck: ${stuckLeads}, Top source: ${topSource ? topSource[0] : 'N/A'}, Conversion: ${conversionRate}%` },
+          ],
+          temperature: 0.7,
+        });
+        const parsed = JSON.parse(completion.choices[0].message.content);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          aiPowered = true;
+          return res.json({ insights: parsed, aiPowered });
+        }
+      }
+    } catch (e) {
+      // Fall back to rule-based insights
+    }
+
+    res.json({ insights, aiPowered: false });
+  } catch (err) { next(err); }
+};
+
+exports.getTeamStats = async (req, res, next) => {
+  try {
+    const wsId = req.workspaceId;
+    const leadsRes = await db.query('SELECT * FROM leads WHERE workspace_id = $1', [wsId]);
+    const leads = leadsRes.rows || [];
+    const usersRes = await db.query('SELECT * FROM users WHERE workspace_id = $1', [wsId]);
+    const users = usersRes.rows || [];
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    let callsToday = 0, totalMessages = 0;
+    try {
+      const callsRes = await db.query('SELECT * FROM calls WHERE workspace_id = $1', [wsId]);
+      callsToday = (callsRes.rows || []).filter(c => c.created_at && c.created_at.split('T')[0] === todayStr).length;
+    } catch {}
+    try {
+      const waRes = await db.query('SELECT * FROM whatsapp_messages WHERE workspace_id = $1', [wsId]);
+      totalMessages += (waRes.rows || []).length;
+    } catch {}
+    try {
+      const smsRes = await db.query('SELECT * FROM sms_messages WHERE workspace_id = $1', [wsId]);
+      totalMessages += (smsRes.rows || []).length;
+    } catch {}
+
+    res.json({
+      totalLeads: leads.length,
+      newLeads: leads.filter(l => l.stage === 'new').length,
+      wonLeads: leads.filter(l => l.stage === 'won').length,
+      totalCalls: callsToday,
+      totalMessages,
+      activeAgents: users.filter(u => u.status === 'active').length,
+    });
   } catch (err) { next(err); }
 };
 
@@ -232,5 +440,23 @@ exports.markAllNotificationsRead = async (req, res, next) => {
   try {
     await db.query('UPDATE notifications SET is_read = true WHERE user_id = $1 AND is_read = false', [req.user.id]);
     res.json({ message: 'All notifications marked as read' });
+  } catch (err) { next(err); }
+};
+
+exports.getWorkspaceSettings = async (req, res, next) => {
+  try {
+    const wsRes = await db.query('SELECT settings FROM workspaces WHERE id = $1', [req.workspaceId]);
+    const settings = wsRes.rows[0]?.settings || {};
+    res.json({ settings });
+  } catch (err) { next(err); }
+};
+
+exports.updateWorkspaceSettings = async (req, res, next) => {
+  try {
+    const wsRes = await db.query('SELECT settings FROM workspaces WHERE id = $1', [req.workspaceId]);
+    const current = wsRes.rows[0]?.settings || {};
+    const updated = { ...current, ...req.body };
+    await db.query('UPDATE workspaces SET settings = $1, updated_at = NOW() WHERE id = $2', [JSON.stringify(updated), req.workspaceId]);
+    res.json({ settings: updated });
   } catch (err) { next(err); }
 };

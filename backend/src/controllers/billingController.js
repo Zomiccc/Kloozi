@@ -36,8 +36,9 @@ exports.getCurrentSubscription = async (req, res, next) => {
 exports.createCheckoutSession = async (req, res, next) => {
   try {
     const { plan, billing_cycle } = req.body;
-    const priceId = config.stripe.prices[plan];
-    if (!priceId) return res.status(400).json({ error: 'Invalid plan' });
+    const planDetails = PLAN_DETAILS[plan];
+    if (!planDetails || planDetails.price === null) return res.status(400).json({ error: 'Invalid plan' });
+    if (planDetails.price === 0) return res.status(400).json({ error: 'Free plan does not require checkout' });
 
     let customerId;
     const subResult = await db.query('SELECT stripe_customer_id FROM subscriptions WHERE workspace_id = $1', [req.workspaceId]);
@@ -48,20 +49,29 @@ exports.createCheckoutSession = async (req, res, next) => {
       const workspaceResult = await db.query('SELECT name FROM workspaces WHERE id = $1', [req.workspaceId]);
       const userResult = await db.query('SELECT email FROM users WHERE id = $1', [req.user.id]);
       const customer = await stripe.customers.create({
-        email: userResult.rows[0].email,
-        name: workspaceResult.rows[0].name,
+        email: userResult.rows[0]?.email,
+        name: workspaceResult.rows[0]?.name,
         metadata: { workspace_id: req.workspaceId },
       });
       customerId = customer.id;
     }
 
+    const cycle = billing_cycle === 'yearly' ? 'year' : 'month';
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       payment_method_types: ['card'],
-      line_items: [{ price: priceId, quantity: 1 }],
+      line_items: [{
+        price_data: {
+          currency: 'usd',
+          product_data: { name: `${planDetails.name} Plan` },
+          unit_amount: planDetails.price * 100,
+          recurring: { interval: cycle },
+        },
+        quantity: 1,
+      }],
       mode: 'subscription',
-      success_url: `${config.webUrl}/billing?success=true`,
-      cancel_url: `${config.webUrl}/billing?canceled=true`,
+      success_url: `${config.webUrl}/app/billing?success=true`,
+      cancel_url: `${config.webUrl}/app/billing?canceled=true`,
       metadata: { workspace_id: req.workspaceId, plan },
     });
 
@@ -80,7 +90,7 @@ exports.createPortalSession = async (req, res, next) => {
     }
     const session = await stripe.billingPortal.sessions.create({
       customer: subResult.rows[0].stripe_customer_id,
-      return_url: `${config.webUrl}/billing`,
+      return_url: `${config.webUrl}/app/billing`,
     });
     res.json({ portalUrl: session.url });
   } catch (err) { next(err); }

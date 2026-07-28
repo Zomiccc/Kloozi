@@ -255,7 +255,7 @@ exports.handleLeadFormSubmission = async (req, res, next) => {
     const d = req.body;
     const firstName = d.first_name || d.name?.split(' ')[0] || 'Unknown';
     const lastName = d.last_name || d.name?.split(' ').slice(1).join(' ') || '';
-    const agentsRes = await db.query(`SELECT u.id FROM users u WHERE u.workspace_id=$1 AND u.role='sales_agent' AND u.status='active' ORDER BY (SELECT COUNT(*) FROM leads WHERE assigned_to=u.id) ASC LIMIT 1`, [page.workspace_id]);
+    const agentsRes = await db.query(`SELECT id FROM users WHERE workspace_id=$1 AND role='sales_agent' AND status='active' LIMIT 1`, [page.workspace_id]);
     const leadRes = await db.query(
       `INSERT INTO leads (workspace_id, first_name, last_name, phone, email, city, budget, lead_source, notes, stage, assigned_to, custom_fields) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
       [page.workspace_id, firstName, lastName, d.phone, d.email, d.city, d.budget, 'lead_form', d.message || d.notes || `Form: ${page.name}`, 'new', page.assigned_to || agentsRes.rows[0]?.id, JSON.stringify(d)]

@@ -4,9 +4,18 @@ import API from '../lib/api';
 import toast from 'react-hot-toast';
 import {
   ArrowLeft, Phone, Mail, MessageSquare, Smartphone, Edit, Trash2,
-  Calendar, Clock, CheckCircle, Tag, User, Activity, Zap, FileText,
-  Send, MapPin, DollarSign, Users, ChevronRight, Star
+  Calendar, Activity, Zap, FileText,
+  Send, MapPin, DollarSign, Tag, User
 } from 'lucide-react';
+
+const stageConfig = {
+  new: { color: '#0066FF', bg: '#0066FF10' },
+  contacted: { color: '#FF9500', bg: '#FF950010' },
+  interested: { color: '#AF52DE', bg: '#AF52DE10' },
+  negotiating: { color: '#FF3B5C', bg: '#FF3B5C10' },
+  won: { color: '#34C759', bg: '#34C75910' },
+  lost: { color: '#8E8E93', bg: '#8E8E9310' },
+};
 
 export default function LeadProfile() {
   const { id } = useParams();
@@ -32,16 +41,16 @@ export default function LeadProfile() {
       loadContentViews();
     } catch (err) {
       toast.error('Failed to load lead');
-      navigate('/leads');
+      navigate('/app/leads');
     } finally { setLoading(false); }
   };
 
   const loadWhatsappMessages = async () => {
-    try { const res = await API.get(`/whatsapp/conversation/${id}`); setWhatsappMessages(res.data.messages || []); } catch {}
+    try { const res = await API.get(`/whatsapp/inbox`, { params: { lead_id: id } }); setWhatsappMessages(res.data.messages || []); } catch {}
   };
 
   const loadContentViews = async () => {
-    try { const res = await API.get(`/content/lead/${id}/views`); setContentViews(res.data.views || []); } catch {}
+    try { const res = await API.get(`/content`, { params: { lead_id: id } }); setContentViews(res.data.files || []); } catch {}
   };
 
   const handleSave = async () => {
@@ -58,7 +67,7 @@ export default function LeadProfile() {
     try {
       await API.delete(`/leads/${id}`);
       toast.success('Lead deleted');
-      navigate('/leads');
+      navigate('/app/leads');
     } catch (err) { toast.error('Delete failed'); }
   };
 
@@ -78,49 +87,85 @@ export default function LeadProfile() {
   const handleEmail = () => { if (data.lead.email) window.location.href = `mailto:${data.lead.email}`; };
   const handleSMS = () => { if (data.lead.phone) window.location.href = `sms:${data.lead.phone}`; };
 
-  if (loading) return <div className="flex items-center justify-center h-64"><div className="animate-spin w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full" /></div>;
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="skeleton h-24" />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="skeleton h-64" />
+          <div className="lg:col-span-2 skeleton h-64" />
+        </div>
+      </div>
+    );
+  }
   if (!data) return null;
 
   const lead = data.lead;
-  const stageColors = { new: 'bg-blue-100 text-blue-700', contacted: 'bg-purple-100 text-purple-700', interested: 'bg-amber-100 text-amber-700', negotiating: 'bg-orange-100 text-orange-700', won: 'bg-green-100 text-green-700', lost: 'bg-red-100 text-red-700' };
+  const initials = `${(lead.first_name || '?')[0]}${(lead.last_name || '')[0] || ''}`.toUpperCase();
+  const stageCfg = stageConfig[lead.stage] || stageConfig.new;
+  const scoreColor = lead.score >= 70 ? '#34C759' : lead.score >= 40 ? '#FF9500' : '#FF3B5C';
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <button onClick={() => navigate('/leads')} className="p-2 hover:bg-dark-100 rounded-lg"><ArrowLeft size={20} /></button>
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold text-dark-900">{lead.first_name} {lead.last_name}</h1>
-          <p className="text-dark-400 flex items-center gap-2"><MapPin size={14} /> {lead.city} • <Tag size={14} /> {lead.lead_source}</p>
+      <button onClick={() => navigate('/app/leads')} className="flex items-center gap-2 text-sm font-semibold text-ink-secondary hover:text-ink-primary transition-colors">
+        <ArrowLeft size={16} /> Back to Leads
+      </button>
+
+      {/* Hero Section */}
+      <div className="card stagger-in" style={{ padding: '32px' }}>
+        <div className="flex items-center gap-5 flex-wrap">
+          <div
+            className="w-20 h-20 rounded-3xl flex items-center justify-center text-white text-2xl font-extrabold flex-shrink-0 shadow-card"
+            style={{ background: 'linear-gradient(135deg, #0066FF, #AF52DE)' }}
+          >
+            {initials}
+          </div>
+          <div className="flex-1 min-w-[200px]">
+            <h1 className="text-3xl font-extrabold text-ink-primary tracking-tight">{lead.first_name} {lead.last_name}</h1>
+            <p className="text-ink-secondary flex items-center gap-3 mt-1.5 text-sm flex-wrap">
+              {lead.city && <span className="flex items-center gap-1"><MapPin size={14} /> {lead.city}</span>}
+              <span className="flex items-center gap-1"><Tag size={14} /> {lead.lead_source}</span>
+            </p>
+            <div className="flex gap-2 mt-3">
+              <span className="badge capitalize" style={{ background: stageCfg.bg, color: stageCfg.color, padding: '4px 12px' }}>
+                {lead.stage}
+              </span>
+              <span className="badge" style={{ background: `${scoreColor}15`, color: scoreColor, padding: '4px 12px' }}>
+                Score: {lead.score || 0}
+              </span>
+            </div>
+          </div>
         </div>
-        <span className={`badge ${stageColors[lead.stage]}`}>{lead.stage}</span>
-        <span className={`badge ${lead.score >= 70 ? 'bg-green-100 text-green-700' : lead.score >= 40 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>Score: {lead.score}</span>
       </div>
 
-      {/* Quick actions */}
+      {/* Quick action buttons */}
       <div className="flex gap-2 flex-wrap">
-        <button onClick={handleCall} disabled={!lead.phone} className="btn btn-secondary flex items-center gap-2"><Phone size={16} /> Call</button>
-        <button onClick={() => setShowMessage(!showMessage)} disabled={!lead.phone} className="btn btn-secondary flex items-center gap-2"><MessageSquare size={16} /> WhatsApp</button>
-        <button onClick={handleWhatsApp} disabled={!lead.phone} className="btn btn-secondary flex items-center gap-2"><MessageSquare size={16} /> Open Chat</button>
-        <button onClick={handleEmail} disabled={!lead.email} className="btn btn-secondary flex items-center gap-2"><Mail size={16} /> Email</button>
-        <button onClick={handleSMS} disabled={!lead.phone} className="btn btn-secondary flex items-center gap-2"><Smartphone size={16} /> SMS</button>
-        <button onClick={() => setEditing(!editing)} className="btn btn-secondary flex items-center gap-2"><Edit size={16} /> {editing ? 'Cancel' : 'Edit'}</button>
-        {lead.lead_source === 'facebook' && <button onClick={handleMarkQualified} className="btn btn-success flex items-center gap-2"><Zap size={16} /> Mark as Qualified</button>}
-        <button onClick={handleDelete} className="btn btn-danger flex items-center gap-2"><Trash2 size={16} /> Delete</button>
+        <button onClick={handleCall} disabled={!lead.phone} className="btn btn-ghost" style={{ color: '#34C759', borderColor: '#34C75930' }}><Phone size={16} /> Call</button>
+        <button onClick={() => setShowMessage(!showMessage)} disabled={!lead.phone} className="btn btn-ghost" style={{ color: '#34C759', borderColor: '#34C75930' }}><MessageSquare size={16} /> WhatsApp</button>
+        <button onClick={handleWhatsApp} disabled={!lead.phone} className="btn btn-ghost"><MessageSquare size={16} /> Open Chat</button>
+        <button onClick={handleEmail} disabled={!lead.email} className="btn btn-ghost" style={{ color: '#0066FF', borderColor: '#0066FF30' }}><Mail size={16} /> Email</button>
+        <button onClick={handleSMS} disabled={!lead.phone} className="btn btn-ghost"><Smartphone size={16} /> SMS</button>
+        <button onClick={() => setEditing(!editing)} className="btn btn-ghost"><Edit size={16} /> {editing ? 'Cancel' : 'Edit'}</button>
+        {lead.lead_source === 'facebook' && <button onClick={handleMarkQualified} className="btn btn-blue"><Zap size={16} /> Mark Qualified</button>}
+        <button onClick={handleDelete} className="btn btn-ghost" style={{ color: '#FF3B5C' }}><Trash2 size={16} /> Delete</button>
       </div>
 
       {/* WhatsApp message box */}
       {showMessage && (
-        <div className="card bg-green-50 border-green-200">
-          <div className="flex items-center justify-between mb-2"><h3 className="font-medium text-dark-900">Send WhatsApp Message</h3><button onClick={() => setShowMessage(false)}>✕</button></div>
+        <div className="card animate-slide-up" style={{ borderColor: '#34C75930' }}>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-bold text-ink-primary">Send WhatsApp Message</h3>
+            <button onClick={() => setShowMessage(false)} className="text-ink-tertiary hover:text-ink-primary">✕</button>
+          </div>
           <textarea className="input" rows={3} placeholder="Type your message..." value={messageText} onChange={e => setMessageText(e.target.value)} />
-          <button onClick={handleSendWhatsApp} className="btn btn-primary mt-2 flex items-center gap-2"><Send size={16} /> Send</button>
+          <button onClick={handleSendWhatsApp} className="btn btn-primary mt-3"><Send size={16} /> Send</button>
         </div>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Lead details */}
-        <div className="card">
-          <h3 className="font-semibold text-dark-900 mb-4">Lead Details</h3>
+        <div className="card stagger-in" style={{ animationDelay: '80ms' }}>
+          <h3 className="text-lg font-bold text-ink-primary mb-4">Lead Details</h3>
           {editing ? (
             <div className="space-y-3">
               <input className="input" placeholder="First Name" value={form.first_name || ''} onChange={(e) => setForm({ ...form, first_name: e.target.value })} />
@@ -146,9 +191,9 @@ export default function LeadProfile() {
               <Detail icon={Tag} label="Source" value={lead.lead_source} />
               <Detail icon={User} label="Agent" value={lead.agent_first_name ? `${lead.agent_first_name} ${lead.agent_last_name}` : 'Unassigned'} />
               <Detail icon={Calendar} label="Created" value={new Date(lead.created_at).toLocaleDateString()} />
-              <div><dt className="text-sm text-dark-400">Notes</dt><dd className="text-sm text-dark-700 mt-1">{lead.notes || 'No notes'}</dd></div>
+              <div><dt className="text-sm font-semibold text-ink-secondary">Notes</dt><dd className="text-sm text-ink-primary mt-1">{lead.notes || 'No notes'}</dd></div>
               {lead.tags && lead.tags.length > 0 && (
-                <div><dt className="text-sm text-dark-400">Tags</dt><dd className="flex gap-1 mt-1 flex-wrap">{lead.tags.map(t => <span key={t} className="badge bg-primary-100 text-primary-700">{t}</span>)}</dd></div>
+                <div><dt className="text-sm font-semibold text-ink-secondary">Tags</dt><dd className="flex gap-1 mt-1 flex-wrap">{lead.tags.map((t, idx) => <span key={t || idx} className="badge" style={{ background: '#0066FF10', color: '#0066FF' }}>{t}</span>)}</dd></div>
               )}
             </dl>
           )}
@@ -157,7 +202,7 @@ export default function LeadProfile() {
         {/* Right column: tabs */}
         <div className="lg:col-span-2 space-y-4">
           {/* Tab bar */}
-          <div className="flex gap-1 border-b border-dark-100">
+          <div className="flex gap-1 bg-white border border-surface-border rounded-full p-1 flex-wrap">
             {[
               { key: 'activity', label: 'Activity', icon: Activity },
               { key: 'whatsapp', label: 'WhatsApp', icon: MessageSquare },
@@ -165,7 +210,7 @@ export default function LeadProfile() {
               { key: 'followups', label: 'Follow-ups', icon: Calendar },
               { key: 'calls', label: 'Calls', icon: Phone },
             ].map(t => (
-              <button key={t.key} onClick={() => setActiveTab(t.key)} className={`px-3 py-2 text-sm font-medium flex items-center gap-1 ${activeTab === t.key ? 'text-primary-600 border-b-2 border-primary-600' : 'text-dark-400 hover:text-dark-600'}`}>
+              <button key={t.key} onClick={() => setActiveTab(t.key)} className={`tab-pill ${activeTab === t.key ? 'tab-pill-active bg-accent-red' : 'text-ink-secondary hover:text-ink-primary'}`}>
                 <t.icon size={14} /> {t.label}
               </button>
             ))}
@@ -173,79 +218,82 @@ export default function LeadProfile() {
 
           {/* Activity timeline */}
           {activeTab === 'activity' && (
-            <div className="card">
-              <h3 className="font-semibold text-dark-900 mb-4 flex items-center gap-2"><Activity size={18} /> Activity Timeline</h3>
+            <div className="card stagger-in">
+              <h3 className="text-lg font-bold text-ink-primary mb-4 flex items-center gap-2"><Activity size={18} /> Activity Timeline</h3>
               <div className="space-y-3 max-h-96 overflow-y-auto">
-                {data.activities && data.activities.length > 0 ? data.activities.map((act) => (
-                  <div key={act.id} className="flex gap-3 pb-3 border-b border-dark-50 last:border-0">
-                    <div className="w-8 h-8 bg-primary-50 rounded-full flex items-center justify-center flex-shrink-0">
-                      <Activity size={14} className="text-primary-600" />
+                {data.activities && data.activities.length > 0 ? data.activities.map((act, idx) => (
+                  <div key={act.id || idx} className="flex gap-3 pb-3 border-b border-surface-border last:border-0">
+                    <div className="w-8 h-8 rounded-xl bg-surface-page flex items-center justify-center flex-shrink-0">
+                      <Activity size={14} className="text-accent-blue" />
                     </div>
                     <div className="flex-1">
-                      <p className="text-sm text-dark-900">{act.description}</p>
-                      <p className="text-xs text-dark-400 mt-0.5">{new Date(act.created_at).toLocaleString()}</p>
+                      <p className="text-sm font-semibold text-ink-primary">{act.description}</p>
+                      <p className="text-xs text-ink-tertiary mt-0.5">{new Date(act.created_at).toLocaleString()}</p>
                     </div>
                   </div>
-                )) : <p className="text-dark-400 text-sm">No activities yet</p>}
+                )) : <p className="text-ink-tertiary text-sm">No activities yet</p>}
               </div>
             </div>
           )}
 
           {/* WhatsApp messages */}
           {activeTab === 'whatsapp' && (
-            <div className="card">
-              <h3 className="font-semibold text-dark-900 mb-4 flex items-center gap-2"><MessageSquare size={18} /> WhatsApp Conversation</h3>
+            <div className="card stagger-in">
+              <h3 className="text-lg font-bold text-ink-primary mb-4 flex items-center gap-2"><MessageSquare size={18} /> WhatsApp Conversation</h3>
               <div className="space-y-2 max-h-96 overflow-y-auto">
-                {whatsappMessages.length > 0 ? whatsappMessages.map(msg => (
-                  <div key={msg.id} className={`flex ${msg.direction === 'outgoing' ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-[70%] rounded-lg px-3 py-2 ${msg.direction === 'outgoing' ? 'bg-primary-600 text-white' : 'bg-dark-100 text-dark-900'}`}>
+                {whatsappMessages.length > 0 ? whatsappMessages.map((msg, idx) => (
+                  <div key={msg.id || idx} className={`flex ${msg.direction === 'outgoing' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[70%] rounded-2xl px-4 py-2.5 ${msg.direction === 'outgoing' ? 'text-white' : 'bg-surface-page text-ink-primary'}`} style={msg.direction === 'outgoing' ? { background: '#34C759' } : {}}>
                       <p className="text-sm">{msg.message}</p>
-                      <p className={`text-xs mt-1 ${msg.direction === 'outgoing' ? 'text-primary-200' : 'text-dark-400'}`}>{new Date(msg.created_at).toLocaleTimeString()}</p>
+                      <p className={`text-xs mt-1 ${msg.direction === 'outgoing' ? 'text-white/70' : 'text-ink-tertiary'}`}>{new Date(msg.created_at).toLocaleTimeString()}</p>
                     </div>
                   </div>
-                )) : <p className="text-dark-400 text-sm">No WhatsApp messages yet</p>}
+                )) : <p className="text-ink-tertiary text-sm">No WhatsApp messages yet</p>}
               </div>
             </div>
           )}
 
           {/* Content views */}
           {activeTab === 'content' && (
-            <div className="card">
-              <h3 className="font-semibold text-dark-900 mb-4 flex items-center gap-2"><FileText size={18} /> Content Views</h3>
+            <div className="card stagger-in">
+              <h3 className="text-lg font-bold text-ink-primary mb-4 flex items-center gap-2"><FileText size={18} /> Content Views</h3>
               <div className="space-y-2 max-h-96 overflow-y-auto">
-                {contentViews.length > 0 ? contentViews.map(v => (
-                  <div key={v.id} className="flex items-center justify-between py-2 border-b border-dark-50 last:border-0">
-                    <div><p className="text-sm font-medium text-dark-900">{v.file_name || 'Unknown file'}</p><p className="text-xs text-dark-400">{v.views || 1} views</p></div>
-                    <p className="text-xs text-dark-400">{new Date(v.created_at).toLocaleString()}</p>
+                {contentViews.length > 0 ? contentViews.map((v, idx) => (
+                  <div key={v.id || idx} className="flex items-center justify-between py-2 border-b border-surface-border last:border-0">
+                    <div><p className="text-sm font-bold text-ink-primary">{v.file_name || 'Unknown file'}</p><p className="text-xs text-ink-tertiary">{v.views || 1} views</p></div>
+                    <p className="text-xs text-ink-tertiary">{new Date(v.created_at).toLocaleString()}</p>
                   </div>
-                )) : <p className="text-dark-400 text-sm">No content viewed yet</p>}
+                )) : <p className="text-ink-tertiary text-sm">No content viewed yet</p>}
               </div>
             </div>
           )}
 
           {/* Follow-ups */}
           {activeTab === 'followups' && (
-            <div className="card">
-              <h3 className="font-semibold text-dark-900 mb-4 flex items-center gap-2"><Calendar size={18} /> Follow-ups</h3>
-              {data.followUps && data.followUps.length > 0 ? data.followUps.map((fu) => (
-                <div key={fu.id} className="flex items-center justify-between py-2 border-b border-dark-50 last:border-0">
-                  <div><p className="text-sm font-medium text-dark-900">{fu.type}</p><p className="text-xs text-dark-400">{fu.title || 'No title'}</p></div>
-                  <div className="text-right"><p className="text-xs text-dark-500">{new Date(fu.due_date).toLocaleString()}</p><span className={`badge ${fu.status === 'completed' ? 'bg-green-100 text-green-700' : fu.status === 'pending' ? 'bg-amber-100 text-amber-700' : 'bg-dark-100 text-dark-600'}`}>{fu.status}</span></div>
+            <div className="card stagger-in">
+              <h3 className="text-lg font-bold text-ink-primary mb-4 flex items-center gap-2"><Calendar size={18} /> Follow-ups</h3>
+              {data.followUps && data.followUps.length > 0 ? data.followUps.map((fu, idx) => (
+                <div key={fu.id || idx} className="flex items-center justify-between py-2 border-b border-surface-border last:border-0">
+                  <div><p className="text-sm font-bold text-ink-primary">{fu.type}</p><p className="text-xs text-ink-tertiary">{fu.title || 'No title'}</p></div>
+                  <div className="text-right">
+                    <p className="text-xs text-ink-tertiary">{new Date(fu.due_date).toLocaleString()}</p>
+                    <span className="badge" style={{ background: fu.status === 'completed' ? '#34C75910' : fu.status === 'pending' ? '#FF950010' : '#8E8E9310', color: fu.status === 'completed' ? '#34C759' : fu.status === 'pending' ? '#FF9500' : '#8E8E93' }}>{fu.status}</span>
+                  </div>
                 </div>
-              )) : <p className="text-dark-400 text-sm">No follow-ups</p>}
+              )) : <p className="text-ink-tertiary text-sm">No follow-ups</p>}
             </div>
           )}
 
           {/* Calls */}
           {activeTab === 'calls' && (
-            <div className="card">
-              <h3 className="font-semibold text-dark-900 mb-4 flex items-center gap-2"><Phone size={18} /> Call History</h3>
-              {data.calls && data.calls.length > 0 ? data.calls.map((call) => (
-                <div key={call.id} className="flex items-center justify-between py-2 border-b border-dark-50 last:border-0">
-                  <div><p className="text-sm font-medium text-dark-900">{call.outcome}</p><p className="text-xs text-dark-400">{call.notes || 'No notes'}</p></div>
-                  <p className="text-xs text-dark-400">{new Date(call.created_at).toLocaleString()}</p>
+            <div className="card stagger-in">
+              <h3 className="text-lg font-bold text-ink-primary mb-4 flex items-center gap-2"><Phone size={18} /> Call History</h3>
+              {data.calls && data.calls.length > 0 ? data.calls.map((call, idx) => (
+                <div key={call.id || idx} className="flex items-center justify-between py-2 border-b border-surface-border last:border-0">
+                  <div><p className="text-sm font-bold text-ink-primary">{call.outcome}</p><p className="text-xs text-ink-tertiary">{call.notes || 'No notes'}</p></div>
+                  <p className="text-xs text-ink-tertiary">{new Date(call.created_at).toLocaleString()}</p>
                 </div>
-              )) : <p className="text-dark-400 text-sm">No calls logged</p>}
+              )) : <p className="text-ink-tertiary text-sm">No calls logged</p>}
             </div>
           )}
         </div>
@@ -255,5 +303,6 @@ export default function LeadProfile() {
 }
 
 function Detail({ icon: Icon, label, value }) {
-  return <div className="flex items-center justify-between"><dt className="text-sm text-dark-400 flex items-center gap-1.5"><Icon size={14} /> {label}</dt><dd className="text-sm text-dark-700 font-medium">{value || '-'}</dd></div>;
+  return <div className="flex items-center justify-between"><dt className="text-sm font-semibold text-ink-secondary flex items-center gap-1.5"><Icon size={14} /> {label}</dt><dd className="text-sm text-ink-primary font-bold">{value || '-'}</dd></div>;
 }
+

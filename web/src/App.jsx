@@ -9,9 +9,12 @@ import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import AcceptInvitation from './pages/AcceptInvitation';
 import AuthCallback from './pages/AuthCallback';
+import Landing from './pages/Landing';
+import Pricing from './pages/Pricing';
 
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
+import Welcome from './pages/Welcome';
 import Leads from './pages/Leads';
 import LeadProfile from './pages/LeadProfile';
 import EmailTemplates from './pages/EmailTemplates';
@@ -68,9 +71,12 @@ export default function App() {
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/accept-invitation" element={<AcceptInvitation />} />
         <Route path="/auth/callback" element={<AuthCallback />} />
+        <Route path="/" element={<Landing />} />
+        <Route path="/pricing" element={<Pricing />} />
 
-        <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-          <Route index element={<Dashboard />} />
+        <Route path="/app" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+          <Route index element={<Welcome />} />
+          <Route path="dashboard" element={<Dashboard />} />
           <Route path="leads" element={<Leads />} />
           <Route path="leads/:id" element={<LeadProfile />} />
           <Route path="email-templates" element={<EmailTemplates />} />

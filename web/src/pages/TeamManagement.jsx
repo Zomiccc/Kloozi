@@ -55,24 +55,27 @@ export default function TeamManagement() {
     catch { toast.error('Failed'); }
   };
 
-  const roleColors = { super_admin: 'bg-purple-100 text-purple-700', admin: 'bg-blue-100 text-blue-700', sales_manager: 'bg-amber-100 text-amber-700', sales_agent: 'bg-green-100 text-green-700' };
+  const roleColors = { super_admin: { bg: '#AF52DE10', color: '#AF52DE' }, admin: { bg: '#0066FF10', color: '#0066FF' }, sales_manager: { bg: '#FF950010', color: '#FF9500' }, sales_agent: { bg: '#34C75910', color: '#34C759' } };
+
+  const sortedMembers = [...members].filter(m => m.status === 'active').sort((a, b) => (b.lead_count || 0) - (a.lead_count || 0));
+  const podium = sortedMembers.slice(0, 3);
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-dark-900">Team</h1>
-        <button onClick={() => setShowInvite(true)} className="btn btn-primary flex items-center gap-2"><UserPlus size={16} /> Invite Member</button>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between flex-wrap gap-4">
+        <h1 className="text-3xl font-extrabold text-ink-primary tracking-tight">Team</h1>
+        <button onClick={() => setShowInvite(true)} className="btn btn-primary"><UserPlus size={16} /> Invite Member</button>
       </div>
 
       {/* Tab bar */}
-      <div className="flex gap-1 border-b border-dark-100">
+      <div className="flex gap-1 bg-white border border-surface-border rounded-full p-1 flex-wrap">
         {[
           { key: 'dashboard', label: 'Dashboard', icon: BarChart3 },
           { key: 'members', label: 'Members', icon: Users2 },
           { key: 'subteams', label: 'Subteams', icon: GitBranch },
           { key: 'assignment', label: 'Lead Assignment', icon: ArrowRightLeft },
         ].map(t => (
-          <button key={t.key} onClick={() => setTab(t.key)} className={`px-4 py-2.5 text-sm font-medium flex items-center gap-2 ${tab === t.key ? 'text-primary-600 border-b-2 border-primary-600' : 'text-dark-400 hover:text-dark-600'}`}>
+          <button key={t.key} onClick={() => setTab(t.key)} className={`tab-pill ${tab === t.key ? 'tab-pill-active bg-accent-red' : 'text-ink-secondary hover:text-ink-primary'}`}>
             <t.icon size={16} /> {t.label}
           </button>
         ))}
@@ -81,47 +84,77 @@ export default function TeamManagement() {
       {/* Dashboard tab */}
       {tab === 'dashboard' && (
         <div className="space-y-6">
+          {/* Podium Leaderboard */}
+          {podium.length > 0 && (
+            <div className="grid grid-cols-3 gap-4 stagger-in">
+              {podium.map((m, idx) => {
+                const heights = ['h-28', 'h-36', 'h-24'];
+                const colors = ['#FF9500', '#8E8E93', '#FF950080'];
+                const positions = ['2nd', '1st', '3rd'];
+                const actualIdx = idx === 0 ? 1 : idx === 1 ? 0 : 2;
+                const m2 = podium[actualIdx];
+                const h2 = heights[actualIdx];
+                const c2 = colors[actualIdx];
+                const p2 = positions[actualIdx];
+                return (
+                  <div key={m2.id} className="flex flex-col items-center">
+                    <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-white text-lg font-extrabold mb-2 shadow-card" style={{ background: 'linear-gradient(135deg, #0066FF, #AF52DE)' }}>
+                      {m2.first_name?.[0] || '?'}
+                    </div>
+                    <p className="text-sm font-bold text-ink-primary">{m2.first_name} {m2.last_name}</p>
+                    <p className="text-xs text-ink-tertiary mb-2">{m2.lead_count || 0} leads</p>
+                    <div className={`${h2} w-full rounded-t-2xl flex items-center justify-center text-white font-extrabold text-lg`} style={{ background: c2 }}>
+                      {p2}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
           {/* Stats cards */}
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
             {[
-              { label: 'Total Leads', value: stats.totalLeads, icon: Users2, color: 'text-blue-600 bg-blue-50' },
-              { label: 'New Leads', value: stats.newLeads, icon: TrendingUp, color: 'text-green-600 bg-green-50' },
-              { label: 'Won', value: stats.wonLeads, icon: CheckCircle2, color: 'text-purple-600 bg-purple-50' },
-              { label: 'Calls', value: stats.totalCalls, icon: Phone, color: 'text-orange-600 bg-orange-50' },
-              { label: 'Messages', value: stats.totalMessages, icon: MessageSquare, color: 'text-teal-600 bg-teal-50' },
-              { label: 'Active Agents', value: stats.activeAgents || members.filter(m => m.status === 'active').length, icon: Activity, color: 'text-indigo-600 bg-indigo-50' },
+              { label: 'Total Leads', value: stats.totalLeads, icon: Users2, color: '#0066FF' },
+              { label: 'New Leads', value: stats.newLeads, icon: TrendingUp, color: '#34C759' },
+              { label: 'Won', value: stats.wonLeads, icon: CheckCircle2, color: '#AF52DE' },
+              { label: 'Calls', value: stats.totalCalls, icon: Phone, color: '#FF9500' },
+              { label: 'Messages', value: stats.totalMessages, icon: MessageSquare, color: '#0066FF' },
+              { label: 'Active Agents', value: stats.activeAgents || members.filter(m => m.status === 'active').length, icon: Activity, color: '#FF3B5C' },
             ].map(s => (
-              <div key={s.label} className="card">
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-2 ${s.color}`}><s.icon size={20} /></div>
-                <p className="text-2xl font-bold text-dark-900">{s.value}</p>
-                <p className="text-xs text-dark-400">{s.label}</p>
+              <div key={s.label} className="card card-hover stagger-in">
+                <div className="w-10 h-10 rounded-2xl flex items-center justify-center mb-3" style={{ background: `${s.color}15` }}>
+                  <s.icon size={20} style={{ color: s.color }} />
+                </div>
+                <p className="text-2xl font-extrabold text-ink-primary">{s.value}</p>
+                <p className="text-xs font-semibold text-ink-secondary">{s.label}</p>
               </div>
             ))}
           </div>
 
           {/* Team performance table */}
-          <div className="bg-white rounded-xl border border-dark-100 overflow-hidden">
-            <div className="p-4 border-b border-dark-100"><h3 className="font-semibold text-dark-900">Team Performance</h3></div>
+          <div className="card overflow-hidden" style={{ padding: 0 }}>
+            <div className="p-4 border-b border-surface-border"><h3 className="font-bold text-ink-primary">Team Performance</h3></div>
             <table className="w-full">
-              <thead className="bg-dark-50 border-b border-dark-100">
+              <thead className="bg-surface-page border-b border-surface-border">
                 <tr>
-                  <th className="p-3 text-left text-xs font-medium text-dark-500 uppercase">Agent</th>
-                  <th className="p-3 text-left text-xs font-medium text-dark-500 uppercase">Leads</th>
-                  <th className="p-3 text-left text-xs font-medium text-dark-500 uppercase">Won</th>
-                  <th className="p-3 text-left text-xs font-medium text-dark-500 uppercase">Calls Today</th>
-                  <th className="p-3 text-left text-xs font-medium text-dark-500 uppercase">Messages</th>
-                  <th className="p-3 text-left text-xs font-medium text-dark-500 uppercase">Win Rate</th>
+                  <th className="p-3 text-left text-xs font-bold text-ink-tertiary uppercase">Agent</th>
+                  <th className="p-3 text-left text-xs font-bold text-ink-tertiary uppercase">Leads</th>
+                  <th className="p-3 text-left text-xs font-bold text-ink-tertiary uppercase">Won</th>
+                  <th className="p-3 text-left text-xs font-bold text-ink-tertiary uppercase">Calls Today</th>
+                  <th className="p-3 text-left text-xs font-bold text-ink-tertiary uppercase">Messages</th>
+                  <th className="p-3 text-left text-xs font-bold text-ink-tertiary uppercase">Win Rate</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-dark-50">
+              <tbody className="divide-y divide-surface-border">
                 {members.filter(m => m.status === 'active').map(m => (
-                  <tr key={m.id} className="hover:bg-dark-50">
-                    <td className="p-3"><div className="flex items-center gap-2"><div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center text-xs font-medium text-primary-700">{m.first_name?.[0] || '?'}</div><div><p className="text-sm font-medium">{m.first_name} {m.last_name}</p><p className="text-xs text-dark-400">{m.designation || m.role?.replace('_', ' ')}</p></div></div></td>
-                    <td className="p-3 text-sm">{m.lead_count || 0}</td>
-                    <td className="p-3 text-sm">{m.won_count || 0}</td>
-                    <td className="p-3 text-sm">{m.calls_today || 0}</td>
-                    <td className="p-3 text-sm">{m.messages_today || 0}</td>
-                    <td className="p-3 text-sm">{m.lead_count > 0 ? Math.round(((m.won_count || 0) / m.lead_count) * 100) : 0}%</td>
+                  <tr key={m.id} className="hover:bg-surface-page transition-colors">
+                    <td className="p-3"><div className="flex items-center gap-2"><div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white" style={{ background: 'linear-gradient(135deg, #0066FF, #AF52DE)' }}>{m.first_name?.[0] || '?'}</div><div><p className="text-sm font-bold text-ink-primary">{m.first_name} {m.last_name}</p><p className="text-xs text-ink-tertiary">{m.designation || m.role?.replace('_', ' ')}</p></div></div></td>
+                    <td className="p-3 text-sm font-semibold text-ink-primary">{m.lead_count || 0}</td>
+                    <td className="p-3 text-sm font-semibold text-ink-primary">{m.won_count || 0}</td>
+                    <td className="p-3 text-sm font-semibold text-ink-primary">{m.calls_today || 0}</td>
+                    <td className="p-3 text-sm font-semibold text-ink-primary">{m.messages_today || 0}</td>
+                    <td className="p-3 text-sm font-bold text-ink-primary">{m.lead_count > 0 ? Math.round(((m.won_count || 0) / m.lead_count) * 100) : 0}%</td>
                   </tr>
                 ))}
               </tbody>
@@ -129,14 +162,14 @@ export default function TeamManagement() {
           </div>
 
           {/* Activity feed */}
-          <div className="card">
-            <h3 className="font-semibold mb-4 flex items-center gap-2"><Activity size={18} /> Team Activity (Last 24h)</h3>
-            {activity.length === 0 ? <p className="text-dark-400 text-sm">No recent activity</p> :
+          <div className="card stagger-in">
+            <h3 className="text-lg font-bold text-ink-primary mb-4 flex items-center gap-2"><Activity size={18} /> Team Activity (Last 24h)</h3>
+            {activity.length === 0 ? <p className="text-ink-tertiary text-sm">No recent activity</p> :
               <div className="space-y-2 max-h-96 overflow-y-auto">
-                {activity.map(a => (
-                  <div key={a.id} className="flex items-center gap-3 py-2 border-b border-dark-50 last:border-0">
-                    <div className="w-8 h-8 bg-primary-50 rounded-full flex items-center justify-center text-xs font-medium text-primary-700">{a.first_name?.[0] || '?'}</div>
-                    <div className="flex-1"><p className="text-sm text-dark-900"><strong>{a.first_name} {a.last_name}</strong> — {a.description}</p><p className="text-xs text-dark-400">{new Date(a.created_at).toLocaleString()}</p></div>
+                {activity.map((a, idx) => (
+                  <div key={a.id || `activity-${idx}`} className="flex items-center gap-3 py-2 border-b border-surface-border last:border-0">
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white" style={{ background: 'linear-gradient(135deg, #0066FF, #AF52DE)' }}>{a.first_name?.[0] || '?'}</div>
+                    <div className="flex-1"><p className="text-sm text-ink-secondary"><strong className="text-ink-primary">{a.first_name} {a.last_name}</strong> — {a.description}</p><p className="text-xs text-ink-tertiary">{new Date(a.created_at).toLocaleString()}</p></div>
                   </div>
                 ))}
               </div>
@@ -147,35 +180,38 @@ export default function TeamManagement() {
 
       {/* Members tab */}
       {tab === 'members' && (
-        loading ? <div className="flex justify-center py-8"><div className="animate-spin w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full" /></div> :
-        <div className="bg-white rounded-xl border border-dark-100 overflow-hidden">
+        loading ? <div className="flex justify-center py-8"><div className="animate-spin w-8 h-8 border-4 border-accent-blue border-t-transparent rounded-full" /></div> :
+        <div className="card overflow-hidden" style={{ padding: 0 }}>
           <table className="w-full">
-            <thead className="bg-dark-50 border-b border-dark-100">
+            <thead className="bg-surface-page border-b border-surface-border">
               <tr>
-                <th className="p-3 text-left text-xs font-medium text-dark-500 uppercase">Name</th>
-                <th className="p-3 text-left text-xs font-medium text-dark-500 uppercase">Role</th>
-                <th className="p-3 text-left text-xs font-medium text-dark-500 uppercase">Leads</th>
-                <th className="p-3 text-left text-xs font-medium text-dark-500 uppercase">Won</th>
-                <th className="p-3 text-left text-xs font-medium text-dark-500 uppercase">Calls Today</th>
-                <th className="p-3 text-left text-xs font-medium text-dark-500 uppercase">Status</th>
-                <th className="p-3 text-left text-xs font-medium text-dark-500 uppercase">Actions</th>
+                <th className="p-3 text-left text-xs font-bold text-ink-tertiary uppercase">Name</th>
+                <th className="p-3 text-left text-xs font-bold text-ink-tertiary uppercase">Role</th>
+                <th className="p-3 text-left text-xs font-bold text-ink-tertiary uppercase">Leads</th>
+                <th className="p-3 text-left text-xs font-bold text-ink-tertiary uppercase">Won</th>
+                <th className="p-3 text-left text-xs font-bold text-ink-tertiary uppercase">Calls Today</th>
+                <th className="p-3 text-left text-xs font-bold text-ink-tertiary uppercase">Status</th>
+                <th className="p-3 text-left text-xs font-bold text-ink-tertiary uppercase">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-dark-50">
-              {members.map(m => (
-                <tr key={m.id} className="hover:bg-dark-50">
-                  <td className="p-3"><div className="font-medium text-dark-900">{m.first_name} {m.last_name}</div><div className="text-xs text-dark-400">{m.email}</div></td>
-                  <td className="p-3"><span className={`badge ${roleColors[m.role]}`}>{m.role.replace('_', ' ')}</span></td>
-                  <td className="p-3 text-sm">{m.lead_count}</td>
-                  <td className="p-3 text-sm">{m.won_count}</td>
-                  <td className="p-3 text-sm">{m.calls_today}</td>
-                  <td className="p-3"><span className={`badge ${m.status === 'active' ? 'bg-green-100 text-green-700' : m.status === 'suspended' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>{m.status}</span></td>
-                  <td className="p-3">
-                    {m.status === 'active' ? <button onClick={() => handleSuspend(m.id)} className="text-red-500 hover:text-red-600"><Ban size={16} /></button> :
-                    <button onClick={() => handleReactivate(m.id)} className="text-green-500 hover:text-green-600"><RefreshCw size={16} /></button>}
-                  </td>
-                </tr>
-              ))}
+            <tbody className="divide-y divide-surface-border">
+              {members.map(m => {
+                const rc = roleColors[m.role] || roleColors.sales_agent;
+                return (
+                  <tr key={m.id} className="hover:bg-surface-page transition-colors">
+                    <td className="p-3"><div className="font-bold text-ink-primary">{m.first_name} {m.last_name}</div><div className="text-xs text-ink-tertiary">{m.email}</div></td>
+                    <td className="p-3"><span className="badge capitalize" style={{ background: rc.bg, color: rc.color }}>{(m.role || 'sales_agent').replace('_', ' ')}</span></td>
+                    <td className="p-3 text-sm font-semibold text-ink-primary">{m.lead_count}</td>
+                    <td className="p-3 text-sm font-semibold text-ink-primary">{m.won_count}</td>
+                    <td className="p-3 text-sm font-semibold text-ink-primary">{m.calls_today}</td>
+                    <td className="p-3"><span className="badge capitalize" style={{ background: m.status === 'active' ? '#34C75910' : m.status === 'suspended' ? '#FF3B5C10' : '#FF950010', color: m.status === 'active' ? '#34C759' : m.status === 'suspended' ? '#FF3B5C' : '#FF9500' }}>{m.status}</span></td>
+                    <td className="p-3">
+                      {m.status === 'active' ? <button onClick={() => handleSuspend(m.id)} className="p-1.5 rounded-lg hover:bg-red-50 transition-colors" style={{ color: '#FF3B5C' }}><Ban size={16} /></button> :
+                      <button onClick={() => handleReactivate(m.id)} className="p-1.5 rounded-lg hover:bg-green-50 transition-colors" style={{ color: '#34C759' }}><RefreshCw size={16} /></button>}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -184,20 +220,23 @@ export default function TeamManagement() {
       {/* Subteams tab */}
       {tab === 'subteams' && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-dark-400">Create subteams to organize your agents and distribute leads efficiently.</p>
-            <button onClick={() => toast.success('Create subteam modal')} className="btn btn-primary flex items-center gap-2 text-sm"><Plus size={16} /> Create Subteam</button>
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <p className="text-sm font-semibold text-ink-secondary">Create subteams to organize your agents and distribute leads efficiently.</p>
+            <button onClick={() => toast.success('Create subteam modal')} className="btn btn-primary"><Plus size={16} /> Create Subteam</button>
           </div>
           {subteams.length === 0 ? (
-            <div className="card text-center py-12"><GitBranch size={48} className="text-dark-300 mx-auto mb-3" /><p className="text-dark-400">No subteams yet</p></div>
+            <div className="card text-center" style={{ padding: '48px 24px' }}>
+              <div className="w-16 h-16 rounded-3xl bg-surface-page flex items-center justify-center mx-auto mb-4"><GitBranch size={32} className="text-ink-tertiary" /></div>
+              <p className="text-ink-tertiary">No subteams yet</p>
+            </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {subteams.map(st => (
-                <div key={st.id} className="card">
-                  <h3 className="font-semibold text-dark-900">{st.name}</h3>
+                <div key={st.id} className="card card-hover stagger-in">
+                  <h3 className="font-bold text-ink-primary">{st.name}</h3>
                   <div className="grid grid-cols-2 gap-2 mt-3 text-sm">
-                    <div><p className="text-dark-400 text-xs">Members</p><p className="font-medium">{st.member_count || 0}</p></div>
-                    <div><p className="text-dark-400 text-xs">Leads</p><p className="font-medium">{st.lead_count || 0}</p></div>
+                    <div><p className="text-ink-tertiary text-xs">Members</p><p className="font-bold text-ink-primary">{st.member_count || 0}</p></div>
+                    <div><p className="text-ink-tertiary text-xs">Leads</p><p className="font-bold text-ink-primary">{st.lead_count || 0}</p></div>
                   </div>
                 </div>
               ))}
@@ -209,22 +248,26 @@ export default function TeamManagement() {
       {/* Lead Assignment tab */}
       {tab === 'assignment' && (
         <div className="space-y-4">
-          <div className="bg-blue-50 rounded-lg p-4">
-            <p className="text-sm text-blue-800">Configure how new leads are assigned to your team members. Rules are processed in order of priority.</p>
+          <div className="rounded-2xl p-4 border border-surface-border bg-surface-page">
+            <p className="text-sm font-semibold text-ink-secondary">Configure how new leads are assigned to your team members. Rules are processed in order of priority.</p>
           </div>
           {assignmentRules.length === 0 ? (
-            <div className="card text-center py-12"><ArrowRightLeft size={48} className="text-dark-300 mx-auto mb-3" /><p className="text-dark-400">No assignment rules yet</p><p className="text-sm text-dark-400 mt-1">Leads will be assigned round-robin by default</p></div>
+            <div className="card text-center" style={{ padding: '48px 24px' }}>
+              <div className="w-16 h-16 rounded-3xl bg-surface-page flex items-center justify-center mx-auto mb-4"><ArrowRightLeft size={32} className="text-ink-tertiary" /></div>
+              <p className="text-ink-tertiary">No assignment rules yet</p>
+              <p className="text-sm text-ink-secondary mt-1">Leads will be assigned round-robin by default</p>
+            </div>
           ) : (
             <div className="space-y-3">
               {assignmentRules.map(r => (
-                <div key={r.id} className="card flex items-center justify-between">
-                  <div><p className="font-medium text-dark-900">{r.name}</p><p className="text-xs text-dark-400 mt-1">{r.conditions} → {r.action}</p></div>
-                  <span className={`badge ${r.is_active ? 'bg-green-100 text-green-700' : 'bg-dark-100 text-dark-600'}`}>{r.is_active ? 'Active' : 'Inactive'}</span>
+                <div key={r.id} className="card card-hover stagger-in flex items-center justify-between">
+                  <div><p className="font-bold text-ink-primary">{r.name}</p><p className="text-xs text-ink-tertiary mt-1">{r.conditions} → {r.action}</p></div>
+                  <span className="badge" style={{ background: r.is_active ? '#34C75910' : '#8E8E9310', color: r.is_active ? '#34C759' : '#8E8E93' }}>{r.is_active ? 'Active' : 'Inactive'}</span>
                 </div>
               ))}
             </div>
           )}
-          <button onClick={() => navigate('/automations/rules')} className="btn btn-primary">Configure Automation Rules</button>
+          <button onClick={() => navigate('/app/automations/rules')} className="btn btn-primary">Configure Automation Rules</button>
         </div>
       )}
 
@@ -236,9 +279,9 @@ export default function TeamManagement() {
 function InviteModal({ onClose, onInvite }) {
   const [form, setForm] = useState({ email: '', role: 'sales_agent', first_name: '', last_name: '', designation: '' });
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl p-6 w-full max-w-md">
-        <div className="flex items-center justify-between mb-4"><h2 className="text-xl font-bold">Invite Team Member</h2><button onClick={onClose}><X size={20} /></button></div>
+    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white border border-surface-border rounded-3xl p-6 w-full max-w-md shadow-modal animate-slide-up">
+        <div className="flex items-center justify-between mb-6"><h2 className="text-xl font-bold text-ink-primary">Invite Team Member</h2><button onClick={onClose} className="text-ink-tertiary hover:text-ink-primary transition-colors"><X size={20} /></button></div>
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <input className="input" placeholder="First name" value={form.first_name} onChange={(e) => setForm({ ...form, first_name: e.target.value })} />

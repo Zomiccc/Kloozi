@@ -2,16 +2,43 @@ const config = require('../config');
 const axios = require('axios');
 const db = require('../config/database');
 const logger = require('../utils/logger');
+const twilio = require('twilio');
 
 async function sendWhatsAppMessage({ to, message, templateName, mediaUrl, media_type }) {
   try {
+    // Use Twilio Sandbox mode
+    if (config.whatsapp.mode === 'sandbox') {
+      if (!config.twilio.accountSid || !config.twilio.authToken) {
+        logger.warn('Twilio not configured, skipping send');
+        return { success: false, error: 'Twilio not configured. Set TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN in .env' };
+      }
+
+      const client = twilio(config.twilio.accountSid, config.twilio.authToken);
+      const fromNumber = config.twilio.whatsappFrom || 'whatsapp:+14155238886';
+      
+      // Format phone number for Twilio: whatsapp:+[country_code][number]
+      const cleanPhone = to.replace(/\D/g, '');
+      const toNumber = `whatsapp:+${cleanPhone}`;
+
+      const messageParams = {
+        from: fromNumber,
+        to: toNumber,
+        body: message,
+      };
+
+      const response = await client.messages.create(messageParams);
+      return { success: true, messageId: response.sid };
+    }
+
+    // Use Meta API for production mode
+    let url = '';
     if (!config.whatsapp.phoneNumberId || !config.whatsapp.accessToken) {
       logger.warn('WhatsApp not configured, skipping send');
-      return { success: false, error: 'WhatsApp not configured' };
+      return { success: false, error: 'WhatsApp not configured. Set WHATSAPP_PHONE_NUMBER_ID and WHATSAPP_ACCESS_TOKEN in .env' };
     }
 
     const phoneNumber = to.replace(/\D/g, '');
-    const url = `${config.whatsapp.apiUrl}/${config.whatsapp.phoneNumberId}/messages`;
+    url = `${config.whatsapp.apiUrl}/${config.whatsapp.phoneNumberId}/messages`;
 
     const body = {
       messaging_product: 'whatsapp',
@@ -39,8 +66,15 @@ async function sendWhatsAppMessage({ to, message, templateName, mediaUrl, media_
 
     return { success: true, messageId: response.data.messages?.[0]?.id };
   } catch (err) {
-    logger.error('WhatsApp send error:', err.response?.data || err.message);
-    return { success: false, error: err.message };
+    const apiError = err.response?.data?.error || err.message;
+    const errorMsg = apiError ? `${apiError.message || apiError.type || 'WhatsApp API error'} (code ${apiError.code || 'unknown'})` : err.message;
+    console.error('[WHATSAPP ERROR]', JSON.stringify({
+      status: err.response?.status,
+      statusText: err.response?.statusText,
+      error: err.message,
+      apiError: apiError || err.response?.data,
+    }, null, 2));
+    return { success: false, error: errorMsg };
   }
 }
 

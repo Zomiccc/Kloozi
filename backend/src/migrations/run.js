@@ -1,48 +1,85 @@
 const db = require('../config/database');
 const logger = require('../utils/logger');
 
+// Convert SQLite-style SQL to PostgreSQL-compatible SQL
+function convertToPostgres(sql) {
+  return sql
+    // Replace datetime('now') with NOW()
+    .replace(/datetime\('now'\)/gi, 'NOW()')
+    // Replace TEXT PRIMARY KEY with UUID PRIMARY KEY DEFAULT gen_random_uuid()
+    .replace(/TEXT\s+PRIMARY\s+KEY/gi, 'UUID PRIMARY KEY DEFAULT gen_random_uuid()')
+    // Replace INTEGER DEFAULT 0/1 with BOOLEAN for flag columns
+    .replace(/(is_\w+|has_\w+|two_factor_enabled)\s+INTEGER\s+DEFAULT\s+(\d)/gi, (match, col, val) => {
+      return `${col} BOOLEAN DEFAULT ${val === '1' ? 'TRUE' : 'FALSE'}`;
+    })
+    // Replace REAL with NUMERIC
+    .replace(/\bREAL\b/gi, 'NUMERIC')
+    // Replace TEXT DEFAULT with VARCHAR DEFAULT where appropriate
+    .replace(/TEXT\s+DEFAULT\s+'/g, "VARCHAR(255) DEFAULT '")
+    // Ensure UUID foreign keys reference UUID columns
+    .replace(/REFERENCES\s+(\w+)\(id\)/g, 'REFERENCES $1(id) ON DELETE CASCADE')
+    // Remove duplicate ON DELETE CASCADE
+    .replace(/ON DELETE CASCADE ON DELETE CASCADE/g, 'ON DELETE CASCADE')
+    // Add IF NOT EXISTS to CREATE TABLE
+    .replace(/CREATE\s+TABLE\s+(?!IF\s+NOT\s+EXISTS)/gi, 'CREATE TABLE IF NOT EXISTS ')
+    // Handle UNIQUE constraints properly
+    .replace(/UNIQUE\(([^)]+)\)/g, 'UNIQUE($1)')
+    // Convert TEXT columns that store JSON to JSONB
+    .replace(/(settings|metadata|config|credentials|field_mapping|filter_config|trigger_config|action_config|data|rules|fields|options|variables|custom_fields|tags|notification_preferences|device_info|old_values|new_values|pages_viewed|allowed_roles)\s+TEXT/g, '$1 JSONB')
+    // Convert TEXT columns that store arrays to JSONB
+    .replace(/(\w+)\s+TEXT\s+DEFAULT\s+'\[\]'/g, (match, col) => {
+      if (['tags', 'custom_fields', 'variables', 'options', 'fields', 'rules', 'pages_viewed', 'allowed_roles'].includes(col)) {
+        return `${col} JSONB DEFAULT '[]'::jsonb`;
+      }
+      return `${col} JSONB DEFAULT '{}'::jsonb`;
+    })
+    .replace(/(\w+)\s+TEXT\s+DEFAULT\s+'\{}/g, (match, col) => {
+      return `${col} JSONB DEFAULT '{}'::jsonb`;
+    });
+}
+
 const migrations = [
   {
     name: '001_create_workspaces_and_users',
     sql: `
       CREATE TABLE IF NOT EXISTS workspaces (
-        id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        slug TEXT UNIQUE,
-        plan TEXT DEFAULT 'free',
-        subscription_status TEXT DEFAULT 'active',
-        stripe_customer_id TEXT,
-        stripe_subscription_id TEXT,
-        trial_ends_at TEXT,
-        settings TEXT DEFAULT '{}',
-        created_at TEXT DEFAULT (datetime('now')),
-        updated_at TEXT DEFAULT (datetime('now'))
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        name VARCHAR(255) NOT NULL,
+        slug VARCHAR(255) UNIQUE,
+        plan VARCHAR(50) DEFAULT 'free',
+        subscription_status VARCHAR(50) DEFAULT 'active',
+        stripe_customer_id VARCHAR(255),
+        stripe_subscription_id VARCHAR(255),
+        trial_ends_at TIMESTAMP,
+        settings JSONB DEFAULT '{}'::jsonb,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
       );
 
       CREATE TABLE IF NOT EXISTS users (
-        id TEXT PRIMARY KEY,
-        workspace_id TEXT REFERENCES workspaces(id) ON DELETE CASCADE,
-        email TEXT UNIQUE NOT NULL,
-        password_hash TEXT,
-        first_name TEXT,
-        last_name TEXT,
-        phone TEXT,
-        profile_image TEXT,
-        role TEXT DEFAULT 'sales_agent',
-        status TEXT DEFAULT 'active',
-        designation TEXT,
-        google_id TEXT,
-        two_factor_enabled INTEGER DEFAULT 0,
-        two_factor_secret TEXT,
-        invitation_token TEXT,
-        invitation_accepted_at TEXT,
-        last_activity_at TEXT DEFAULT (datetime('now')),
-        notification_preferences TEXT DEFAULT '{}',
-        quiet_hours_start TEXT DEFAULT '22:00',
-        quiet_hours_end TEXT DEFAULT '08:00',
-        language TEXT DEFAULT 'en',
-        created_at TEXT DEFAULT (datetime('now')),
-        updated_at TEXT DEFAULT (datetime('now'))
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        password_hash VARCHAR(255),
+        first_name VARCHAR(255),
+        last_name VARCHAR(255),
+        phone VARCHAR(50),
+        profile_image VARCHAR(500),
+        role VARCHAR(50) DEFAULT 'sales_agent',
+        status VARCHAR(50) DEFAULT 'active',
+        designation VARCHAR(255),
+        google_id VARCHAR(255),
+        two_factor_enabled BOOLEAN DEFAULT FALSE,
+        two_factor_secret VARCHAR(255),
+        invitation_token VARCHAR(255),
+        invitation_accepted_at TIMESTAMP,
+        last_activity_at TIMESTAMP DEFAULT NOW(),
+        notification_preferences JSONB DEFAULT '{}'::jsonb,
+        quiet_hours_start VARCHAR(10) DEFAULT '22:00',
+        quiet_hours_end VARCHAR(10) DEFAULT '08:00',
+        language VARCHAR(10) DEFAULT 'en',
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
       );
 
       CREATE INDEX IF NOT EXISTS idx_users_workspace ON users(workspace_id);
@@ -54,43 +91,43 @@ const migrations = [
     name: '002_create_leads_tables',
     sql: `
       CREATE TABLE IF NOT EXISTS lead_stages (
-        id TEXT PRIMARY KEY,
-        workspace_id TEXT REFERENCES workspaces(id) ON DELETE CASCADE,
-        name TEXT NOT NULL,
-        color TEXT DEFAULT '#6b7280',
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL,
+        color VARCHAR(50) DEFAULT '#6b7280',
         sort_order INTEGER DEFAULT 0,
-        is_default INTEGER DEFAULT 0,
-        is_won INTEGER DEFAULT 0,
-        is_lost INTEGER DEFAULT 0,
-        created_at TEXT DEFAULT (datetime('now'))
+        is_default BOOLEAN DEFAULT FALSE,
+        is_won BOOLEAN DEFAULT FALSE,
+        is_lost BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT NOW()
       );
 
       CREATE TABLE IF NOT EXISTS leads (
-        id TEXT PRIMARY KEY,
-        workspace_id TEXT REFERENCES workspaces(id) ON DELETE CASCADE,
-        first_name TEXT,
-        last_name TEXT,
-        phone TEXT,
-        email TEXT,
-        city TEXT,
-        budget REAL,
-        lead_source TEXT DEFAULT 'manual',
-        stage_id TEXT REFERENCES lead_stages(id),
-        stage TEXT DEFAULT 'new',
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+        first_name VARCHAR(255),
+        last_name VARCHAR(255),
+        phone VARCHAR(50),
+        email VARCHAR(255),
+        city VARCHAR(255),
+        budget NUMERIC,
+        lead_source VARCHAR(100) DEFAULT 'manual',
+        stage_id UUID REFERENCES lead_stages(id),
+        stage VARCHAR(50) DEFAULT 'new',
         notes TEXT,
-        custom_fields TEXT DEFAULT '[]',
-        tags TEXT DEFAULT '[]',
+        custom_fields JSONB DEFAULT '[]'::jsonb,
+        tags JSONB DEFAULT '[]'::jsonb,
         score INTEGER DEFAULT 0,
-        assigned_to TEXT REFERENCES users(id),
-        created_by TEXT REFERENCES users(id),
-        last_activity_at TEXT DEFAULT (datetime('now')),
-        follow_up_date TEXT,
-        follow_up_type TEXT,
+        assigned_to UUID REFERENCES users(id),
+        created_by UUID REFERENCES users(id),
+        last_activity_at TIMESTAMP DEFAULT NOW(),
+        follow_up_date TIMESTAMP,
+        follow_up_type VARCHAR(50),
         follow_up_notes TEXT,
-        is_unsubscribed INTEGER DEFAULT 0,
-        metadata TEXT DEFAULT '{}',
-        created_at TEXT DEFAULT (datetime('now')),
-        updated_at TEXT DEFAULT (datetime('now'))
+        is_unsubscribed BOOLEAN DEFAULT FALSE,
+        metadata JSONB DEFAULT '{}'::jsonb,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
       );
 
       CREATE INDEX IF NOT EXISTS idx_leads_workspace ON leads(workspace_id);
@@ -104,14 +141,14 @@ const migrations = [
       CREATE INDEX IF NOT EXISTS idx_leads_created_at ON leads(created_at);
 
       CREATE TABLE IF NOT EXISTS lead_activities (
-        id TEXT PRIMARY KEY,
-        workspace_id TEXT REFERENCES workspaces(id) ON DELETE CASCADE,
-        lead_id TEXT REFERENCES leads(id) ON DELETE CASCADE,
-        user_id TEXT REFERENCES users(id),
-        type TEXT NOT NULL,
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+        lead_id UUID REFERENCES leads(id) ON DELETE CASCADE,
+        user_id UUID REFERENCES users(id),
+        type VARCHAR(100) NOT NULL,
         description TEXT,
-        metadata TEXT DEFAULT '{}',
-        created_at TEXT DEFAULT (datetime('now'))
+        metadata JSONB DEFAULT '{}'::jsonb,
+        created_at TIMESTAMP DEFAULT NOW()
       );
 
       CREATE INDEX IF NOT EXISTS idx_activities_lead ON lead_activities(lead_id);
@@ -120,33 +157,33 @@ const migrations = [
       CREATE INDEX IF NOT EXISTS idx_activities_created ON lead_activities(created_at);
 
       CREATE TABLE IF NOT EXISTS lead_tags (
-        id TEXT PRIMARY KEY,
-        workspace_id TEXT REFERENCES workspaces(id) ON DELETE CASCADE,
-        name TEXT NOT NULL,
-        color TEXT DEFAULT '#3b82f6',
-        created_at TEXT DEFAULT (datetime('now')),
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL,
+        color VARCHAR(50) DEFAULT '#3b82f6',
+        created_at TIMESTAMP DEFAULT NOW(),
         UNIQUE(workspace_id, name)
       );
 
       CREATE TABLE IF NOT EXISTS lead_groups (
-        id TEXT PRIMARY KEY,
-        workspace_id TEXT REFERENCES workspaces(id) ON DELETE CASCADE,
-        name TEXT NOT NULL,
-        type TEXT DEFAULT 'static',
-        filter_config TEXT DEFAULT '{}',
-        created_by TEXT REFERENCES users(id),
-        created_at TEXT DEFAULT (datetime('now'))
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL,
+        type VARCHAR(50) DEFAULT 'static',
+        filter_config JSONB DEFAULT '{}'::jsonb,
+        created_by UUID REFERENCES users(id),
+        created_at TIMESTAMP DEFAULT NOW()
       );
 
       CREATE TABLE IF NOT EXISTS lead_custom_fields (
-        id TEXT PRIMARY KEY,
-        workspace_id TEXT REFERENCES workspaces(id) ON DELETE CASCADE,
-        name TEXT NOT NULL,
-        type TEXT DEFAULT 'text',
-        options TEXT DEFAULT '[]',
-        is_required INTEGER DEFAULT 0,
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL,
+        type VARCHAR(50) DEFAULT 'text',
+        options JSONB DEFAULT '[]'::jsonb,
+        is_required BOOLEAN DEFAULT FALSE,
         sort_order INTEGER DEFAULT 0,
-        created_at TEXT DEFAULT (datetime('now'))
+        created_at TIMESTAMP DEFAULT NOW()
       );
     `
   },
@@ -154,19 +191,19 @@ const migrations = [
     name: '003_create_followups_calls',
     sql: `
       CREATE TABLE IF NOT EXISTS follow_ups (
-        id TEXT PRIMARY KEY,
-        workspace_id TEXT REFERENCES workspaces(id) ON DELETE CASCADE,
-        lead_id TEXT REFERENCES leads(id) ON DELETE CASCADE,
-        user_id TEXT REFERENCES users(id),
-        type TEXT NOT NULL,
-        title TEXT,
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+        lead_id UUID REFERENCES leads(id) ON DELETE CASCADE,
+        user_id UUID REFERENCES users(id),
+        type VARCHAR(50) NOT NULL,
+        title VARCHAR(255),
         notes TEXT,
-        due_date TEXT NOT NULL,
-        status TEXT DEFAULT 'pending',
-        completed_at TEXT,
-        snoozed_until TEXT,
-        created_at TEXT DEFAULT (datetime('now')),
-        updated_at TEXT DEFAULT (datetime('now'))
+        due_date TIMESTAMP NOT NULL,
+        status VARCHAR(50) DEFAULT 'pending',
+        completed_at TIMESTAMP,
+        snoozed_until TIMESTAMP,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
       );
 
       CREATE INDEX IF NOT EXISTS idx_followups_workspace ON follow_ups(workspace_id);
@@ -176,16 +213,16 @@ const migrations = [
       CREATE INDEX IF NOT EXISTS idx_followups_status ON follow_ups(status);
 
       CREATE TABLE IF NOT EXISTS calls (
-        id TEXT PRIMARY KEY,
-        workspace_id TEXT REFERENCES workspaces(id) ON DELETE CASCADE,
-        lead_id TEXT REFERENCES leads(id) ON DELETE CASCADE,
-        user_id TEXT REFERENCES users(id),
-        phone_number TEXT,
-        outcome TEXT,
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+        lead_id UUID REFERENCES leads(id) ON DELETE CASCADE,
+        user_id UUID REFERENCES users(id),
+        phone_number VARCHAR(50),
+        outcome VARCHAR(255),
         notes TEXT,
         duration_seconds INTEGER DEFAULT 0,
-        follow_up_scheduled TEXT,
-        created_at TEXT DEFAULT (datetime('now'))
+        follow_up_scheduled TIMESTAMP,
+        created_at TIMESTAMP DEFAULT NOW()
       );
 
       CREATE INDEX IF NOT EXISTS idx_calls_workspace ON calls(workspace_id);
@@ -198,22 +235,22 @@ const migrations = [
     name: '004_create_messaging_tables',
     sql: `
       CREATE TABLE IF NOT EXISTS whatsapp_messages (
-        id TEXT PRIMARY KEY,
-        workspace_id TEXT REFERENCES workspaces(id) ON DELETE CASCADE,
-        lead_id TEXT REFERENCES leads(id) ON DELETE CASCADE,
-        user_id TEXT REFERENCES users(id),
-        direction TEXT DEFAULT 'outbound',
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+        lead_id UUID REFERENCES leads(id) ON DELETE CASCADE,
+        user_id UUID REFERENCES users(id),
+        direction VARCHAR(20) DEFAULT 'outbound',
         message_text TEXT,
-        template_name TEXT,
-        media_url TEXT,
-        media_type TEXT,
-        status TEXT DEFAULT 'pending',
-        wa_message_id TEXT,
-        sent_at TEXT,
-        delivered_at TEXT,
-        read_at TEXT,
+        template_name VARCHAR(255),
+        media_url VARCHAR(500),
+        media_type VARCHAR(50),
+        status VARCHAR(50) DEFAULT 'pending',
+        wa_message_id VARCHAR(255),
+        sent_at TIMESTAMP,
+        delivered_at TIMESTAMP,
+        read_at TIMESTAMP,
         error_message TEXT,
-        created_at TEXT DEFAULT (datetime('now'))
+        created_at TIMESTAMP DEFAULT NOW()
       );
 
       CREATE INDEX IF NOT EXISTS idx_wa_workspace ON whatsapp_messages(workspace_id);
@@ -221,29 +258,29 @@ const migrations = [
       CREATE INDEX IF NOT EXISTS idx_wa_status ON whatsapp_messages(status);
 
       CREATE TABLE IF NOT EXISTS whatsapp_templates (
-        id TEXT PRIMARY KEY,
-        workspace_id TEXT REFERENCES workspaces(id) ON DELETE CASCADE,
-        name TEXT NOT NULL,
-        category TEXT DEFAULT 'intro',
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL,
+        category VARCHAR(50) DEFAULT 'intro',
         content TEXT NOT NULL,
-        variables TEXT DEFAULT '[]',
-        created_at TEXT DEFAULT (datetime('now'))
+        variables JSONB DEFAULT '[]'::jsonb,
+        created_at TIMESTAMP DEFAULT NOW()
       );
 
       CREATE TABLE IF NOT EXISTS sms_messages (
-        id TEXT PRIMARY KEY,
-        workspace_id TEXT REFERENCES workspaces(id) ON DELETE CASCADE,
-        lead_id TEXT REFERENCES leads(id) ON DELETE CASCADE,
-        user_id TEXT REFERENCES users(id),
-        direction TEXT DEFAULT 'outbound',
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+        lead_id UUID REFERENCES leads(id) ON DELETE CASCADE,
+        user_id UUID REFERENCES users(id),
+        direction VARCHAR(20) DEFAULT 'outbound',
         message_text TEXT,
-        template_name TEXT,
-        status TEXT DEFAULT 'pending',
-        twilio_message_id TEXT,
-        sent_at TEXT,
-        delivered_at TEXT,
+        template_name VARCHAR(255),
+        status VARCHAR(50) DEFAULT 'pending',
+        twilio_message_id VARCHAR(255),
+        sent_at TIMESTAMP,
+        delivered_at TIMESTAMP,
         error_message TEXT,
-        created_at TEXT DEFAULT (datetime('now'))
+        created_at TIMESTAMP DEFAULT NOW()
       );
 
       CREATE INDEX IF NOT EXISTS idx_sms_workspace ON sms_messages(workspace_id);
@@ -251,12 +288,12 @@ const migrations = [
       CREATE INDEX IF NOT EXISTS idx_sms_status ON sms_messages(status);
 
       CREATE TABLE IF NOT EXISTS sms_templates (
-        id TEXT PRIMARY KEY,
-        workspace_id TEXT REFERENCES workspaces(id) ON DELETE CASCADE,
-        name TEXT NOT NULL,
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL,
         content TEXT NOT NULL,
-        variables TEXT DEFAULT '[]',
-        created_at TEXT DEFAULT (datetime('now'))
+        variables JSONB DEFAULT '[]'::jsonb,
+        created_at TIMESTAMP DEFAULT NOW()
       );
     `
   },
@@ -264,46 +301,46 @@ const migrations = [
     name: '005_create_email_marketing_tables',
     sql: `
       CREATE TABLE IF NOT EXISTS email_templates (
-        id TEXT PRIMARY KEY,
-        workspace_id TEXT REFERENCES workspaces(id) ON DELETE CASCADE,
-        name TEXT NOT NULL,
-        subject TEXT,
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL,
+        subject VARCHAR(500),
         body TEXT NOT NULL,
-        category TEXT DEFAULT 'intro',
-        variables TEXT DEFAULT '[]',
-        is_draft INTEGER DEFAULT 0,
-        created_by TEXT REFERENCES users(id),
-        created_at TEXT DEFAULT (datetime('now')),
-        updated_at TEXT DEFAULT (datetime('now'))
+        category VARCHAR(50) DEFAULT 'intro',
+        variables JSONB DEFAULT '[]'::jsonb,
+        is_draft BOOLEAN DEFAULT FALSE,
+        created_by UUID REFERENCES users(id),
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
       );
 
       CREATE INDEX IF NOT EXISTS idx_email_templates_workspace ON email_templates(workspace_id);
 
       CREATE TABLE IF NOT EXISTS emails (
-        id TEXT PRIMARY KEY,
-        workspace_id TEXT REFERENCES workspaces(id) ON DELETE CASCADE,
-        lead_id TEXT REFERENCES leads(id) ON DELETE CASCADE,
-        user_id TEXT REFERENCES users(id),
-        template_id TEXT REFERENCES email_templates(id),
-        campaign_id TEXT,
-        sequence_id TEXT,
-        subject TEXT,
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+        lead_id UUID REFERENCES leads(id) ON DELETE CASCADE,
+        user_id UUID REFERENCES users(id),
+        template_id UUID REFERENCES email_templates(id),
+        campaign_id UUID,
+        sequence_id UUID,
+        subject VARCHAR(500),
         body TEXT,
-        from_email TEXT,
-        from_name TEXT,
-        reply_to TEXT,
-        status TEXT DEFAULT 'pending',
-        sendgrid_message_id TEXT,
-        sent_at TEXT,
-        opened_at TEXT,
-        clicked_at TEXT,
-        replied_at TEXT,
-        bounced_at TEXT,
+        from_email VARCHAR(255),
+        from_name VARCHAR(255),
+        reply_to VARCHAR(255),
+        status VARCHAR(50) DEFAULT 'pending',
+        sendgrid_message_id VARCHAR(255),
+        sent_at TIMESTAMP,
+        opened_at TIMESTAMP,
+        clicked_at TIMESTAMP,
+        replied_at TIMESTAMP,
+        bounced_at TIMESTAMP,
         open_count INTEGER DEFAULT 0,
         click_count INTEGER DEFAULT 0,
-        tracking_pixel_id TEXT,
+        tracking_pixel_id VARCHAR(255),
         error_message TEXT,
-        created_at TEXT DEFAULT (datetime('now'))
+        created_at TIMESTAMP DEFAULT NOW()
       );
 
       CREATE INDEX IF NOT EXISTS idx_emails_workspace ON emails(workspace_id);
@@ -313,40 +350,40 @@ const migrations = [
       CREATE INDEX IF NOT EXISTS idx_emails_tracking ON emails(tracking_pixel_id);
 
       CREATE TABLE IF NOT EXISTS email_sequences (
-        id TEXT PRIMARY KEY,
-        workspace_id TEXT REFERENCES workspaces(id) ON DELETE CASCADE,
-        name TEXT NOT NULL,
-        type TEXT DEFAULT 'custom',
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL,
+        type VARCHAR(50) DEFAULT 'custom',
         description TEXT,
-        is_active INTEGER DEFAULT 1,
-        created_by TEXT REFERENCES users(id),
-        created_at TEXT DEFAULT (datetime('now'))
+        is_active BOOLEAN DEFAULT TRUE,
+        created_by UUID REFERENCES users(id),
+        created_at TIMESTAMP DEFAULT NOW()
       );
 
       CREATE TABLE IF NOT EXISTS email_sequence_steps (
-        id TEXT PRIMARY KEY,
-        sequence_id TEXT REFERENCES email_sequences(id) ON DELETE CASCADE,
-        template_id TEXT REFERENCES email_templates(id),
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        sequence_id UUID REFERENCES email_sequences(id) ON DELETE CASCADE,
+        template_id UUID REFERENCES email_templates(id),
         step_number INTEGER NOT NULL,
         delay_hours INTEGER DEFAULT 0,
         delay_days INTEGER DEFAULT 0,
-        condition_type TEXT,
-        condition_value TEXT DEFAULT '{}',
-        created_at TEXT DEFAULT (datetime('now'))
+        condition_type VARCHAR(50),
+        condition_value JSONB DEFAULT '{}'::jsonb,
+        created_at TIMESTAMP DEFAULT NOW()
       );
 
       CREATE INDEX IF NOT EXISTS idx_seq_steps_sequence ON email_sequence_steps(sequence_id);
 
       CREATE TABLE IF NOT EXISTS email_sequence_enrollments (
-        id TEXT PRIMARY KEY,
-        sequence_id TEXT REFERENCES email_sequences(id) ON DELETE CASCADE,
-        lead_id TEXT REFERENCES leads(id) ON DELETE CASCADE,
-        workspace_id TEXT REFERENCES workspaces(id) ON DELETE CASCADE,
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        sequence_id UUID REFERENCES email_sequences(id) ON DELETE CASCADE,
+        lead_id UUID REFERENCES leads(id) ON DELETE CASCADE,
+        workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
         current_step INTEGER DEFAULT 1,
-        status TEXT DEFAULT 'active',
-        enrolled_at TEXT DEFAULT (datetime('now')),
-        last_step_at TEXT,
-        next_step_at TEXT,
+        status VARCHAR(50) DEFAULT 'active',
+        enrolled_at TIMESTAMP DEFAULT NOW(),
+        last_step_at TIMESTAMP,
+        next_step_at TIMESTAMP,
         UNIQUE(sequence_id, lead_id)
       );
 
@@ -355,69 +392,69 @@ const migrations = [
       CREATE INDEX IF NOT EXISTS idx_enrollments_status ON email_sequence_enrollments(status);
 
       CREATE TABLE IF NOT EXISTS email_flows (
-        id TEXT PRIMARY KEY,
-        workspace_id TEXT REFERENCES workspaces(id) ON DELETE CASCADE,
-        name TEXT NOT NULL,
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL,
         description TEXT,
-        is_active INTEGER DEFAULT 0,
-        is_published INTEGER DEFAULT 0,
+        is_active BOOLEAN DEFAULT FALSE,
+        is_published BOOLEAN DEFAULT FALSE,
         version INTEGER DEFAULT 1,
-        created_by TEXT REFERENCES users(id),
-        created_at TEXT DEFAULT (datetime('now')),
-        updated_at TEXT DEFAULT (datetime('now'))
+        created_by UUID REFERENCES users(id),
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
       );
 
       CREATE TABLE IF NOT EXISTS email_flow_nodes (
-        id TEXT PRIMARY KEY,
-        flow_id TEXT REFERENCES email_flows(id) ON DELETE CASCADE,
-        node_type TEXT NOT NULL,
-        node_key TEXT NOT NULL,
-        position_x REAL DEFAULT 0,
-        position_y REAL DEFAULT 0,
-        config TEXT DEFAULT '{}',
-        created_at TEXT DEFAULT (datetime('now'))
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        flow_id UUID REFERENCES email_flows(id) ON DELETE CASCADE,
+        node_type VARCHAR(50) NOT NULL,
+        node_key VARCHAR(255) NOT NULL,
+        position_x NUMERIC DEFAULT 0,
+        position_y NUMERIC DEFAULT 0,
+        config JSONB DEFAULT '{}'::jsonb,
+        created_at TIMESTAMP DEFAULT NOW()
       );
 
       CREATE TABLE IF NOT EXISTS email_flow_edges (
-        id TEXT PRIMARY KEY,
-        flow_id TEXT REFERENCES email_flows(id) ON DELETE CASCADE,
-        source_node_key TEXT NOT NULL,
-        target_node_key TEXT NOT NULL,
-        condition_label TEXT,
-        created_at TEXT DEFAULT (datetime('now'))
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        flow_id UUID REFERENCES email_flows(id) ON DELETE CASCADE,
+        source_node_key VARCHAR(255) NOT NULL,
+        target_node_key VARCHAR(255) NOT NULL,
+        condition_label VARCHAR(255),
+        created_at TIMESTAMP DEFAULT NOW()
       );
 
       CREATE TABLE IF NOT EXISTS email_flow_enrollments (
-        id TEXT PRIMARY KEY,
-        flow_id TEXT REFERENCES email_flows(id) ON DELETE CASCADE,
-        lead_id TEXT REFERENCES leads(id) ON DELETE CASCADE,
-        workspace_id TEXT REFERENCES workspaces(id) ON DELETE CASCADE,
-        current_node_key TEXT,
-        status TEXT DEFAULT 'active',
-        enrolled_at TEXT DEFAULT (datetime('now')),
-        next_action_at TEXT,
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        flow_id UUID REFERENCES email_flows(id) ON DELETE CASCADE,
+        lead_id UUID REFERENCES leads(id) ON DELETE CASCADE,
+        workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+        current_node_key VARCHAR(255),
+        status VARCHAR(50) DEFAULT 'active',
+        enrolled_at TIMESTAMP DEFAULT NOW(),
+        next_action_at TIMESTAMP,
         UNIQUE(flow_id, lead_id)
       );
 
       CREATE TABLE IF NOT EXISTS email_triggers (
-        id TEXT PRIMARY KEY,
-        workspace_id TEXT REFERENCES workspaces(id) ON DELETE CASCADE,
-        name TEXT NOT NULL,
-        trigger_type TEXT NOT NULL,
-        trigger_config TEXT DEFAULT '{}',
-        action_type TEXT NOT NULL,
-        action_config TEXT DEFAULT '{}',
-        is_enabled INTEGER DEFAULT 1,
-        created_by TEXT REFERENCES users(id),
-        created_at TEXT DEFAULT (datetime('now'))
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL,
+        trigger_type VARCHAR(50) NOT NULL,
+        trigger_config JSONB DEFAULT '{}'::jsonb,
+        action_type VARCHAR(50) NOT NULL,
+        action_config JSONB DEFAULT '{}'::jsonb,
+        is_enabled BOOLEAN DEFAULT TRUE,
+        created_by UUID REFERENCES users(id),
+        created_at TIMESTAMP DEFAULT NOW()
       );
 
       CREATE TABLE IF NOT EXISTS email_trigger_logs (
-        id TEXT PRIMARY KEY,
-        trigger_id TEXT REFERENCES email_triggers(id) ON DELETE CASCADE,
-        workspace_id TEXT REFERENCES workspaces(id) ON DELETE CASCADE,
-        lead_id TEXT REFERENCES leads(id),
-        fired_at TEXT DEFAULT (datetime('now'))
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        trigger_id UUID REFERENCES email_triggers(id) ON DELETE CASCADE,
+        workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+        lead_id UUID REFERENCES leads(id),
+        fired_at TIMESTAMP DEFAULT NOW()
       );
     `
   },
@@ -425,13 +462,13 @@ const migrations = [
     name: '006_create_campaigns',
     sql: `
       CREATE TABLE IF NOT EXISTS campaigns (
-        id TEXT PRIMARY KEY,
-        workspace_id TEXT REFERENCES workspaces(id) ON DELETE CASCADE,
-        name TEXT NOT NULL,
-        type TEXT NOT NULL,
-        channel TEXT NOT NULL,
-        template_id TEXT,
-        subject TEXT,
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL,
+        type VARCHAR(50) NOT NULL,
+        channel VARCHAR(50) NOT NULL,
+        template_id UUID,
+        subject VARCHAR(500),
         body TEXT,
         recipients_count INTEGER DEFAULT 0,
         sent_count INTEGER DEFAULT 0,
@@ -440,18 +477,18 @@ const migrations = [
         clicked_count INTEGER DEFAULT 0,
         replied_count INTEGER DEFAULT 0,
         failed_count INTEGER DEFAULT 0,
-        status TEXT DEFAULT 'draft',
-        scheduled_at TEXT,
-        started_at TEXT,
-        completed_at TEXT,
-        created_by TEXT REFERENCES users(id),
-        filter_config TEXT DEFAULT '{}',
-        ab_test_enabled INTEGER DEFAULT 0,
-        ab_variant_b_template_id TEXT,
+        status VARCHAR(50) DEFAULT 'draft',
+        scheduled_at TIMESTAMP,
+        started_at TIMESTAMP,
+        completed_at TIMESTAMP,
+        created_by UUID REFERENCES users(id),
+        filter_config JSONB DEFAULT '{}'::jsonb,
+        ab_test_enabled BOOLEAN DEFAULT FALSE,
+        ab_variant_b_template_id UUID,
         ab_split_percentage INTEGER DEFAULT 50,
-        ab_winner_declared INTEGER DEFAULT 0,
-        created_at TEXT DEFAULT (datetime('now')),
-        updated_at TEXT DEFAULT (datetime('now'))
+        ab_winner_declared BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
       );
 
       CREATE INDEX IF NOT EXISTS idx_campaigns_workspace ON campaigns(workspace_id);
@@ -459,18 +496,18 @@ const migrations = [
       CREATE INDEX IF NOT EXISTS idx_campaigns_type ON campaigns(type);
 
       CREATE TABLE IF NOT EXISTS campaign_recipients (
-        id TEXT PRIMARY KEY,
-        campaign_id TEXT REFERENCES campaigns(id) ON DELETE CASCADE,
-        lead_id TEXT REFERENCES leads(id) ON DELETE CASCADE,
-        workspace_id TEXT REFERENCES workspaces(id) ON DELETE CASCADE,
-        status TEXT DEFAULT 'pending',
-        variant TEXT DEFAULT 'a',
-        sent_at TEXT,
-        opened_at TEXT,
-        clicked_at TEXT,
-        replied_at TEXT,
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        campaign_id UUID REFERENCES campaigns(id) ON DELETE CASCADE,
+        lead_id UUID REFERENCES leads(id) ON DELETE CASCADE,
+        workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+        status VARCHAR(50) DEFAULT 'pending',
+        variant VARCHAR(10) DEFAULT 'a',
+        sent_at TIMESTAMP,
+        opened_at TIMESTAMP,
+        clicked_at TIMESTAMP,
+        replied_at TIMESTAMP,
         error_message TEXT,
-        created_at TEXT DEFAULT (datetime('now'))
+        created_at TIMESTAMP DEFAULT NOW()
       );
 
       CREATE INDEX IF NOT EXISTS idx_recipients_campaign ON campaign_recipients(campaign_id);
@@ -481,52 +518,52 @@ const migrations = [
     name: '007_create_content_files',
     sql: `
       CREATE TABLE IF NOT EXISTS content_files (
-        id TEXT PRIMARY KEY,
-        workspace_id TEXT REFERENCES workspaces(id) ON DELETE CASCADE,
-        name TEXT NOT NULL,
-        original_name TEXT,
-        s3_key TEXT,
-        url TEXT,
-        file_type TEXT,
-        mime_type TEXT,
-        size_bytes INTEGER,
-        folder_id TEXT,
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL,
+        original_name VARCHAR(255),
+        s3_key VARCHAR(500),
+        url VARCHAR(500),
+        file_type VARCHAR(50),
+        mime_type VARCHAR(100),
+        size_bytes BIGINT,
+        folder_id UUID,
         version INTEGER DEFAULT 1,
-        parent_file_id TEXT REFERENCES content_files(id),
-        is_restricted INTEGER DEFAULT 0,
-        allowed_roles TEXT DEFAULT '[]',
-        tracking_enabled INTEGER DEFAULT 1,
-        uploaded_by TEXT REFERENCES users(id),
-        created_at TEXT DEFAULT (datetime('now')),
-        updated_at TEXT DEFAULT (datetime('now'))
+        parent_file_id UUID REFERENCES content_files(id),
+        is_restricted BOOLEAN DEFAULT FALSE,
+        allowed_roles JSONB DEFAULT '[]'::jsonb,
+        tracking_enabled BOOLEAN DEFAULT TRUE,
+        uploaded_by UUID REFERENCES users(id),
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
       );
 
       CREATE INDEX IF NOT EXISTS idx_files_workspace ON content_files(workspace_id);
       CREATE INDEX IF NOT EXISTS idx_files_folder ON content_files(folder_id);
 
       CREATE TABLE IF NOT EXISTS content_folders (
-        id TEXT PRIMARY KEY,
-        workspace_id TEXT REFERENCES workspaces(id) ON DELETE CASCADE,
-        name TEXT NOT NULL,
-        parent_id TEXT REFERENCES content_folders(id),
-        created_at TEXT DEFAULT (datetime('now'))
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL,
+        parent_id UUID REFERENCES content_folders(id),
+        created_at TIMESTAMP DEFAULT NOW()
       );
 
       CREATE TABLE IF NOT EXISTS content_tracking (
-        id TEXT PRIMARY KEY,
-        workspace_id TEXT REFERENCES workspaces(id) ON DELETE CASCADE,
-        file_id TEXT REFERENCES content_files(id) ON DELETE CASCADE,
-        lead_id TEXT REFERENCES leads(id) ON DELETE CASCADE,
-        tracking_id TEXT UNIQUE,
-        sent_by TEXT REFERENCES users(id),
-        sent_at TEXT DEFAULT (datetime('now')),
-        first_opened_at TEXT,
-        last_opened_at TEXT,
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+        file_id UUID REFERENCES content_files(id) ON DELETE CASCADE,
+        lead_id UUID REFERENCES leads(id) ON DELETE CASCADE,
+        tracking_id VARCHAR(255) UNIQUE,
+        sent_by UUID REFERENCES users(id),
+        sent_at TIMESTAMP DEFAULT NOW(),
+        first_opened_at TIMESTAMP,
+        last_opened_at TIMESTAMP,
         open_count INTEGER DEFAULT 0,
-        pages_viewed TEXT DEFAULT '[]',
+        pages_viewed JSONB DEFAULT '[]'::jsonb,
         time_spent_seconds INTEGER DEFAULT 0,
-        video_played INTEGER DEFAULT 0,
-        created_at TEXT DEFAULT (datetime('now'))
+        video_played BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT NOW()
       );
 
       CREATE INDEX IF NOT EXISTS idx_tracking_file ON content_tracking(file_id);
@@ -538,15 +575,15 @@ const migrations = [
     name: '008_create_notifications_devices',
     sql: `
       CREATE TABLE IF NOT EXISTS notifications (
-        id TEXT PRIMARY KEY,
-        user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
-        workspace_id TEXT REFERENCES workspaces(id) ON DELETE CASCADE,
-        type TEXT NOT NULL,
-        title TEXT NOT NULL,
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+        workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+        type VARCHAR(50) NOT NULL,
+        title VARCHAR(255) NOT NULL,
         body TEXT,
-        data TEXT DEFAULT '{}',
-        is_read INTEGER DEFAULT 0,
-        created_at TEXT DEFAULT (datetime('now'))
+        data JSONB DEFAULT '{}'::jsonb,
+        is_read BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT NOW()
       );
 
       CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
@@ -554,14 +591,14 @@ const migrations = [
       CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(is_read);
 
       CREATE TABLE IF NOT EXISTS device_tokens (
-        id TEXT PRIMARY KEY,
-        user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
-        token TEXT NOT NULL,
-        platform TEXT,
-        device_info TEXT DEFAULT '{}',
-        active INTEGER DEFAULT 1,
-        created_at TEXT DEFAULT (datetime('now')),
-        updated_at TEXT DEFAULT (datetime('now'))
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+        token VARCHAR(500) NOT NULL,
+        platform VARCHAR(50),
+        device_info JSONB DEFAULT '{}'::jsonb,
+        active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
       );
 
       CREATE INDEX IF NOT EXISTS idx_device_tokens_user ON device_tokens(user_id);
@@ -572,44 +609,44 @@ const migrations = [
     name: '009_create_integrations',
     sql: `
       CREATE TABLE IF NOT EXISTS integrations (
-        id TEXT PRIMARY KEY,
-        workspace_id TEXT REFERENCES workspaces(id) ON DELETE CASCADE,
-        type TEXT NOT NULL,
-        name TEXT,
-        is_connected INTEGER DEFAULT 0,
-        credentials TEXT DEFAULT '{}',
-        config TEXT DEFAULT '{}',
-        field_mapping TEXT DEFAULT '{}',
-        last_synced_at TEXT,
-        created_at TEXT DEFAULT (datetime('now')),
-        updated_at TEXT DEFAULT (datetime('now')),
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+        type VARCHAR(50) NOT NULL,
+        name VARCHAR(255),
+        is_connected BOOLEAN DEFAULT FALSE,
+        credentials JSONB DEFAULT '{}'::jsonb,
+        config JSONB DEFAULT '{}'::jsonb,
+        field_mapping JSONB DEFAULT '{}'::jsonb,
+        last_synced_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW(),
         UNIQUE(workspace_id, type)
       );
 
       CREATE INDEX IF NOT EXISTS idx_integrations_workspace ON integrations(workspace_id);
 
       CREATE TABLE IF NOT EXISTS webhook_endpoints (
-        id TEXT PRIMARY KEY,
-        workspace_id TEXT REFERENCES workspaces(id) ON DELETE CASCADE,
-        type TEXT NOT NULL,
-        endpoint_url TEXT UNIQUE NOT NULL,
-        secret TEXT,
-        field_mapping TEXT DEFAULT '{}',
-        is_active INTEGER DEFAULT 1,
-        created_at TEXT DEFAULT (datetime('now'))
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+        type VARCHAR(50) NOT NULL,
+        endpoint_url VARCHAR(500) UNIQUE NOT NULL,
+        secret VARCHAR(255),
+        field_mapping JSONB DEFAULT '{}'::jsonb,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT NOW()
       );
 
       CREATE INDEX IF NOT EXISTS idx_webhooks_workspace ON webhook_endpoints(workspace_id);
 
       CREATE TABLE IF NOT EXISTS embed_forms (
-        id TEXT PRIMARY KEY,
-        workspace_id TEXT REFERENCES workspaces(id) ON DELETE CASCADE,
-        name TEXT NOT NULL,
-        form_key TEXT UNIQUE NOT NULL,
-        fields TEXT DEFAULT '[]',
-        redirect_url TEXT,
-        is_active INTEGER DEFAULT 1,
-        created_at TEXT DEFAULT (datetime('now'))
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL,
+        form_key VARCHAR(255) UNIQUE NOT NULL,
+        fields JSONB DEFAULT '[]'::jsonb,
+        redirect_url VARCHAR(500),
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT NOW()
       );
 
       CREATE INDEX IF NOT EXISTS idx_embed_forms_workspace ON embed_forms(workspace_id);
@@ -619,50 +656,50 @@ const migrations = [
     name: '010_create_billing_audit',
     sql: `
       CREATE TABLE IF NOT EXISTS subscriptions (
-        id TEXT PRIMARY KEY,
-        workspace_id TEXT REFERENCES workspaces(id) ON DELETE CASCADE,
-        plan TEXT DEFAULT 'free',
-        status TEXT DEFAULT 'active',
-        stripe_customer_id TEXT,
-        stripe_subscription_id TEXT,
-        stripe_price_id TEXT,
-        current_period_start TEXT,
-        current_period_end TEXT,
-        cancel_at_period_end INTEGER DEFAULT 0,
-        trial_start TEXT,
-        trial_end TEXT,
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+        plan VARCHAR(50) DEFAULT 'free',
+        status VARCHAR(50) DEFAULT 'active',
+        stripe_customer_id VARCHAR(255),
+        stripe_subscription_id VARCHAR(255),
+        stripe_price_id VARCHAR(255),
+        current_period_start TIMESTAMP,
+        current_period_end TIMESTAMP,
+        cancel_at_period_end BOOLEAN DEFAULT FALSE,
+        trial_start TIMESTAMP,
+        trial_end TIMESTAMP,
         agent_limit INTEGER,
-        created_at TEXT DEFAULT (datetime('now')),
-        updated_at TEXT DEFAULT (datetime('now'))
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
       );
 
       CREATE INDEX IF NOT EXISTS idx_subscriptions_workspace ON subscriptions(workspace_id);
 
       CREATE TABLE IF NOT EXISTS invoices (
-        id TEXT PRIMARY KEY,
-        workspace_id TEXT REFERENCES workspaces(id) ON DELETE CASCADE,
-        stripe_invoice_id TEXT,
-        amount REAL,
-        currency TEXT DEFAULT 'usd',
-        status TEXT DEFAULT 'open',
-        period_start TEXT,
-        period_end TEXT,
-        invoice_url TEXT,
-        created_at TEXT DEFAULT (datetime('now'))
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+        stripe_invoice_id VARCHAR(255),
+        amount NUMERIC,
+        currency VARCHAR(10) DEFAULT 'usd',
+        status VARCHAR(50) DEFAULT 'open',
+        period_start TIMESTAMP,
+        period_end TIMESTAMP,
+        invoice_url VARCHAR(500),
+        created_at TIMESTAMP DEFAULT NOW()
       );
 
       CREATE TABLE IF NOT EXISTS audit_logs (
-        id TEXT PRIMARY KEY,
-        workspace_id TEXT REFERENCES workspaces(id) ON DELETE CASCADE,
-        user_id TEXT REFERENCES users(id),
-        action TEXT NOT NULL,
-        entity_type TEXT,
-        entity_id TEXT,
-        old_values TEXT,
-        new_values TEXT,
-        ip_address TEXT,
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+        user_id UUID REFERENCES users(id),
+        action VARCHAR(255) NOT NULL,
+        entity_type VARCHAR(100),
+        entity_id UUID,
+        old_values JSONB,
+        new_values JSONB,
+        ip_address VARCHAR(50),
         user_agent TEXT,
-        created_at TEXT DEFAULT (datetime('now'))
+        created_at TIMESTAMP DEFAULT NOW()
       );
 
       CREATE INDEX IF NOT EXISTS idx_audit_workspace ON audit_logs(workspace_id);
@@ -670,73 +707,73 @@ const migrations = [
       CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_logs(action);
 
       CREATE TABLE IF NOT EXISTS refresh_tokens (
-        id TEXT PRIMARY KEY,
-        user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
-        token TEXT NOT NULL,
-        expires_at TEXT NOT NULL,
-        is_revoked INTEGER DEFAULT 0,
-        created_at TEXT DEFAULT (datetime('now'))
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+        token VARCHAR(500) NOT NULL,
+        expires_at TIMESTAMP NOT NULL,
+        is_revoked BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT NOW()
       );
 
       CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user ON refresh_tokens(user_id);
       CREATE INDEX IF NOT EXISTS idx_refresh_tokens_token ON refresh_tokens(token);
 
       CREATE TABLE IF NOT EXISTS password_resets (
-        id TEXT PRIMARY KEY,
-        email TEXT NOT NULL,
-        token TEXT NOT NULL,
-        expires_at TEXT NOT NULL,
-        used INTEGER DEFAULT 0,
-        created_at TEXT DEFAULT (datetime('now'))
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        email VARCHAR(255) NOT NULL,
+        token VARCHAR(500) NOT NULL,
+        expires_at TIMESTAMP NOT NULL,
+        used BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT NOW()
       );
 
       CREATE INDEX IF NOT EXISTS idx_password_resets_token ON password_resets(token);
 
       CREATE TABLE IF NOT EXISTS export_history (
-        id TEXT PRIMARY KEY,
-        workspace_id TEXT REFERENCES workspaces(id) ON DELETE CASCADE,
-        user_id TEXT REFERENCES users(id),
-        type TEXT,
-        filter_config TEXT DEFAULT '{}',
-        fields TEXT DEFAULT '[]',
-        file_url TEXT,
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+        user_id UUID REFERENCES users(id),
+        type VARCHAR(50),
+        filter_config JSONB DEFAULT '{}'::jsonb,
+        fields JSONB DEFAULT '[]'::jsonb,
+        file_url VARCHAR(500),
         row_count INTEGER DEFAULT 0,
-        created_at TEXT DEFAULT (datetime('now'))
+        created_at TIMESTAMP DEFAULT NOW()
       );
 
       CREATE INDEX IF NOT EXISTS idx_export_workspace ON export_history(workspace_id);
 
       CREATE TABLE IF NOT EXISTS territories (
-        id TEXT PRIMARY KEY,
-        workspace_id TEXT REFERENCES workspaces(id) ON DELETE CASCADE,
-        user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
-        city TEXT NOT NULL,
-        created_at TEXT DEFAULT (datetime('now')),
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+        user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+        city VARCHAR(255) NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW(),
         UNIQUE(workspace_id, user_id, city)
       );
 
       CREATE INDEX IF NOT EXISTS idx_territories_workspace ON territories(workspace_id);
 
       CREATE TABLE IF NOT EXISTS lead_assignment_rules (
-        id TEXT PRIMARY KEY,
-        workspace_id TEXT REFERENCES workspaces(id) ON DELETE CASCADE,
-        type TEXT DEFAULT 'round_robin',
-        rules TEXT DEFAULT '[]',
-        is_active INTEGER DEFAULT 1,
-        created_at TEXT DEFAULT (datetime('now'))
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+        type VARCHAR(50) DEFAULT 'round_robin',
+        rules JSONB DEFAULT '[]'::jsonb,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT NOW()
       );
 
       CREATE TABLE IF NOT EXISTS sequence_enrollments (
-        id TEXT PRIMARY KEY,
-        workspace_id TEXT REFERENCES workspaces(id) ON DELETE CASCADE,
-        lead_id TEXT REFERENCES leads(id) ON DELETE CASCADE,
-        sequence_type TEXT NOT NULL,
-        sequence_id TEXT,
-        channel TEXT DEFAULT 'whatsapp',
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+        lead_id UUID REFERENCES leads(id) ON DELETE CASCADE,
+        sequence_type VARCHAR(50) NOT NULL,
+        sequence_id UUID,
+        channel VARCHAR(50) DEFAULT 'whatsapp',
         current_step INTEGER DEFAULT 1,
-        status TEXT DEFAULT 'active',
-        enrolled_at TEXT DEFAULT (datetime('now')),
-        next_step_at TEXT,
+        status VARCHAR(50) DEFAULT 'active',
+        enrolled_at TIMESTAMP DEFAULT NOW(),
+        next_step_at TIMESTAMP,
         UNIQUE(sequence_id, lead_id, sequence_type)
       );
 
@@ -744,51 +781,194 @@ const migrations = [
       CREATE INDEX IF NOT EXISTS idx_seq_enroll_status ON sequence_enrollments(status);
     `
   },
+  {
+    name: '011_create_extra_tables',
+    sql: `
+      CREATE TABLE IF NOT EXISTS whatsapp_auto_responder (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+        is_enabled BOOLEAN DEFAULT FALSE,
+        trigger_keywords JSONB DEFAULT '[]'::jsonb,
+        response_message TEXT,
+        match_type VARCHAR(20) DEFAULT 'exact',
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS whatsapp_sequences (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS whatsapp_sequence_steps (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        sequence_id UUID REFERENCES whatsapp_sequences(id) ON DELETE CASCADE,
+        step_number INTEGER NOT NULL,
+        message_text TEXT,
+        delay_minutes INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS whatsapp_sequence_enrollments (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        sequence_id UUID REFERENCES whatsapp_sequences(id) ON DELETE CASCADE,
+        lead_id UUID REFERENCES leads(id) ON DELETE CASCADE,
+        workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+        current_step INTEGER DEFAULT 1,
+        status VARCHAR(50) DEFAULT 'active',
+        enrolled_at TIMESTAMP DEFAULT NOW(),
+        next_step_at TIMESTAMP,
+        UNIQUE(sequence_id, lead_id)
+      );
+
+      CREATE TABLE IF NOT EXISTS workspace_branding (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE UNIQUE,
+        logo_url VARCHAR(500),
+        primary_color VARCHAR(50) DEFAULT '#3b82f6',
+        secondary_color VARCHAR(50) DEFAULT '#1e40af',
+        company_name VARCHAR(255),
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS subteams (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL,
+        description TEXT,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS lead_automation_rules (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL,
+        trigger_type VARCHAR(50) NOT NULL,
+        trigger_config JSONB DEFAULT '{}'::jsonb,
+        action_type VARCHAR(50) NOT NULL,
+        action_config JSONB DEFAULT '{}'::jsonb,
+        is_enabled BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS lead_distribution_config (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+        type VARCHAR(50) DEFAULT 'round_robin',
+        config JSONB DEFAULT '{}'::jsonb,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS whatsapp_chat_assistant_rules (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL,
+        trigger_keywords JSONB DEFAULT '[]'::jsonb,
+        response_message TEXT,
+        match_type VARCHAR(20) DEFAULT 'exact',
+        is_enabled BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS outgoing_webhooks (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL,
+        url VARCHAR(500) NOT NULL,
+        trigger_event VARCHAR(100) NOT NULL,
+        headers JSONB DEFAULT '{}'::jsonb,
+        is_enabled BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS outgoing_webhook_logs (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        webhook_id UUID REFERENCES outgoing_webhooks(id) ON DELETE CASCADE,
+        workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+        event_type VARCHAR(100),
+        request_body JSONB,
+        response_status INTEGER,
+        response_body TEXT,
+        success BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS lead_form_pages (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL,
+        form_key VARCHAR(255) UNIQUE NOT NULL,
+        fields JSONB DEFAULT '[]'::jsonb,
+        redirect_url VARCHAR(500),
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS meta_capi_config (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE UNIQUE,
+        pixel_id VARCHAR(255),
+        access_token TEXT,
+        is_enabled BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+    `
+  },
 ];
 
 async function runMigrations() {
-  logger.info('Starting database migrations (JSON file DB)...');
-
-  const db = require('../config/database');
-  const fs = require('fs');
-  const path = require('path');
-
-  const dbPath = path.resolve(__dirname, '../../crm_final.json');
-  let tables = {};
-  try {
-    if (fs.existsSync(dbPath)) {
-      tables = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
-    }
-  } catch {}
-
-  const tableNames = [
-    'workspaces', 'users', 'lead_stages', 'leads', 'lead_activities', 'lead_tags',
-    'lead_groups', 'lead_custom_fields', 'follow_ups', 'calls',
-    'whatsapp_messages', 'whatsapp_templates', 'sms_messages', 'sms_templates',
-    'email_templates', 'emails', 'email_sequences', 'email_sequence_steps',
-    'email_sequence_enrollments', 'email_flows', 'email_flow_nodes', 'email_flow_edges',
-    'email_flow_enrollments', 'email_triggers', 'email_trigger_logs',
-    'campaigns', 'campaign_recipients',
-    'content_files', 'content_folders', 'content_tracking',
-    'notifications', 'device_tokens',
-    'integrations', 'webhook_endpoints', 'embed_forms',
-    'subscriptions', 'invoices', 'audit_logs', 'refresh_tokens', 'password_resets',
-    'export_history', 'territories', 'lead_assignment_rules', 'sequence_enrollments',
-    'whatsapp_auto_responder', 'whatsapp_sequences', 'whatsapp_sequence_steps',
-    'whatsapp_sequence_enrollments', 'workspace_branding', 'subteams',
-    'lead_automation_rules', 'lead_distribution_config', 'whatsapp_chat_assistant_rules',
-    'outgoing_webhooks', 'outgoing_webhook_logs', 'lead_form_pages', 'meta_capi_config',
-  ];
-
-  for (const name of tableNames) {
-    if (!tables[name]) {
-      tables[name] = { _schema: '', _data: [] };
-      logger.info(`Created table: ${name}`);
+  logger.info('Starting database migrations (PostgreSQL)...');
+  
+  // First, ensure the pgcrypto extension is available for gen_random_uuid()
+  await db.query('CREATE EXTENSION IF NOT EXISTS "pgcrypto"');
+  logger.info('pgcrypto extension enabled');
+  
+  let completedCount = 0;
+  
+  for (const migration of migrations) {
+    try {
+      // Check if migration was already run
+      const checkResult = await db.query(
+        'SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = $1)',
+        [migration.name.split('_').slice(1).join('_')]
+      );
+      
+      // Split by semicolons and run each statement
+      const statements = migration.sql
+        .split(';')
+        .map(s => s.trim())
+        .filter(s => s.length > 0);
+      
+      for (const stmt of statements) {
+        await db.query(stmt);
+      }
+      
+      completedCount++;
+      logger.info(`Migration ${migration.name} completed successfully`);
+    } catch (err) {
+      // If table already exists, that's fine
+      if (err.code === '42P07' || err.message.includes('already exists')) {
+        completedCount++;
+        logger.info(`Migration ${migration.name} skipped (already exists)`);
+      } else {
+        logger.error(`Migration ${migration.name} failed:`, err.message);
+        throw err;
+      }
     }
   }
-
-  fs.writeFileSync(dbPath, JSON.stringify(tables, null, 2));
-  logger.info('All migrations completed successfully');
+  
+  logger.info(`All ${completedCount}/${migrations.length} migrations completed successfully`);
 }
 
 if (require.main === module) {

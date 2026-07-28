@@ -18,31 +18,31 @@ export default function AutomationRules() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
-      <button onClick={() => navigate('/automations')} className="flex items-center gap-2 text-sm text-dark-400 hover:text-dark-600"><ArrowLeft size={16} /> Back to Automations</button>
+      <button onClick={() => navigate('/app/automations')} className="flex items-center gap-2 text-sm text-ink-secondary hover:text-ink-primary"><ArrowLeft size={16} /> Back to Automations</button>
 
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 bg-primary-100 rounded-xl flex items-center justify-center"><Filter size={24} className="text-primary-600" /></div>
-          <div><h2 className="text-xl font-bold text-dark-900">Lead Automation Rules</h2><p className="text-sm text-dark-400">Assign leads via rules or round robin</p></div>
+          <div className="w-12 h-12 bg-surface-page rounded-xl flex items-center justify-center"><Filter size={24} className="text-ink-secondary" /></div>
+          <div><h2 className="text-xl font-bold text-ink-primary">Lead Automation Rules</h2><p className="text-sm text-ink-secondary">Assign leads via rules or round robin</p></div>
         </div>
-        <button onClick={() => setShowCreate(true)} className="btn btn-primary flex items-center gap-2"><Plus size={16} /> New Rule</button>
+        <button onClick={() => setShowCreate(true)} className="px-4 py-2 rounded-lg btn btn-primary flex items-center gap-2 transition-colors"><Plus size={16} /> New Rule</button>
       </div>
 
       {rules.length === 0 ? (
-        <div className="card text-center py-12"><Filter size={48} className="text-dark-300 mx-auto mb-3" /><p className="text-dark-400">No automation rules yet</p></div>
+        <div className="card text-center py-12"><Filter size={48} className="text-ink-tertiary mx-auto mb-3" /><p className="text-ink-secondary">No automation rules yet</p></div>
       ) : (
         <div className="space-y-3">
           {rules.map(r => (
             <div key={r.id} className="card">
               <div className="flex items-center justify-between">
                 <div className="flex-1">
-                  <div className="flex items-center gap-2"><span className="font-medium text-dark-900">{r.name}</span><span className={`badge ${r.is_active ? 'bg-green-100 text-green-700' : 'bg-dark-100 text-dark-600'}`}>{r.is_active ? 'Active' : 'Inactive'}</span></div>
-                  <p className="text-xs text-dark-400 mt-1">Source: {r.trigger_source} | Priority: {r.priority}</p>
+                  <div className="flex items-center gap-2"><span className="font-medium text-ink-primary">{r.name}</span><span className={`badge ${r.is_active ? 'bg-surface-page text-ink-secondary' : 'bg-surface-hover text-ink-secondary'}`}>{r.is_active ? 'Active' : 'Inactive'}</span></div>
+                  <p className="text-xs text-ink-tertiary mt-1">Source: {r.trigger_source} | Priority: {r.priority}</p>
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={() => handleTest(r)} className="btn btn-secondary text-sm p-2" title="Test"><Play size={14} /></button>
-                  <button onClick={() => handleToggle(r)} className="btn btn-secondary text-sm p-2" title="Toggle"><Filter size={14} /></button>
-                  <button onClick={() => handleDelete(r.id)} className="btn btn-danger text-sm p-2"><Trash2 size={14} /></button>
+                  <button onClick={() => handleTest(r)} className="px-3 py-2 rounded-lg bg-surface-hover text-ink-secondary border border-surface-border hover:bg-surface-hover text-sm p-2 transition-colors" title="Test"><Play size={14} /></button>
+                  <button onClick={() => handleToggle(r)} className="px-3 py-2 rounded-lg bg-surface-hover text-ink-secondary border border-surface-border hover:bg-surface-hover text-sm p-2 transition-colors" title="Toggle"><Filter size={14} /></button>
+                  <button onClick={() => handleDelete(r.id)} className="px-3 py-2 rounded-lg bg-surface-page text-ink-secondary border border-surface-border hover:bg-surface-hover text-sm p-2 transition-colors"><Trash2 size={14} /></button>
                 </div>
               </div>
             </div>
@@ -66,16 +66,16 @@ export default function AutomationRules() {
     };
 
     return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
-          <div className="flex items-center justify-between mb-4"><h2 className="text-xl font-bold">New Automation Rule</h2><button onClick={onClose}>✕</button></div>
+      <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="bg-white border border-surface-border rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-modal">
+          <div className="flex items-center justify-between mb-4"><h2 className="text-xl font-bold text-ink-primary">New Automation Rule</h2><button onClick={onClose}>✕</button></div>
           <div className="space-y-4">
             <input className="input" placeholder="Rule name" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
             <select className="input" value={form.trigger_source} onChange={e => setForm({ ...form, trigger_source: e.target.value })}>
               <option value="any">Any Source</option><option value="facebook">Facebook</option><option value="google">Google</option><option value="tiktok">TikTok</option><option value="website">Website</option><option value="lead_form">Lead Form</option>
             </select>
             <div>
-              <label className="text-sm font-medium">Conditions:</label>
+              <label className="text-sm font-medium text-ink-secondary">Conditions:</label>
               {form.conditions.map((c, i) => (
                 <div key={i} className="flex gap-2 mt-2">
                   <select className="input flex-1" value={c.field} onChange={e => setForm({ ...form, conditions: form.conditions.map((x, idx) => idx === i ? { ...x, field: e.target.value } : x) })}>{fields.map(f => <option key={f} value={f}>{f}</option>)}</select>
@@ -83,19 +83,19 @@ export default function AutomationRules() {
                   <input className="input flex-1" placeholder="Value" value={c.value} onChange={e => setForm({ ...form, conditions: form.conditions.map((x, idx) => idx === i ? { ...x, value: e.target.value } : x) })} />
                 </div>
               ))}
-              <button onClick={() => setForm({ ...form, conditions: [...form.conditions, { field: 'city', operator: 'equals', value: '' }] })} className="text-xs text-primary-600 mt-2">+ Add Condition</button>
+              <button onClick={() => setForm({ ...form, conditions: [...form.conditions, { field: 'city', operator: 'equals', value: '' }] })} className="text-xs text-ink-secondary mt-2">+ Add Condition</button>
             </div>
             <div>
-              <label className="text-sm font-medium">Actions:</label>
+              <label className="text-sm font-medium text-ink-secondary">Actions:</label>
               {form.actions.map((a, i) => (
                 <div key={i} className="flex gap-2 mt-2">
                   <select className="input flex-1" value={a.type} onChange={e => setForm({ ...form, actions: form.actions.map((x, idx) => idx === i ? { ...x, type: e.target.value } : x) })}>{actionTypes.map(a => <option key={a.v} value={a.v}>{a.l}</option>)}</select>
                   {a.type !== 'assign_round_robin' && a.type !== 'send_to_distribution' && <input className="input flex-1" placeholder="Value" value={a.value} onChange={e => setForm({ ...form, actions: form.actions.map((x, idx) => idx === i ? { ...x, value: e.target.value } : x) })} />}
                 </div>
               ))}
-              <button onClick={() => setForm({ ...form, actions: [...form.actions, { type: 'add_tag', value: '' }] })} className="text-xs text-primary-600 mt-2">+ Add Action</button>
+              <button onClick={() => setForm({ ...form, actions: [...form.actions, { type: 'add_tag', value: '' }] })} className="text-xs text-ink-secondary mt-2">+ Add Action</button>
             </div>
-            <button onClick={handleCreate} className="btn btn-primary w-full">Create Rule</button>
+            <button onClick={handleCreate} className="w-full px-4 py-2.5 rounded-lg btn btn-primary transition-colors">Create Rule</button>
           </div>
         </div>
       </div>

@@ -23,37 +23,37 @@ export default function LeadFormsBuilder() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
-      <button onClick={() => navigate('/automations')} className="flex items-center gap-2 text-sm text-dark-400 hover:text-dark-600"><ArrowLeft size={16} /> Back to Automations</button>
+      <button onClick={() => navigate('/app/automations')} className="flex items-center gap-2 text-sm text-ink-secondary hover:text-ink-primary"><ArrowLeft size={16} /> Back to Automations</button>
 
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 bg-primary-100 rounded-xl flex items-center justify-center"><FileText size={24} className="text-primary-600" /></div>
-          <div><h2 className="text-xl font-bold text-dark-900">CRM Final Lead Forms</h2><p className="text-sm text-dark-400">Create lead forms and receive instant alerts</p></div>
+          <div className="w-12 h-12 bg-surface-page rounded-xl flex items-center justify-center"><FileText size={24} className="text-ink-secondary" /></div>
+          <div><h2 className="text-xl font-bold text-ink-primary">CRM Final Lead Forms</h2><p className="text-sm text-ink-secondary">Create lead forms and receive instant alerts</p></div>
         </div>
-        <button onClick={() => { setEditing(null); setShowCreate(true); }} className="btn btn-primary flex items-center gap-2"><Plus size={16} /> New Form</button>
+        <button onClick={() => { setEditing(null); setShowCreate(true); }} className="px-4 py-2 rounded-lg btn btn-primary flex items-center gap-2 transition-colors"><Plus size={16} /> New Form</button>
       </div>
 
       {pages.length === 0 ? (
         <div className="card text-center py-12">
-          <FileText size={48} className="text-dark-300 mx-auto mb-3" />
-          <p className="text-dark-400">No lead forms yet. Create your first form!</p>
+          <FileText size={48} className="text-ink-tertiary mx-auto mb-3" />
+          <p className="text-ink-secondary">No lead forms yet. Create your first form!</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {pages.map(p => (
-            <div key={p.id} className="card">
+          {pages.map((p, idx) => (
+            <div key={p.id || idx} className="card">
               <div className="flex items-start justify-between mb-3">
-                <div><h3 className="font-semibold text-dark-900">{p.name}</h3><p className="text-xs text-dark-400">{p.title}</p></div>
-                <span className={`badge ${p.is_active ? 'bg-green-100 text-green-700' : 'bg-dark-100 text-dark-600'}`}>{p.is_active ? 'Active' : 'Inactive'}</span>
+                <div><h3 className="font-semibold text-ink-primary">{p.name}</h3><p className="text-xs text-ink-tertiary">{p.title}</p></div>
+                <span className={`badge ${p.is_active ? 'bg-surface-page text-ink-secondary' : 'bg-surface-hover text-ink-secondary'}`}>{p.is_active ? 'Active' : 'Inactive'}</span>
               </div>
-              <div className="flex items-center gap-2 text-xs text-dark-400 mb-3">
+              <div className="flex items-center gap-2 text-xs text-ink-tertiary mb-3">
                 <span>Views: {p.views || 0}</span><span>•</span><span>Submissions: {p.submissions || 0}</span>
               </div>
               <div className="flex gap-2">
-                <button onClick={() => window.open(`/api/automations/lead-form/${p.form_key}`, '_blank')} className="btn btn-secondary text-sm flex items-center gap-1 flex-1"><ExternalLink size={14} /> View</button>
-                <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/api/automations/lead-form/${p.form_key}`); toast.success('Link copied!'); }} className="btn btn-secondary text-sm p-2"><Copy size={14} /></button>
-                <button onClick={() => { setEditing(p); setShowCreate(true); }} className="btn btn-secondary text-sm p-2"><Edit size={14} /></button>
-                <button onClick={() => handleDelete(p.id)} className="btn btn-danger text-sm p-2"><Trash2 size={14} /></button>
+                <button onClick={() => window.open(`/api/automations/lead-form/${p.form_key}`, '_blank')} className="px-3 py-2 rounded-lg bg-surface-hover text-ink-secondary border border-surface-border hover:bg-surface-hover text-sm flex items-center gap-1 flex-1 transition-colors"><ExternalLink size={14} /> View</button>
+                <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/api/automations/lead-form/${p.form_key}`); toast.success('Link copied!'); }} className="px-3 py-2 rounded-lg bg-surface-hover text-ink-secondary border border-surface-border hover:bg-surface-hover text-sm p-2 transition-colors"><Copy size={14} /></button>
+                <button onClick={() => { setEditing(p); setShowCreate(true); }} className="px-3 py-2 rounded-lg bg-surface-hover text-ink-secondary border border-surface-border hover:bg-surface-hover text-sm p-2 transition-colors"><Edit size={14} /></button>
+                <button onClick={() => handleDelete(p.id)} className="px-3 py-2 rounded-lg bg-surface-page text-ink-secondary border border-surface-border hover:bg-surface-hover text-sm p-2 transition-colors"><Trash2 size={14} /></button>
               </div>
             </div>
           ))}
@@ -95,34 +95,34 @@ function FormBuilderModal({ page, onClose, onSaved }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between mb-4"><h2 className="text-xl font-bold">{page ? 'Edit Form' : 'New Lead Form'}</h2><button onClick={onClose}>✕</button></div>
+    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white border border-surface-border rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-modal">
+        <div className="flex items-center justify-between mb-4"><h2 className="text-xl font-bold text-ink-primary">{page ? 'Edit Form' : 'New Lead Form'}</h2><button onClick={onClose}>✕</button></div>
         <div className="space-y-4">
-          <div><label className="text-sm font-medium">Form Name *</label><input className="input mt-1" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Website Contact Form" /></div>
-          <div><label className="text-sm font-medium">Form Title</label><input className="input mt-1" value={title} onChange={e => setTitle(e.target.value)} placeholder="Contact Us" /></div>
-          <div><label className="text-sm font-medium">Description</label><textarea className="input mt-1" rows={2} value={description} onChange={e => setDescription(e.target.value)} /></div>
+          <div><label className="text-sm font-medium text-ink-secondary">Form Name *</label><input className="input mt-1" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Website Contact Form" /></div>
+          <div><label className="text-sm font-medium text-ink-secondary">Form Title</label><input className="input mt-1" value={title} onChange={e => setTitle(e.target.value)} placeholder="Contact Us" /></div>
+          <div><label className="text-sm font-medium text-ink-secondary">Description</label><textarea className="input mt-1" rows={2} value={description} onChange={e => setDescription(e.target.value)} /></div>
           <div className="grid grid-cols-2 gap-3">
-            <div><label className="text-sm font-medium">Logo URL</label><input className="input mt-1" value={logoUrl} onChange={e => setLogoUrl(e.target.value)} placeholder="https://..." /></div>
-            <div><label className="text-sm font-medium">Primary Color</label><input type="color" className="input mt-1 h-10" value={primaryColor} onChange={e => setPrimaryColor(e.target.value)} /></div>
+            <div><label className="text-sm font-medium text-ink-secondary">Logo URL</label><input className="input mt-1" value={logoUrl} onChange={e => setLogoUrl(e.target.value)} placeholder="https://..." /></div>
+            <div><label className="text-sm font-medium text-ink-secondary">Primary Color</label><input type="color" className="input mt-1 h-10" value={primaryColor} onChange={e => setPrimaryColor(e.target.value)} /></div>
           </div>
-          <div><label className="text-sm font-medium">Thank You Message</label><input className="input mt-1" value={thankYou} onChange={e => setThankYou(e.target.value)} /></div>
-          <div><label className="text-sm font-medium">Redirect URL (optional)</label><input className="input mt-1" value={redirectUrl} onChange={e => setRedirectUrl(e.target.value)} placeholder="https://..." /></div>
+          <div><label className="text-sm font-medium text-ink-secondary">Thank You Message</label><input className="input mt-1" value={thankYou} onChange={e => setThankYou(e.target.value)} /></div>
+          <div><label className="text-sm font-medium text-ink-secondary">Redirect URL (optional)</label><input className="input mt-1" value={redirectUrl} onChange={e => setRedirectUrl(e.target.value)} placeholder="https://..." /></div>
 
           <div>
-            <div className="flex items-center justify-between mb-2"><label className="text-sm font-medium">Form Fields</label><button onClick={addField} className="text-xs text-primary-600 flex items-center gap-1"><Plus size={14} /> Add Field</button></div>
+            <div className="flex items-center justify-between mb-2"><label className="text-sm font-medium text-ink-secondary">Form Fields</label><button onClick={addField} className="text-xs text-ink-secondary flex items-center gap-1"><Plus size={14} /> Add Field</button></div>
             {fields.map((f, i) => (
               <div key={i} className="flex items-center gap-2 mb-2">
                 <input className="input flex-1" placeholder="Field name" value={f.name} onChange={e => updateField(i, 'name', e.target.value)} />
                 <input className="input flex-1" placeholder="Label" value={f.label} onChange={e => updateField(i, 'label', e.target.value)} />
                 <select className="input w-32" value={f.type} onChange={e => updateField(i, 'type', e.target.value)}>{fieldTypes.map(t => <option key={t} value={t}>{t}</option>)}</select>
                 <label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={f.required} onChange={e => updateField(i, 'required', e.target.checked)} /> Req</label>
-                <button onClick={() => removeField(i)} className="text-red-500 p-1"><Trash2 size={14} /></button>
+                <button onClick={() => removeField(i)} className="text-ink-secondary p-1 hover:text-red-300 transition-colors"><Trash2 size={14} /></button>
               </div>
             ))}
           </div>
 
-          <button onClick={handleSave} className="btn btn-primary w-full">{page ? 'Update Form' : 'Create Form'}</button>
+          <button onClick={handleSave} className="w-full px-4 py-2.5 rounded-lg btn btn-primary transition-colors">{page ? 'Update Form' : 'Create Form'}</button>
         </div>
       </div>
     </div>

@@ -1,7 +1,7 @@
 const dotenv = require('dotenv');
 const path = require('path');
 
-dotenv.config({ path: path.resolve(__dirname, '../.env') });
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 module.exports = {
   env: process.env.NODE_ENV || 'development',
@@ -54,6 +54,7 @@ module.exports = {
     accountSid: process.env.TWILIO_ACCOUNT_SID || '',
     authToken: process.env.TWILIO_AUTH_TOKEN || '',
     phoneNumber: process.env.TWILIO_PHONE_NUMBER || '',
+    whatsappFrom: process.env.TWILIO_WHATSAPP_FROM || 'whatsapp:+14155238886',
   },
 
   stripe: {
@@ -78,18 +79,35 @@ module.exports = {
     apiKey: process.env.OPENAI_API_KEY || '',
   },
 
-  firebase: {
-    projectId: process.env.FIREBASE_PROJECT_ID || '',
-    clientEmail: process.env.FIREBASE_CLIENT_EMAIL || '',
-    privateKey: (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
-  },
+  firebase: (() => {
+    const projectId = process.env.FIREBASE_PROJECT_ID || '';
+    const clientEmail = process.env.FIREBASE_CLIENT_EMAIL || '';
+    const privateKey = (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n');
+    
+    if (projectId && clientEmail && privateKey) {
+      return { projectId, clientEmail, privateKey };
+    }
+    
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      const saPath = path.resolve(__dirname, '../../firebase-service-account.json');
+      if (fs.existsSync(saPath)) {
+        const sa = JSON.parse(fs.readFileSync(saPath, 'utf8'));
+        return { projectId: sa.project_id, clientEmail: sa.client_email, privateKey: sa.private_key };
+      }
+    } catch (e) {}
+    
+    return { projectId: '', clientEmail: '', privateKey: '' };
+  })(),
 
   whatsapp: {
     apiUrl: process.env.WHATSAPP_API_URL || 'https://graph.facebook.com/v18.0',
     phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID || '',
     accessToken: process.env.WHATSAPP_ACCESS_TOKEN || '',
-    businessId: process.env.WHATSAPP_BUSINESS_ID || '',
+    businessId: process.env.WHATSAPP_BUSINESS_ACCOUNT_ID || process.env.WHATSAPP_BUSINESS_ID || '',
     verifyToken: process.env.WHATSAPP_VERIFY_TOKEN || '',
+    mode: process.env.WHATSAPP_MODE || 'sandbox',
   },
 
   facebook: {

@@ -25,8 +25,11 @@ const billingRoutes = require('./routes/billing');
 const integrationRoutes = require('./routes/integrations');
 const automationRoutes = require('./routes/automations');
 const { getTranslations, getAvailableLanguages } = require('./utils/i18n');
+const path = require('path');
+const fs = require('fs');
 
 const app = express();
+app.set('trust proxy', 1);
 const server = http.createServer(app);
 
 const io = require('socket.io')(server, {
@@ -68,6 +71,19 @@ app.get('/api/translations', (req, res) => {
 });
 
 app.use('/api', apiLimiter);
+
+// Serve frontend in production
+if (config.env === 'production' || config.env === 'staging') {
+  const webDist = path.resolve(__dirname, '../../web/dist');
+  if (fs.existsSync(webDist)) {
+    app.use(express.static(webDist));
+    app.get('*', (req, res, next) => {
+      if (req.path.startsWith('/api')) return next();
+      res.sendFile(path.join(webDist, 'index.html'));
+    });
+  }
+}
+
 app.use(notFound);
 app.use(errorHandler);
 

@@ -24,11 +24,11 @@ async function enqueueJob(queueName, data, options = {}) {
           await sendPushNotification(data.userId, data.title, data.body, data.data);
         } else if (queueName === 'campaign') {
           const { campaignId, workspaceId } = data;
-          const campaignResult = db.query('SELECT * FROM campaigns WHERE id = ? AND workspace_id = ?', [campaignId, workspaceId]);
+          const campaignResult = await db.query('SELECT * FROM campaigns WHERE id = $1 AND workspace_id = $2', [campaignId, workspaceId]);
           if (campaignResult.rows.length === 0) return;
           const campaign = campaignResult.rows[0];
-          const recipients = db.query(
-            'SELECT cr.*, l.email, l.phone FROM campaign_recipients cr JOIN leads l ON cr.lead_id = l.id WHERE cr.campaign_id = ? AND cr.status = ?',
+          const recipients = await db.query(
+            'SELECT cr.*, l.email, l.phone FROM campaign_recipients cr JOIN leads l ON cr.lead_id = l.id WHERE cr.campaign_id = $1 AND cr.status = $2',
             [campaignId, 'pending']
           );
           for (const recipient of recipients.rows) {
@@ -40,8 +40,28 @@ async function enqueueJob(queueName, data, options = {}) {
                   templateId: campaign.template_id, campaignId, overrideSubject: campaign.subject, overrideBody: campaign.body,
                 });
                 if (result.success) {
-                  db.query("UPDATE campaign_recipients SET status = 'sent', sent_at = datetime('now') WHERE id = ?", [recipient.id]);
-                  db.query('UPDATE campaigns SET sent_count = sent_count + 1 WHERE id = ?', [campaignId]);
+                  await db.query("UPDATE campaign_recipients SET status = 'sent', sent_at = NOW() WHERE id = $1", [recipient.id]);
+                  await db.query('UPDATE campaigns SET sent_count = sent_count + 1 WHERE id = $1', [campaignId]);
+                }
+              } else if (campaign.channel === 'whatsapp') {
+                const { sendWhatsAppToLead } = require('../services/whatsappService');
+                const result = await sendWhatsAppToLead({
+                  workspaceId, leadId: recipient.lead_id, userId: campaign.created_by,
+                  message: campaign.body,
+                });
+                if (result.success) {
+                  await db.query("UPDATE campaign_recipients SET status = 'sent', sent_at = NOW() WHERE id = $1", [recipient.id]);
+                  await db.query('UPDATE campaigns SET sent_count = sent_count + 1 WHERE id = $1', [campaignId]);
+                }
+              } else if (campaign.channel === 'sms') {
+                const { sendSMSToLead } = require('../services/smsService');
+                const result = await sendSMSToLead({
+                  workspaceId, leadId: recipient.lead_id, userId: campaign.created_by,
+                  message: campaign.body,
+                });
+                if (result.success) {
+                  await db.query("UPDATE campaign_recipients SET status = 'sent', sent_at = NOW() WHERE id = $1", [recipient.id]);
+                  await db.query('UPDATE campaigns SET sent_count = sent_count + 1 WHERE id = $1', [campaignId]);
                 }
               }
               await new Promise(resolve => setTimeout(resolve, 100));
@@ -49,7 +69,7 @@ async function enqueueJob(queueName, data, options = {}) {
               logger.error(`Campaign recipient error: ${err.message}`);
             }
           }
-          db.query("UPDATE campaigns SET status = 'completed', completed_at = datetime('now') WHERE id = ?", [campaignId]);
+          await db.query("UPDATE campaigns SET status = 'completed', completed_at = NOW() WHERE id = $1", [campaignId]);
         }
       } catch (err) {
         logger.error(`Job execution error (${queueName}):`, err.message);

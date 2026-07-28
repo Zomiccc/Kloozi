@@ -32,26 +32,26 @@ export default function EmailFlows() {
   if (editing) return <FlowBuilder flow={editing} onBack={() => { setEditing(null); loadFlows(); }} />;
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-dark-900">Email Flows</h1>
-        <button onClick={() => setShowCreate(true)} className="btn btn-primary flex items-center gap-2"><Plus size={16} /> New Flow</button>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between flex-wrap gap-4">
+        <h1 className="text-3xl font-extrabold text-ink-primary tracking-tight">Email Flows</h1>
+        <button onClick={() => setShowCreate(true)} className="btn btn-primary"><Plus size={16} /> New Flow</button>
       </div>
 
-      {loading ? <div className="flex justify-center py-8"><div className="animate-spin w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full" /></div> :
-        flows.length === 0 ? <div className="card text-center py-12 text-dark-400"><p>No flows yet. Create a visual email flow!</p></div> :
+      {loading ? <div className="flex justify-center py-8"><div className="animate-spin w-8 h-8 border-4 border-accent-blue border-t-transparent rounded-full" /></div> :
+        flows.length === 0 ? <div className="card text-center" style={{ padding: '48px 24px' }}><p className="text-ink-tertiary">No flows yet. Create a visual email flow!</p></div> :
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {flows.map(f => (
-            <div key={f.id} className="card">
-              <h3 className="font-semibold text-dark-900">{f.name}</h3>
-              <p className="text-sm text-dark-400 mt-1">{f.description || 'No description'}</p>
+          {flows.map((f, idx) => (
+            <div key={f.id || `flow-${idx}`} className="card card-hover stagger-in">
+              <h3 className="font-bold text-ink-primary">{f.name}</h3>
+              <p className="text-sm text-ink-secondary mt-1">{f.description || 'No description'}</p>
               <div className="flex gap-2 mt-3">
-                {f.is_published ? <span className="badge bg-green-100 text-green-700">Published</span> : <span className="badge bg-amber-100 text-amber-700">Draft</span>}
-                {f.is_active && <span className="badge bg-blue-100 text-blue-700">Active</span>}
+                {f.is_published ? <span className="badge" style={{ background: '#34C75910', color: '#34C759' }}>Published</span> : <span className="badge" style={{ background: '#FF950010', color: '#FF9500' }}>Draft</span>}
+                {f.is_active && <span className="badge" style={{ background: '#0066FF10', color: '#0066FF' }}>Active</span>}
               </div>
               <div className="flex gap-2 mt-4">
-                <button onClick={() => setEditing(f)} className="btn btn-secondary flex-1 text-sm py-1.5">Edit Flow</button>
-                {!f.is_published && <button onClick={() => handlePublish(f.id)} className="btn btn-primary flex-1 text-sm py-1.5"><Play size={14} /> Publish</button>}
+                <button onClick={() => setEditing(f)} className="btn btn-ghost flex-1">Edit Flow</button>
+                {!f.is_published && <button onClick={() => handlePublish(f.id)} className="btn btn-primary flex-1"><Play size={14} /> Publish</button>}
               </div>
             </div>
           ))}
@@ -67,13 +67,13 @@ function CreateFlowModal({ onClose, onSave }) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl p-6 w-full max-w-md">
-        <div className="flex items-center justify-between mb-4"><h2 className="text-xl font-bold">New Email Flow</h2><button onClick={onClose}><X size={20} /></button></div>
+    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white border border-surface-border rounded-3xl p-6 w-full max-w-md shadow-modal animate-slide-up">
+        <div className="flex items-center justify-between mb-6"><h2 className="text-xl font-bold text-ink-primary">New Email Flow</h2><button onClick={onClose} className="text-ink-tertiary hover:text-ink-primary transition-colors"><X size={20} /></button></div>
         <div className="space-y-3">
           <input className="input" placeholder="Flow name" value={name} onChange={(e) => setName(e.target.value)} />
           <textarea className="input" rows="2" placeholder="Description" value={description} onChange={(e) => setDescription(e.target.value)} />
-          <div className="flex gap-2"><button onClick={onClose} className="btn btn-secondary flex-1">Cancel</button><button onClick={() => onSave({ name, description, nodes: [], edges: [] })} className="btn btn-primary flex-1">Create</button></div>
+          <div className="flex gap-2"><button onClick={onClose} className="btn btn-ghost flex-1">Cancel</button><button onClick={() => onSave({ name, description, nodes: [], edges: [] })} className="btn btn-primary flex-1">Create</button></div>
         </div>
       </div>
     </div>
@@ -124,8 +124,8 @@ function FlowBuilder({ flow, onBack }) {
     <div className="space-y-4 h-full flex flex-col">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <button onClick={onBack} className="btn btn-secondary">Back</button>
-          <h1 className="text-2xl font-bold">{flow.name}</h1>
+          <button onClick={onBack} className="btn btn-ghost">Back</button>
+          <h1 className="text-2xl font-extrabold text-ink-primary tracking-tight">{flow.name}</h1>
         </div>
         <div className="flex gap-2">
           <select value={nodeType} onChange={(e) => setNodeType(e.target.value)} className="input w-auto">
@@ -134,13 +134,13 @@ function FlowBuilder({ flow, onBack }) {
             <option value="notify_agent">Notify Agent</option><option value="send_whatsapp">Send WhatsApp</option>
             <option value="send_sms">Send SMS</option><option value="condition">Condition (IF/ELSE)</option>
           </select>
-          <button onClick={addNode} className="btn btn-secondary"><Plus size={16} /> Add Node</button>
+          <button onClick={addNode} className="btn btn-ghost"><Plus size={16} /> Add Node</button>
           <button onClick={save} className="btn btn-primary">Save Flow</button>
         </div>
       </div>
-      <div className="flex-1 bg-white rounded-xl border border-dark-100 overflow-hidden">
+      <div className="flex-1 bg-white rounded-2xl border border-surface-border overflow-hidden">
         <ReactFlow nodes={nodes} edges={edges} onConnect={onConnect} fitView>
-          <Background /><Controls /><MiniMap />
+          <Background color="#E5E5EA" /><Controls /><MiniMap />
         </ReactFlow>
       </div>
     </div>

@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
+const axios = require('axios');
 const config = require('../config');
 const db = require('../config/database');
 const logger = require('../utils/logger');
@@ -97,7 +98,7 @@ exports.signup = async (req, res, next) => {
 
     res.status(201).json({
       message: 'Account created successfully',
-      user: { id: result.id, email: result.email, firstName: result.first_name, lastName: result.last_name, role: result.role },
+      user: { id: result.id, email: result.email, firstName: result.first_name, lastName: result.last_name, role: result.role, workspaceId: result.workspace_id },
       accessToken,
       refreshToken: tokens,
     });
@@ -330,7 +331,13 @@ exports.googleCallback = async (req, res, next) => {
     res.redirect(`${config.webUrl}/auth/callback?token=${accessToken}&refresh=${tokens}`);
   } catch (err) {
     logger.error('Google OAuth error:', err.message);
-    res.redirect(`${config.webUrl}/login?error=google_auth_failed`);
+    logger.error('Google OAuth error details:', JSON.stringify({
+      message: err.message,
+      response: err.response?.data,
+      status: err.response?.status,
+      stack: err.stack?.split('\n').slice(0, 5).join(' | '),
+    }));
+    res.redirect(`${config.webUrl}/login?error=google_auth_failed&reason=${encodeURIComponent(err.message || 'unknown')}`);
   }
 };
 

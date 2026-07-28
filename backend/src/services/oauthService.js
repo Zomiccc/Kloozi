@@ -5,6 +5,7 @@ const logger = require('../utils/logger');
 const { logActivity } = require('../utils/activityLog');
 const { sendPushNotification } = require('../utils/notifications');
 const { updateLeadScore } = require('../utils/activityLog');
+const { cacheDelPattern } = require('../config/redis');
 
 // ─── Facebook Lead Ads ───
 
@@ -53,10 +54,11 @@ exports.facebookCallback = async (req, res, next) => {
       }
     }
 
-    res.redirect(`${config.webUrl}/integrations/facebook?connected=true`);
+    res.redirect(`${config.webUrl}/app/automations/facebook?connected=true`);
   } catch (err) {
     logger.error('Facebook OAuth callback error:', err.message);
-    res.redirect(`${config.webUrl}/integrations/facebook?error=oauth_failed`);
+    if (err.response?.data) logger.error('FB OAuth error details:', JSON.stringify(err.response.data));
+    res.redirect(`${config.webUrl}/app/automations/facebook?error=oauth_failed&reason=${encodeURIComponent(err.message)}`);
   }
 };
 
@@ -161,10 +163,10 @@ exports.tiktokCallback = async (req, res, next) => {
       [workspaceId, JSON.stringify({ accessToken }), JSON.stringify({})]
     );
 
-    res.redirect(`${config.webUrl}/integrations/tiktok?connected=true`);
+    res.redirect(`${config.webUrl}/app/automations/tiktok?connected=true`);
   } catch (err) {
     logger.error('TikTok OAuth callback error:', err.message);
-    res.redirect(`${config.webUrl}/integrations/tiktok?error=oauth_failed`);
+    res.redirect(`${config.webUrl}/app/automations/tiktok?error=oauth_failed`);
   }
 };
 
@@ -222,10 +224,10 @@ exports.linkedinCallback = async (req, res, next) => {
       [workspaceId, JSON.stringify({ accessToken }), JSON.stringify({})]
     );
 
-    res.redirect(`${config.webUrl}/integrations/linkedin?connected=true`);
+    res.redirect(`${config.webUrl}/app/automations/linkedin?connected=true`);
   } catch (err) {
     logger.error('LinkedIn OAuth callback error:', err.message);
-    res.redirect(`${config.webUrl}/integrations/linkedin?error=oauth_failed`);
+    res.redirect(`${config.webUrl}/app/automations/linkedin?error=oauth_failed`);
   }
 };
 
@@ -256,6 +258,54 @@ exports.linkedinWebhook = async (req, res, next) => {
 // ─── Shared helper ───
 
 async function createLeadFromIntegration(workspaceId, parsed, source) {
+  // Check workspace duplicate lead settings
+  let dupMode = 'allow';
+  let matchPhone = true;
+  let matchEmail = true;
+  try {
+    const wsRes = await db.query('SELECT settings FROM workspaces WHERE id = $1', [workspaceId]);
+    const wsSettings = wsRes.rows[0]?.settings || {};
+    dupMode = wsSettings.duplicate_mode || 'allow';
+    matchPhone = wsSettings.duplicate_match_phone !== false;
+    matchEmail = wsSettings.duplicate_match_email !== false;
+  } catch {}
+
+  // Check for duplicates if mode is not 'allow'
+  if (dupMode !== 'allow' && (parsed.phone || parsed.email)) {
+    let dupQuery = 'SELECT id FROM leads WHERE workspace_id = $1 AND (';
+    let dupParams = [workspaceId];
+    let conditions = [];
+    let idx = 2;
+    if (matchPhone && parsed.phone) { conditions.push(`phone = $${idx++}`); dupParams.push(parsed.phone); }
+    if (matchEmail && parsed.email) { conditions.push(`email = $${idx++}`); dupParams.push(parsed.email); }
+    dupQuery += conditions.join(' OR ') + ') LIMIT 1';
+    const dupResult = await db.query(dupQuery, dupParams);
+    if (dupResult.rows.length > 0) {
+      const existingId = dupResult.rows[0].id;
+      if (dupMode === 'auto_merge') {
+        // Update existing lead with new info
+        const updateFields = [];
+        const updateParams = [];
+        let pIdx = 1;
+        if (parsed.first_name) { updateFields.push(`first_name = $${pIdx++}`); updateParams.push(parsed.first_name); }
+        if (parsed.last_name) { updateFields.push(`last_name = $${pIdx++}`); updateParams.push(parsed.last_name); }
+        if (parsed.city) { updateFields.push(`city = $${pIdx++}`); updateParams.push(parsed.city); }
+        if (updateFields.length > 0) {
+          updateFields.push(`updated_at = NOW()`);
+          updateParams.push(existingId, workspaceId);
+          await db.query(`UPDATE leads SET ${updateFields.join(', ')} WHERE id = $${pIdx++} AND workspace_id = $${pIdx++}`, updateParams);
+        }
+        await logActivity(workspaceId, existingId, null, 'lead_merged', `Lead auto-merged from ${source} (duplicate detected)`, { merged_source: source });
+        await updateLeadScore(existingId);
+        await cacheDelPattern(`leads:${workspaceId}:*`);
+        return existingId;
+      }
+      // dupMode === 'warn' — log and skip creating new lead
+      logger.info(`Duplicate lead skipped from ${source} for workspace ${workspaceId}`);
+      return null;
+    }
+  }
+
   const stageResult = await db.query('SELECT id FROM lead_stages WHERE workspace_id = $1 AND is_default = true LIMIT 1', [workspaceId]);
   const agentsResult = await db.query(
     `SELECT u.id FROM users u WHERE u.workspace_id = $1 AND u.role = $2 AND u.status = $3

@@ -49,32 +49,32 @@ export default function EmailSequences() {
 
   if (selected) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-6">
         <div className="flex items-center gap-4">
-          <button onClick={() => setSelected(null)} className="btn btn-secondary">Back</button>
-          <h1 className="text-2xl font-bold">{selected.sequence.name}</h1>
+          <button onClick={() => setSelected(null)} className="btn btn-ghost">Back</button>
+          <h1 className="text-3xl font-extrabold text-ink-primary tracking-tight">{selected.sequence.name}</h1>
         </div>
 
-        <div className="card">
-          <h3 className="font-semibold mb-4">Sequence Steps</h3>
+        <div className="card stagger-in">
+          <h3 className="text-lg font-bold text-ink-primary mb-4">Sequence Steps</h3>
           {selected.steps.map((step, i) => (
-            <div key={step.id} className="flex items-center gap-3 py-3 border-b border-dark-50 last:border-0">
-              <div className="w-8 h-8 bg-primary-100 text-primary-700 rounded-full flex items-center justify-center font-bold">{step.step_number}</div>
-              <div className="flex-1"><p className="text-sm font-medium">{step.template_name || 'No template'}</p><p className="text-xs text-dark-400">Delay: {step.delay_days}d {step.delay_hours}h</p></div>
+            <div key={step.id} className="flex items-center gap-3 py-3 border-b border-surface-border last:border-0">
+              <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-white" style={{ background: 'linear-gradient(135deg, #0066FF, #AF52DE)' }}>{step.step_number}</div>
+              <div className="flex-1"><p className="text-sm font-bold text-ink-primary">{step.template_name || 'No template'}</p><p className="text-xs text-ink-tertiary">Delay: {step.delay_days}d {step.delay_hours}h</p></div>
             </div>
           ))}
         </div>
 
-        <div className="card">
-          <h3 className="font-semibold mb-4 flex items-center gap-2"><Users size={18} /> Enrolled Leads ({selected.enrollments.length})</h3>
-          {selected.enrollments.length === 0 ? <p className="text-dark-400 text-sm">No leads enrolled</p> :
+        <div className="card stagger-in">
+          <h3 className="text-lg font-bold text-ink-primary mb-4 flex items-center gap-2"><Users size={18} /> Enrolled Leads ({selected.enrollments.length})</h3>
+          {selected.enrollments.length === 0 ? <p className="text-ink-tertiary text-sm">No leads enrolled</p> :
             selected.enrollments.map(e => (
-              <div key={e.id} className="flex items-center justify-between py-2 border-b border-dark-50 last:border-0">
-                <div><p className="text-sm font-medium">{e.first_name} {e.last_name}</p><p className="text-xs text-dark-400">Step {e.current_step} • {e.status}</p></div>
+              <div key={e.id} className="flex items-center justify-between py-2 border-b border-surface-border last:border-0">
+                <div><p className="text-sm font-bold text-ink-primary">{e.first_name} {e.last_name}</p><p className="text-xs text-ink-tertiary">Step {e.current_step} • {e.status}</p></div>
                 <div className="flex gap-1">
-                  {e.status === 'active' && <button onClick={() => handlePause(selected.sequence.id, e.lead_id)} className="btn btn-secondary p-1.5"><Pause size={14} /></button>}
-                  {e.status === 'paused' && <button onClick={() => handleResume(selected.sequence.id, e.lead_id)} className="btn btn-secondary p-1.5"><Play size={14} /></button>}
-                  <button onClick={() => handleRemove(selected.sequence.id, e.lead_id)} className="btn btn-danger p-1.5"><Trash2 size={14} /></button>
+                  {e.status === 'active' && <button onClick={() => handlePause(selected.sequence.id, e.lead_id)} className="btn btn-ghost" style={{ minHeight: '32px' }}><Pause size={14} /></button>}
+                  {e.status === 'paused' && <button onClick={() => handleResume(selected.sequence.id, e.lead_id)} className="btn btn-ghost" style={{ minHeight: '32px' }}><Play size={14} /></button>}
+                  <button onClick={() => handleRemove(selected.sequence.id, e.lead_id)} className="btn btn-ghost" style={{ minHeight: '32px', color: '#FF3B5C' }}><Trash2 size={14} /></button>
                 </div>
               </div>
             ))
@@ -85,26 +85,26 @@ export default function EmailSequences() {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-dark-900">Email Sequences</h1>
-        <button onClick={() => setShowCreate(true)} className="btn btn-primary flex items-center gap-2"><Plus size={16} /> New Sequence</button>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between flex-wrap gap-4">
+        <h1 className="text-3xl font-extrabold text-ink-primary tracking-tight">Email Sequences</h1>
+        <button onClick={() => setShowCreate(true)} className="btn btn-primary"><Plus size={16} /> New Sequence</button>
       </div>
 
-      {loading ? <div className="flex justify-center py-8"><div className="animate-spin w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full" /></div> :
-        sequences.length === 0 ? <div className="card text-center py-12 text-dark-400"><p>No sequences yet</p></div> :
+      {loading ? <div className="flex justify-center py-8"><div className="animate-spin w-8 h-8 border-4 border-accent-blue border-t-transparent rounded-full" /></div> :
+        sequences.length === 0 ? <div className="card text-center" style={{ padding: '48px 24px' }}><p className="text-ink-tertiary">No sequences yet</p></div> :
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {sequences.map(s => (
-            <div key={s.id} className="card">
-              <h3 className="font-semibold text-dark-900">{s.name}</h3>
-              <p className="text-sm text-dark-400 mt-1 capitalize">{s.type}</p>
+          {sequences.map((s, idx) => (
+            <div key={s.id || `seq-${idx}`} className="card card-hover stagger-in">
+              <h3 className="font-bold text-ink-primary">{s.name}</h3>
+              <p className="text-sm text-ink-secondary mt-1 capitalize">{s.type}</p>
               <div className="flex gap-4 mt-3 text-sm">
-                <span className="text-dark-600">{s.step_count} steps</span>
-                <span className="text-dark-600">{s.active_enrollments} active</span>
+                <span className="text-ink-secondary font-semibold">{s.step_count} steps</span>
+                <span className="text-ink-secondary font-semibold">{s.active_enrollments} active</span>
               </div>
               <div className="flex gap-2 mt-4">
-                <button onClick={() => loadDetails(s.id)} className="btn btn-secondary flex-1 text-sm py-1.5">View</button>
-                <button onClick={() => handleClone(s.id)} className="btn btn-secondary flex-1 text-sm py-1.5"><Copy size={14} /></button>
+                <button onClick={() => loadDetails(s.id)} className="btn btn-ghost flex-1">View</button>
+                <button onClick={() => handleClone(s.id)} className="btn btn-ghost flex-1" style={{ minHeight: '36px' }}><Copy size={14} /></button>
               </div>
             </div>
           ))}
@@ -125,11 +125,11 @@ function CreateSequenceModal({ onClose, onSave }) {
   }, []);
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold">New Email Sequence</h2>
-          <button onClick={onClose}><X size={20} /></button>
+    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white border border-surface-border rounded-3xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-modal animate-slide-up">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-bold text-ink-primary">New Email Sequence</h2>
+          <button onClick={onClose} className="text-ink-tertiary hover:text-ink-primary transition-colors"><X size={20} /></button>
         </div>
         <div className="space-y-3">
           <input className="input" placeholder="Sequence name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
@@ -140,11 +140,11 @@ function CreateSequenceModal({ onClose, onSave }) {
           </select>
           <textarea className="input" rows="2" placeholder="Description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
           {form.steps.map((step, i) => (
-            <div key={i} className="border border-dark-200 rounded-lg p-3 space-y-2">
-              <p className="text-sm font-medium">Step {i + 1}</p>
+            <div key={i} className="border border-surface-border rounded-2xl p-3 space-y-2 bg-surface-page">
+              <p className="text-sm font-bold text-ink-primary">Step {i + 1}</p>
               <select className="input" value={step.template_id} onChange={(e) => { const s = [...form.steps]; s[i].template_id = e.target.value; setForm({ ...form, steps: s }); }}>
                 <option value="">Select template</option>
-                {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                {templates.map((t, idx) => <option key={t.id || idx} value={t.id}>{t.name}</option>)}
               </select>
               <div className="grid grid-cols-2 gap-2">
                 <input type="number" className="input" placeholder="Delay days" value={step.delay_days} onChange={(e) => { const s = [...form.steps]; s[i].delay_days = parseInt(e.target.value) || 0; setForm({ ...form, steps: s }); }} />
@@ -152,9 +152,9 @@ function CreateSequenceModal({ onClose, onSave }) {
               </div>
             </div>
           ))}
-          <button onClick={() => setForm({ ...form, steps: [...form.steps, { template_id: '', delay_hours: 0, delay_days: 0 }] })} className="btn btn-secondary w-full">Add Step</button>
+          <button onClick={() => setForm({ ...form, steps: [...form.steps, { template_id: '', delay_hours: 0, delay_days: 0 }] })} className="btn btn-ghost w-full">Add Step</button>
           <div className="flex gap-2">
-            <button onClick={onClose} className="btn btn-secondary flex-1">Cancel</button>
+            <button onClick={onClose} className="btn btn-ghost flex-1">Cancel</button>
             <button onClick={() => onSave(form)} className="btn btn-primary flex-1">Create</button>
           </div>
         </div>

@@ -13,6 +13,7 @@ function validate(req, res, next) {
 
 function errorHandler(err, req, res, next) {
   const logger = require('../utils/logger');
+  console.error('[ERROR]', req.method, req.originalUrl, err.message, err.stack);
   logger.error('Unhandled error:', err.message, { stack: err.stack });
 
   if (err.type === 'entity.parse.failed') {

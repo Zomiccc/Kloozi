@@ -16,6 +16,15 @@ router.get('/oauth/facebook/callback', oauthService.facebookCallback);
 router.get('/oauth/tiktok/callback', oauthService.tiktokCallback);
 router.get('/oauth/linkedin/callback', oauthService.linkedinCallback);
 
+// Public OAuth config (returns app IDs for frontend redirect)
+router.get('/oauth/config', (req, res) => {
+  const config = require('../config');
+  res.json({
+    facebook: { appId: config.facebook.appId },
+    apiUrl: config.apiUrl,
+  });
+});
+
 // Platform webhooks (no auth — verified by platform tokens)
 router.get('/webhook/facebook', oauthService.facebookWebhookVerify);
 router.post('/webhook/facebook', oauthService.facebookWebhook);

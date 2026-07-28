@@ -3,6 +3,10 @@ const router = express.Router();
 const { authenticate, requireAdminOrAbove } = require('../middleware/auth');
 const auto = require('../controllers/automationController');
 
+// Lead Form public endpoints (no auth) - must be before authenticate
+router.get('/lead-form/:formKey', auto.serveLeadFormPage);
+router.post('/lead-form/:formKey', auto.handleLeadFormSubmission);
+
 router.use(authenticate);
 
 // Lead Automation Rules
@@ -33,10 +37,6 @@ router.get('/lead-form-pages', auto.getLeadFormPages);
 router.post('/lead-form-pages', auto.createLeadFormPage);
 router.put('/lead-form-pages/:id', auto.updateLeadFormPage);
 router.delete('/lead-form-pages/:id', auto.deleteLeadFormPage);
-
-// Lead Form public endpoints (no auth)
-router.get('/lead-form/:formKey', auto.serveLeadFormPage);
-router.post('/lead-form/:formKey', auto.handleLeadFormSubmission);
 
 // Meta CAPI
 router.get('/meta-capi', auto.getMetaCAPIConfig);

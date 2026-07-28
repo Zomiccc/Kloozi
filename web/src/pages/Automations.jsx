@@ -8,38 +8,39 @@ import {
   Settings, CheckCircle2, XCircle, ChevronRight, Bot, Repeat, Copy,
   Monitor, Search, Phone, RefreshCw, X
 } from 'lucide-react';
+import BrandLogo from '../components/BrandLogo';
 
 const leadSourceCards = [
-  { id: 'lead_forms', icon: FileText, title: 'CRM Final Forms', desc: 'Create lead forms using our form builder and receive instant alerts', route: '/automations/lead-forms', connected: true },
-  { id: 'facebook', icon: Facebook, title: 'Facebook & Instagram', desc: 'Receive new leads from Facebook & Instagram Lead Ads', route: '/automations/facebook', oauth: true },
-  { id: 'linkedin', icon: Linkedin, title: 'LinkedIn', desc: 'Receive new leads from LinkedIn Lead Gen Forms', route: '/automations/linkedin', oauth: true },
-  { id: 'wordpress', icon: Globe, title: 'WordPress', desc: 'Receive new leads from WordPress contact forms', route: '/automations/wordpress' },
-  { id: 'whatsapp_chats', icon: MessageSquare, title: 'WhatsApp Chats', desc: 'Auto create leads from WhatsApp conversations', route: '/automations/whatsapp-chats' },
-  { id: 'google_forms', icon: FileText, title: 'Google Forms', desc: 'Receive leads from Google Forms', route: '/automations/google-forms' },
-  { id: 'tiktok', icon: Music, title: 'TikTok', desc: 'Receive leads from TikTok Lead Generation', route: '/automations/tiktok', oauth: true },
-  { id: 'google_ads', icon: Search, title: 'Google Ads', desc: 'Receive leads from Google Ads Lead Form Assets', route: '/automations/google-ads', oauth: true },
-  { id: 'zapier', icon: Link2, title: 'Zapier / Webhook', desc: 'Connect any other lead source via webhook', route: '/automations/zapier' },
+  { id: 'lead_forms', icon: FileText, title: 'CRM Final Forms', desc: 'Create lead forms using our form builder and receive instant alerts', route: '/app/automations/lead-forms', connected: true },
+  { id: 'facebook', icon: Facebook, title: 'Facebook & Instagram', desc: 'Receive new leads from Facebook & Instagram Lead Ads', route: '/app/automations/facebook', oauth: true, logo: 'facebook' },
+  { id: 'linkedin', icon: Linkedin, title: 'LinkedIn', desc: 'Receive new leads from LinkedIn Lead Gen Forms', route: '/app/automations/linkedin', oauth: true, logo: 'linkedin' },
+  { id: 'wordpress', icon: Globe, title: 'WordPress', desc: 'Receive new leads from WordPress contact forms', route: '/app/automations/wordpress', logo: 'wordpress' },
+  { id: 'whatsapp_chats', icon: MessageSquare, title: 'WhatsApp Chats', desc: 'Auto create leads from WhatsApp conversations', route: '/app/automations/whatsapp-chats', logo: 'whatsapp' },
+  { id: 'google_forms', icon: FileText, title: 'Google Forms', desc: 'Receive leads from Google Forms', route: '/app/automations/google-forms', logo: 'google' },
+  { id: 'tiktok', icon: Music, title: 'TikTok', desc: 'Receive leads from TikTok Lead Generation', route: '/app/automations/tiktok', oauth: true, logo: 'tiktok' },
+  { id: 'google_ads', icon: Search, title: 'Google Ads', desc: 'Receive leads from Google Ads Lead Form Assets', route: '/app/automations/google-ads', oauth: true, logo: 'google' },
+  { id: 'zapier', icon: Link2, title: 'Zapier / Webhook', desc: 'Connect any other lead source via webhook', route: '/app/automations/zapier', logo: 'zapier' },
 ];
 
 const leadAutomationCards = [
-  { id: 'whatsapp_auto', icon: MessageSquare, title: 'WhatsApp Auto-Responder', desc: 'Instantly message new leads on WhatsApp from your own number', route: '/automations/whatsapp-auto-responder' },
-  { id: 'meta_capi', icon: Zap, title: 'Meta Conversions API', desc: 'Optimise Facebook Lead Ad campaigns', route: '/automations/meta-capi' },
-  { id: 'duplicate_merge', icon: GitBranch, title: 'Duplicate Lead Merging', desc: 'Auto merge leads with same phone/email', route: '/automations/duplicate-merge' },
-  { id: 'automation_rules', icon: Filter, title: 'Lead Automation Rules', desc: 'Assign leads via rules or round robin', route: '/automations/rules' },
-  { id: 'lead_distribution', icon: Send, title: 'Lead Distribution', desc: 'Forward leads to recipients via WhatsApp/email', route: '/automations/distribution' },
-  { id: 'outgoing_webhooks', icon: Webhook, title: 'Outgoing Webhooks', desc: 'Trigger webhooks to any system that supports webhooks', route: '/automations/outgoing-webhooks' },
+  { id: 'whatsapp_auto', icon: MessageSquare, title: 'WhatsApp Auto-Responder', desc: 'Instantly message new leads on WhatsApp from your own number', route: '/app/automations/whatsapp-auto-responder', logo: 'whatsapp' },
+  { id: 'meta_capi', icon: Zap, title: 'Meta Conversions API', desc: 'Optimise Facebook Lead Ad campaigns', route: '/app/automations/meta-capi', logo: 'meta' },
+  { id: 'duplicate_merge', icon: GitBranch, title: 'Duplicate Lead Merging', desc: 'Auto merge leads with same phone/email', route: '/app/automations/duplicate-merge' },
+  { id: 'automation_rules', icon: Filter, title: 'Lead Automation Rules', desc: 'Assign leads via rules or round robin', route: '/app/automations/rules' },
+  { id: 'lead_distribution', icon: Send, title: 'Lead Distribution', desc: 'Forward leads to recipients via WhatsApp/email', route: '/app/automations/distribution' },
+  { id: 'outgoing_webhooks', icon: Webhook, title: 'Outgoing Webhooks', desc: 'Trigger webhooks to any system that supports webhooks', route: '/app/automations/outgoing-webhooks' },
 ];
 
 const whatsappAutomationCards = [
-  { id: 'wa_campaigns', icon: Send, title: 'WhatsApp Campaigns', desc: 'Bulk message 1,000s from your own number', route: '/whatsapp-campaigns' },
-  { id: 'wa_auto_responder', icon: MessageSquare, title: 'WhatsApp Auto-Responder', desc: 'Instantly message new leads', route: '/automations/whatsapp-auto-responder' },
-  { id: 'wa_sequences', icon: Repeat, title: 'Automated WhatsApp Sequences', desc: 'Multi-step sequences over multiple days', route: '/automations/whatsapp-sequences' },
-  { id: 'wa_chat_assistant', icon: Bot, title: 'WhatsApp Chat Assistant', desc: 'Configure automated response rules', route: '/automations/chat-assistant' },
-  { id: 'wa_contact_import', icon: Users, title: 'WhatsApp Contact Import', desc: 'Create leads from WhatsApp chats', route: '/automations/whatsapp-contact-import' },
-  { id: 'wa_lead_distribution', icon: Send, title: 'WhatsApp Lead Distribution', desc: 'Forward new leads via WhatsApp', route: '/automations/distribution' },
-  { id: 'wa_chat_monitoring', icon: Monitor, title: 'WhatsApp Chat Monitoring', desc: 'View team WhatsApp conversations', route: '/automations/chat-monitoring' },
-  { id: 'wa_widget', icon: Globe, title: 'WhatsApp Widget for Website', desc: 'Add chat button to website', route: '/automations/whatsapp-widget' },
-  { id: 'wa_ai_agent', icon: Bot, title: 'WhatsApp AI Agent Lite', desc: 'Add AI to WhatsApp to capture details', route: '/automations/whatsapp-ai-agent' },
+  { id: 'wa_campaigns', icon: Send, title: 'WhatsApp Campaigns', desc: 'Bulk message 1,000s from your own number', route: '/app/whatsapp-campaigns', logo: 'whatsapp' },
+  { id: 'wa_auto_responder', icon: MessageSquare, title: 'WhatsApp Auto-Responder', desc: 'Instantly message new leads', route: '/app/automations/whatsapp-auto-responder', logo: 'whatsapp' },
+  { id: 'wa_sequences', icon: Repeat, title: 'Automated WhatsApp Sequences', desc: 'Multi-step sequences over multiple days', route: '/app/automations/whatsapp-sequences', logo: 'whatsapp' },
+  { id: 'wa_chat_assistant', icon: Bot, title: 'WhatsApp Chat Assistant', desc: 'Configure automated response rules', route: '/app/automations/chat-assistant', logo: 'whatsapp' },
+  { id: 'wa_contact_import', icon: Users, title: 'WhatsApp Contact Import', desc: 'Create leads from WhatsApp chats', route: '/app/automations/whatsapp-contact-import', logo: 'whatsapp' },
+  { id: 'wa_lead_distribution', icon: Send, title: 'WhatsApp Lead Distribution', desc: 'Forward new leads via WhatsApp', route: '/app/automations/distribution', logo: 'whatsapp' },
+  { id: 'wa_chat_monitoring', icon: Monitor, title: 'WhatsApp Chat Monitoring', desc: 'View team WhatsApp conversations', route: '/app/automations/chat-monitoring', logo: 'whatsapp' },
+  { id: 'wa_widget', icon: Globe, title: 'WhatsApp Widget for Website', desc: 'Add chat button to website', route: '/app/automations/whatsapp-widget', logo: 'whatsapp' },
+  { id: 'wa_ai_agent', icon: Bot, title: 'WhatsApp AI Agent Lite', desc: 'Add AI to WhatsApp to capture details', route: '/app/automations/whatsapp-ai-agent', logo: 'whatsapp' },
 ];
 
 export default function Automations() {
@@ -69,29 +70,29 @@ export default function Automations() {
   const renderCard = (card) => {
     const connected = card.connected || isConnected(card.id) || isConnected(card.oauth ? card.id : card.id);
     return (
-      <div key={card.id} className="bg-white rounded-xl border border-dark-100 p-5 flex flex-col hover:shadow-md transition-shadow">
+      <div key={card.id} className="card card-hover stagger-in flex flex-col transition-all duration-200 hover:shadow-card-hover">
         <div className="flex items-start gap-3 mb-3">
-          <div className="w-10 h-10 rounded-lg bg-primary-50 flex items-center justify-center flex-shrink-0">
-            <card.icon size={20} className="text-primary-600" />
+          <div className="w-11 h-11 rounded-2xl bg-surface-page flex items-center justify-center flex-shrink-0">
+            {card.logo ? <BrandLogo brand={card.logo} /> : <card.icon size={20} className="text-accent-blue" />}
           </div>
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-dark-900 text-sm">{card.title}</h3>
-            <p className="text-xs text-dark-400 mt-1 leading-relaxed">{card.desc}</p>
+            <h3 className="font-bold text-ink-primary text-sm">{card.title}</h3>
+            <p className="text-xs text-ink-secondary mt-1 leading-relaxed">{card.desc}</p>
           </div>
         </div>
-        <div className="mt-auto flex items-center justify-between pt-3">
+        <div className="mt-auto flex items-center justify-between pt-3 border-t border-surface-border">
           {connected ? (
-            <span className="flex items-center gap-1 text-xs text-green-600 font-medium">
-              <CheckCircle2 size={14} /> Connected
+            <span className="flex items-center gap-1.5 text-xs font-bold" style={{ color: '#34C759' }}>
+              <span className="w-2 h-2 rounded-full" style={{ background: '#34C759' }} /> Connected
             </span>
           ) : (
-            <span className="flex items-center gap-1 text-xs text-dark-400 font-medium">
-              <XCircle size={14} /> Not Connected
+            <span className="flex items-center gap-1.5 text-xs font-bold text-ink-tertiary">
+              <span className="w-2 h-2 rounded-full bg-surface-border" /> Not Connected
             </span>
           )}
           <button
             onClick={() => navigate(card.route)}
-            className="text-xs font-medium text-primary-600 hover:text-primary-700 flex items-center gap-1"
+            className="text-xs font-bold text-accent-blue hover:underline flex items-center gap-1"
           >
             {connected ? 'Configure' : card.oauth ? 'Connect' : 'Configure'}
             <ChevronRight size={14} />
@@ -103,14 +104,37 @@ export default function Automations() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-dark-900">Automations</h1>
+      {/* Header */}
+      <div>
+        <h1 className="text-3xl font-extrabold text-ink-primary tracking-tight">Automations</h1>
+        <p className="text-sm font-semibold text-ink-secondary mt-1">Connect your lead sources and configure automated workflows</p>
+      </div>
 
-      <div className="flex gap-1 border-b border-dark-100">
+      {/* WhatsApp Hero Banner */}
+      <div className="rounded-3xl p-8 stagger-in" style={{ background: 'linear-gradient(135deg, #34C759, #0066FF)' }}>
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center flex-shrink-0">
+              <MessageSquare size={28} className="text-white" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-white">WhatsApp Business Suite</h2>
+              <p className="text-sm text-white/80 mt-1">Auto-respond, send campaigns, build sequences, and more — all from your own number</p>
+            </div>
+          </div>
+          <button onClick={() => setTab('whatsapp')} className="bg-white/20 hover:bg-white/30 rounded-xl px-5 py-2.5 text-sm font-bold text-white transition-all backdrop-blur-sm whitespace-nowrap">
+            Explore WhatsApp →
+          </button>
+        </div>
+      </div>
+
+      {/* Tab bar */}
+      <div className="flex gap-1 bg-white border border-surface-border rounded-full p-1 flex-wrap">
         {['all', 'sources', 'automations', 'whatsapp', 'import'].map(t => (
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`px-4 py-2.5 text-sm font-medium capitalize transition-colors ${tab === t ? 'text-primary-600 border-b-2 border-primary-600' : 'text-dark-400 hover:text-dark-600'}`}
+            className={`tab-pill ${tab === t ? 'tab-pill-active bg-accent-red' : 'text-ink-secondary hover:text-ink-primary'}`}
           >
             {t === 'all' ? 'All Automations' : t === 'sources' ? 'Lead Sources' : t === 'automations' ? 'Lead Automations' : t === 'whatsapp' ? 'WhatsApp' : 'Import/Export'}
           </button>
@@ -119,12 +143,12 @@ export default function Automations() {
 
       {(tab === 'all' || tab === 'sources') && (
         <section>
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="text-lg font-semibold text-dark-900">Lead Source Integrations</h2>
-              <p className="text-sm text-dark-400">Connect your website, lead ads, contact forms, and other sources for instant lead alerts and automatic importing of leads.</p>
+              <h2 className="text-lg font-bold text-ink-primary">Lead Source Integrations</h2>
+              <p className="text-sm text-ink-secondary mt-0.5">Connect your website, lead ads, contact forms, and other sources for instant lead alerts and automatic importing of leads.</p>
             </div>
-            {tab === 'all' && <button onClick={() => setTab('sources')} className="text-sm text-primary-600 font-medium hover:underline">View All →</button>}
+            {tab === 'all' && <button onClick={() => setTab('sources')} className="text-sm font-bold text-accent-blue hover:underline whitespace-nowrap">View All →</button>}
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {leadSourceCards.map(renderCard)}
@@ -134,12 +158,12 @@ export default function Automations() {
 
       {(tab === 'all' || tab === 'automations') && (
         <section>
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="text-lg font-semibold text-dark-900">Lead Automations</h2>
-              <p className="text-sm text-dark-400">Configure rules and automations that run whenever a lead is received from your connected lead sources.</p>
+              <h2 className="text-lg font-bold text-ink-primary">Lead Automations</h2>
+              <p className="text-sm text-ink-secondary mt-0.5">Configure rules and automations that run whenever a lead is received from your connected lead sources.</p>
             </div>
-            {tab === 'all' && <button onClick={() => setTab('automations')} className="text-sm text-primary-600 font-medium hover:underline">View All →</button>}
+            {tab === 'all' && <button onClick={() => setTab('automations')} className="text-sm font-bold text-accent-blue hover:underline whitespace-nowrap">View All →</button>}
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {leadAutomationCards.map(renderCard)}
@@ -149,13 +173,23 @@ export default function Automations() {
 
       {(tab === 'all' || tab === 'whatsapp') && (
         <section>
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="text-lg font-semibold text-dark-900">WhatsApp Automations</h2>
-              <p className="text-sm text-dark-400">Use your existing WhatsApp Business number to instantly message new leads, send bulk message campaigns, send multi-step automated sequences, and more.</p>
+              <h2 className="text-lg font-bold text-ink-primary">WhatsApp Automations</h2>
+              <p className="text-sm text-ink-secondary mt-0.5">Use your existing WhatsApp Business number to instantly message new leads, send bulk message campaigns, send multi-step automated sequences, and more.</p>
             </div>
-            {tab === 'all' && <button onClick={() => setTab('whatsapp')} className="text-sm text-primary-600 font-medium hover:underline">View All →</button>}
+            {tab === 'all' && <button onClick={() => setTab('whatsapp')} className="text-sm font-bold text-accent-blue hover:underline whitespace-nowrap">View All →</button>}
           </div>
+
+          {/* Sandbox Mode Banner */}
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-start gap-3 mb-4">
+            <div className="text-yellow-600 mt-0.5">⚠️</div>
+            <div>
+              <p className="text-sm font-medium text-yellow-800">Running in Sandbox Mode</p>
+              <p className="text-xs text-yellow-700 mt-1">Contacts must join sandbox before receiving messages. Go live after Meta business verification.</p>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {whatsappAutomationCards.map(renderCard)}
           </div>
@@ -171,22 +205,22 @@ function ImportExportSection() {
   const navigate = useNavigate();
   return (
     <section>
-      <h2 className="text-lg font-semibold text-dark-900 mb-1">Import & Export Data</h2>
-      <p className="text-sm text-dark-400 mb-4">Bulk import clients from a spreadsheet, download your client and activity data, and more</p>
+      <h2 className="text-lg font-bold text-ink-primary mb-1">Import & Export Data</h2>
+      <p className="text-sm text-ink-secondary mb-4">Bulk import leads from a spreadsheet, download your lead and activity data, and more</p>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl">
-        <div className="bg-white rounded-xl border border-dark-100 p-5">
+        <div className="card card-hover stagger-in">
           <div className="flex items-start gap-3 mb-3">
-            <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center"><Upload size={20} className="text-blue-600" /></div>
-            <div><h3 className="font-semibold text-sm">Import Clients from CSV</h3><p className="text-xs text-dark-400 mt-1">Bulk import contacts from a CSV file</p></div>
+            <div className="w-11 h-11 rounded-2xl bg-surface-page flex items-center justify-center"><Upload size={20} className="text-accent-blue" /></div>
+            <div><h3 className="font-bold text-sm text-ink-primary">Import Leads from CSV</h3><p className="text-xs text-ink-secondary mt-1">Bulk import contacts from a CSV file</p></div>
           </div>
-          <button onClick={() => navigate('/leads?import=true')} className="text-xs font-medium text-primary-600 flex items-center gap-1">Configure <ChevronRight size={14} /></button>
+          <button onClick={() => navigate('/app/leads?import=true')} className="text-xs font-bold text-accent-blue flex items-center gap-1 hover:underline">Configure <ChevronRight size={14} /></button>
         </div>
-        <div className="bg-white rounded-xl border border-dark-100 p-5">
+        <div className="card card-hover stagger-in" style={{ animationDelay: '80ms' }}>
           <div className="flex items-start gap-3 mb-3">
-            <div className="w-10 h-10 rounded-lg bg-green-50 flex items-center justify-center"><Download size={20} className="text-green-600" /></div>
-            <div><h3 className="font-semibold text-sm">Export Client List</h3><p className="text-xs text-dark-400 mt-1">Download client list in CSV format</p></div>
+            <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: '#34C75910' }}><Download size={20} style={{ color: '#34C759' }} /></div>
+            <div><h3 className="font-bold text-sm text-ink-primary">Export Lead List</h3><p className="text-xs text-ink-secondary mt-1">Download lead list in CSV format</p></div>
           </div>
-          <button onClick={() => navigate('/leads?export=true')} className="text-xs font-medium text-primary-600 flex items-center gap-1">Configure <ChevronRight size={14} /></button>
+          <button onClick={() => navigate('/app/leads?export=true')} className="text-xs font-bold text-accent-blue flex items-center gap-1 hover:underline">Configure <ChevronRight size={14} /></button>
         </div>
       </div>
     </section>

@@ -21,5 +21,12 @@ router.post('/sequences', whatsappController.createWhatsAppSequence);
 router.post('/sequences/enroll', whatsappController.enrollWhatsAppSequence);
 router.get('/chat-monitoring', whatsappController.getChatMonitoring);
 router.get('/chat-monitoring/:lead_id', whatsappController.getConversationDetail);
+router.post('/send-otp', whatsappController.sendOTP);
+router.post('/verify-otp', whatsappController.verifyOTP);
+router.post('/resend-otp', whatsappController.resendOTP);
+router.get('/status', whatsappController.getWhatsAppStatus);
+router.delete('/disconnect', whatsappController.disconnectWhatsApp);
+router.get('/auto-responder-settings', whatsappController.getAutoResponderSettings);
+router.put('/auto-responder-settings', whatsappController.updateAutoResponderSettings);
 
 module.exports = router;

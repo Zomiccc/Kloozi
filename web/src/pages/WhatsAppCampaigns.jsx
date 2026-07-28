@@ -27,51 +27,60 @@ export default function WhatsAppCampaigns() {
     catch { toast.error('Failed'); }
   };
 
-  const statusColors = { draft: 'bg-dark-100 text-dark-600', scheduled: 'bg-amber-100 text-amber-700', sending: 'bg-blue-100 text-blue-700', completed: 'bg-green-100 text-green-700' };
+  const statusColors = { draft: 'bg-white/10 text-slate-400', scheduled: 'bg-amber-500/15 text-amber-400', sending: 'bg-blue-500/15 text-blue-400', completed: 'bg-emerald-500/15 text-emerald-400' };
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-dark-900">WhatsApp Campaigns</h1>
-        <button onClick={() => setShowBuilder(true)} className="btn btn-primary flex items-center gap-2"><Plus size={16} /> New Campaign</button>
+        <h1 className="text-2xl font-bold text-white">WhatsApp Campaigns</h1>
+        <button onClick={() => setShowBuilder(true)} className="px-4 py-2 rounded-lg text-sm bg-[#25D366] text-white hover:bg-[#1da851] flex items-center gap-2 transition-colors"><Plus size={16} /> New Campaign</button>
       </div>
 
-      <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-start gap-3">
-        <MessageSquare size={20} className="text-green-600 flex-shrink-0" />
+      {/* Sandbox Mode Banner */}
+      <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4 flex items-start gap-3">
+        <div className="text-yellow-400 mt-0.5">⚠️</div>
         <div>
-          <p className="text-sm font-medium text-green-800">Send bulk WhatsApp messages from your own number</p>
-          <p className="text-xs text-green-700 mt-1">Messages are sent one by one with random delays to avoid blocking. Each message is personalized with lead data.</p>
+          <p className="text-sm font-medium text-yellow-400">Running in Sandbox Mode</p>
+          <p className="text-xs text-yellow-500/80 mt-1">Contacts must join sandbox before receiving messages. Go live after Meta business verification.</p>
         </div>
       </div>
 
-      {loading ? <div className="flex justify-center py-8"><div className="animate-spin w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full" /></div> :
+      <div className="bg-[#25D366]/10 border border-[#25D366]/20 rounded-lg p-4 flex items-start gap-3">
+        <MessageSquare size={20} className="text-[#25D366] flex-shrink-0" />
+        <div>
+          <p className="text-sm font-medium text-[#25D366]">Send bulk WhatsApp messages from your own number</p>
+          <p className="text-xs text-slate-400 mt-1">Messages are sent one by one with random delays to avoid blocking. Each message is personalized with lead data.</p>
+        </div>
+      </div>
+
+      {loading ? <div className="flex justify-center py-8"><div className="animate-spin w-8 h-8 border-4 border-[#25D366] border-t-transparent rounded-full" /></div> :
         campaigns.length === 0 ? (
           <div className="card text-center py-12">
-            <MessageSquare size={48} className="text-dark-300 mx-auto mb-3" />
-            <p className="text-lg font-medium text-dark-700">No WhatsApp campaigns yet</p>
-            <p className="text-sm text-dark-400 mt-1">Create your first campaign to start messaging leads in bulk</p>
+            <MessageSquare size={48} className="text-slate-600 mx-auto mb-3" />
+            <p className="text-lg font-medium text-slate-300">No WhatsApp campaigns yet</p>
+            <p className="text-sm text-slate-500 mt-1">Create your first campaign to start messaging leads in bulk</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {campaigns.map(c => (
-              <div key={c.id} className="card">
-                <div className="flex items-start justify-between mb-2"><h3 className="font-semibold">{c.name}</h3><span className={`badge ${statusColors[c.status]}`}>{c.status}</span></div>
+            {campaigns.map((c, idx) => (
+              <div key={c.id || idx} className="card">
+                <div className="flex items-start justify-between mb-2"><h3 className="font-semibold text-white">{c.name}</h3><span className={`badge ${statusColors[c.status]}`}>{c.status}</span></div>
                 <div className="grid grid-cols-2 gap-2 text-sm mt-3">
-                  <div><p className="text-dark-400">Recipients</p><p className="font-medium">{c.recipients_count}</p></div>
-                  <div><p className="text-dark-400">Sent</p><p className="font-medium">{c.sent_count}</p></div>
-                  <div><p className="text-dark-400">Delivered</p><p className="font-medium">{c.delivered_count}</p></div>
-                  <div><p className="text-dark-400">Failed</p><p className="font-medium">{c.failed_count}</p></div>
+                  <div><p className="text-slate-500">Recipients</p><p className="font-medium text-white">{c.recipients_count}</p></div>
+                  <div><p className="text-slate-500">Sent</p><p className="font-medium text-white">{c.sent_count}</p></div>
+                  <div><p className="text-slate-500">Delivered</p><p className="font-medium text-white">{c.delivered_count}</p></div>
+                  <div><p className="text-slate-500">Failed</p><p className="font-medium text-white">{c.failed_count}</p></div>
                 </div>
-                {stats?.id === c.id && (
-                  <div className="mt-3 pt-3 border-t border-dark-100 grid grid-cols-3 gap-2 text-center text-xs">
-                    <div><p className="font-bold">{stats.delivery_rate || 0}%</p><p className="text-dark-400">Delivery</p></div>
-                    <div><p className="font-bold">{stats.read_count || 0}</p><p className="text-dark-400">Read</p></div>
-                    <div><p className="font-bold">{stats.reply_count || 0}</p><p className="text-dark-400">Replies</p></div>
+                {stats && stats.id === c.id && (
+                  <div className="mt-3 pt-3 border-t border-white/10 grid grid-cols-3 gap-2 text-center text-xs">
+                    <div><p className="font-bold text-white">{stats.delivery_rate || 0}%</p><p className="text-slate-500">Delivery</p></div>
+                    <div><p className="font-bold text-white">{stats.read_count || 0}</p><p className="text-slate-500">Read</p></div>
+                    <div><p className="font-bold text-white">{stats.reply_count || 0}</p><p className="text-slate-500">Replies</p></div>
                   </div>
                 )}
                 <div className="flex gap-2 mt-4">
-                  {c.status === 'draft' && <button onClick={() => handleSend(c.id)} className="btn btn-primary flex-1 text-sm py-1.5"><Send size={14} /> Send</button>}
-                  <button onClick={() => loadStats(c.id)} className="btn btn-secondary flex-1 text-sm py-1.5"><BarChart3 size={14} /> Stats</button>
+                  {c.status === 'draft' && <button onClick={() => handleSend(c.id)} className="px-3 py-1.5 rounded-lg text-sm bg-[#25D366] text-white hover:bg-[#1da851] transition-colors flex-1 flex items-center justify-center gap-1"><Send size={14} /> Send</button>}
+                  <button onClick={() => loadStats(c.id)} className="px-3 py-1.5 rounded-lg text-sm bg-white/5 text-slate-300 border border-white/10 hover:bg-white/10 transition-colors flex-1 flex items-center justify-center gap-1"><BarChart3 size={14} /> Stats</button>
                 </div>
               </div>
             ))}
@@ -136,22 +145,22 @@ function CampaignBuilder({ onClose, onCreated }) {
   const variables = ['first_name', 'last_name', 'phone', 'email', 'city', 'budget'];
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-slate-800 border border-white/10 rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold">WhatsApp Campaign Builder</h2>
-          <button onClick={onClose}><X size={20} /></button>
+          <h2 className="text-xl font-bold text-white">WhatsApp Campaign Builder</h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors"><X size={20} /></button>
         </div>
 
         {/* Steps indicator */}
         <div className="flex items-center gap-2 mb-6">
           {['Message', 'Recipients', 'Schedule'].map((s, i) => (
             <div key={s} className="flex items-center gap-2">
-              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium ${step > i + 1 ? 'bg-green-500 text-white' : step === i + 1 ? 'bg-primary-600 text-white' : 'bg-dark-100 text-dark-400'}`}>
+              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium ${step > i + 1 ? 'bg-emerald-500 text-white' : step === i + 1 ? 'bg-[#25D366] text-white' : 'bg-white/10 text-slate-500'}`}>
                 {step > i + 1 ? <CheckCircle2 size={14} /> : i + 1}
               </div>
-              <span className={`text-sm ${step >= i + 1 ? 'text-dark-900 font-medium' : 'text-dark-400'}`}>{s}</span>
-              {i < 2 && <div className={`w-8 h-0.5 ${step > i + 1 ? 'bg-green-500' : 'bg-dark-100'}`} />}
+              <span className={`text-sm ${step >= i + 1 ? 'text-white font-medium' : 'text-slate-500'}`}>{s}</span>
+              {i < 2 && <div className={`w-8 h-0.5 ${step > i + 1 ? 'bg-emerald-500' : 'bg-white/10'}`} />}
             </div>
           ))}
         </div>
@@ -159,17 +168,17 @@ function CampaignBuilder({ onClose, onCreated }) {
         {/* Step 1: Message */}
         {step === 1 && (
           <div className="space-y-4">
-            <div><label className="text-sm font-medium">Campaign Name *</label><input className="input mt-1" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. New Property Launch" /></div>
+            <div><label className="text-sm font-medium text-slate-300">Campaign Name *</label><input className="input mt-1" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. New Property Launch" /></div>
             <div>
-              <label className="text-sm font-medium">Message *</label>
+              <label className="text-sm font-medium text-slate-300">Message *</label>
               <div className="flex gap-1 mt-1 mb-2 flex-wrap">
-                {variables.map(v => <button key={v} onClick={() => insertVariable(v)} className="text-xs bg-primary-50 text-primary-700 px-2 py-1 rounded hover:bg-primary-100">{`{{${v}}}`}</button>)}
+                {variables.map(v => <button key={v} onClick={() => insertVariable(v)} className="text-xs bg-[#25D366]/15 text-[#25D366] px-2 py-1 rounded hover:bg-[#25D366]/25 transition-colors">{`{{${v}}}`}</button>)}
               </div>
               <textarea className="input" rows={5} value={message} onChange={e => setMessage(e.target.value)} placeholder="Hi {{first_name}}, we have a new property in {{city}}..." />
-              <p className="text-xs text-dark-400 mt-1">Variables will be replaced with lead data when sending</p>
+              <p className="text-xs text-slate-500 mt-1">Variables will be replaced with lead data when sending</p>
             </div>
             <div>
-              <label className="text-sm font-medium">Attach File (optional)</label>
+              <label className="text-sm font-medium text-slate-300">Attach File (optional)</label>
               <select className="input mt-1" value={attachFile || ''} onChange={e => setAttachFile(e.target.value || null)}>
                 <option value="">No attachment</option>
                 {files.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
@@ -177,12 +186,12 @@ function CampaignBuilder({ onClose, onCreated }) {
             </div>
             {/* Preview */}
             {message && (
-              <div className="bg-green-50 rounded-lg p-4">
-                <p className="text-xs text-dark-400 mb-2">Preview:</p>
-                <p className="text-sm text-dark-900 whitespace-pre-wrap">{message.replace(/\{\{(\w+)\}\}/g, '[$1]')}</p>
+              <div className="bg-[#25D366]/10 border border-[#25D366]/20 rounded-lg p-4">
+                <p className="text-xs text-slate-500 mb-2">Preview:</p>
+                <p className="text-sm text-slate-200 whitespace-pre-wrap">{message.replace(/\{\{(\w+)\}\}/g, '[$1]')}</p>
               </div>
             )}
-            <button onClick={() => setStep(2)} disabled={!name || !message} className="btn btn-primary w-full">Next: Select Recipients</button>
+            <button onClick={() => setStep(2)} disabled={!name || !message} className="w-full px-4 py-2.5 rounded-lg bg-[#25D366] text-white hover:bg-[#1da851] disabled:opacity-50 transition-colors">Next: Select Recipients</button>
           </div>
         )}
 
@@ -190,36 +199,36 @@ function CampaignBuilder({ onClose, onCreated }) {
         {step === 2 && (
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium">Recipient Filter</label>
+              <label className="text-sm font-medium text-slate-300">Recipient Filter</label>
               <div className="space-y-2 mt-2">
-                <label className="flex items-center gap-3 p-3 border border-dark-100 rounded-lg cursor-pointer hover:bg-dark-50">
-                  <input type="radio" checked={recipientFilter === 'all'} onChange={() => setRecipientFilter('all')} />
-                  <div><p className="text-sm font-medium">All Leads</p><p className="text-xs text-dark-400">Send to all leads with phone numbers</p></div>
+                <label className="flex items-center gap-3 p-3 border border-white/10 rounded-lg cursor-pointer hover:bg-white/5 transition-colors">
+                  <input type="radio" checked={recipientFilter === 'all'} onChange={() => setRecipientFilter('all')} className="accent-[#25D366]" />
+                  <div><p className="text-sm font-medium text-white">All Leads</p><p className="text-xs text-slate-500">Send to all leads with phone numbers</p></div>
                 </label>
-                <label className="flex items-center gap-3 p-3 border border-dark-100 rounded-lg cursor-pointer hover:bg-dark-50">
-                  <input type="radio" checked={recipientFilter === 'stage'} onChange={() => setRecipientFilter('stage')} />
-                  <div><p className="text-sm font-medium">By Stage</p><p className="text-xs text-dark-400">Select specific lead stages</p></div>
+                <label className="flex items-center gap-3 p-3 border border-white/10 rounded-lg cursor-pointer hover:bg-white/5 transition-colors">
+                  <input type="radio" checked={recipientFilter === 'stage'} onChange={() => setRecipientFilter('stage')} className="accent-[#25D366]" />
+                  <div><p className="text-sm font-medium text-white">By Stage</p><p className="text-xs text-slate-500">Select specific lead stages</p></div>
                 </label>
-                <label className="flex items-center gap-3 p-3 border border-dark-100 rounded-lg cursor-pointer hover:bg-dark-50">
-                  <input type="radio" checked={recipientFilter === 'tag'} onChange={() => setRecipientFilter('tag')} />
-                  <div><p className="text-sm font-medium">By Tag</p><p className="text-xs text-dark-400">Select leads with specific tags</p></div>
+                <label className="flex items-center gap-3 p-3 border border-white/10 rounded-lg cursor-pointer hover:bg-white/5 transition-colors">
+                  <input type="radio" checked={recipientFilter === 'tag'} onChange={() => setRecipientFilter('tag')} className="accent-[#25D366]" />
+                  <div><p className="text-sm font-medium text-white">By Tag</p><p className="text-xs text-slate-500">Select leads with specific tags</p></div>
                 </label>
               </div>
             </div>
             {recipientFilter === 'stage' && (
               <div className="flex gap-2 flex-wrap">
                 {['new', 'contacted', 'interested', 'negotiating', 'won', 'lost'].map(s => (
-                  <label key={s} className="flex items-center gap-1 text-sm"><input type="checkbox" checked={selectedStages.includes(s)} onChange={e => setSelectedStages(e.target.checked ? [...selectedStages, s] : selectedStages.filter(x => x !== s))} /> {s}</label>
+                  <label key={s} className="flex items-center gap-1 text-sm text-slate-300"><input type="checkbox" checked={selectedStages.includes(s)} onChange={e => setSelectedStages(e.target.checked ? [...selectedStages, s] : selectedStages.filter(x => x !== s))} className="accent-[#25D366]" /> {s}</label>
                 ))}
               </div>
             )}
-            <div className="bg-primary-50 rounded-lg p-4 flex items-center gap-3">
-              <Users size={20} className="text-primary-600" />
-              <div><p className="text-sm font-medium text-primary-800">{recipientCount} recipients</p><p className="text-xs text-primary-600">Only leads with phone numbers will receive the message</p></div>
+            <div className="bg-[#25D366]/10 border border-[#25D366]/20 rounded-lg p-4 flex items-center gap-3">
+              <Users size={20} className="text-[#25D366]" />
+              <div><p className="text-sm font-medium text-white">{recipientCount} recipients</p><p className="text-xs text-slate-400">Only leads with phone numbers will receive the message</p></div>
             </div>
             <div className="flex gap-2">
-              <button onClick={() => setStep(1)} className="btn btn-secondary flex-1">Back</button>
-              <button onClick={() => setStep(3)} className="btn btn-primary flex-1">Next: Schedule</button>
+              <button onClick={() => setStep(1)} className="flex-1 px-4 py-2.5 rounded-lg bg-white/5 text-slate-300 border border-white/10 hover:bg-white/10 transition-colors">Back</button>
+              <button onClick={() => setStep(3)} className="flex-1 px-4 py-2.5 rounded-lg bg-[#25D366] text-white hover:bg-[#1da851] transition-colors">Next: Schedule</button>
             </div>
           </div>
         )}
@@ -228,28 +237,28 @@ function CampaignBuilder({ onClose, onCreated }) {
         {step === 3 && (
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium">When to send?</label>
+              <label className="text-sm font-medium text-slate-300">When to send?</label>
               <div className="space-y-2 mt-2">
-                <label className="flex items-center gap-3 p-3 border border-dark-100 rounded-lg cursor-pointer hover:bg-dark-50">
-                  <input type="radio" checked={schedule === 'now'} onChange={() => setSchedule('now')} />
-                  <div><p className="text-sm font-medium">Send Now</p><p className="text-xs text-dark-400">Start sending immediately</p></div>
+                <label className="flex items-center gap-3 p-3 border border-white/10 rounded-lg cursor-pointer hover:bg-white/5 transition-colors">
+                  <input type="radio" checked={schedule === 'now'} onChange={() => setSchedule('now')} className="accent-[#25D366]" />
+                  <div><p className="text-sm font-medium text-white">Send Now</p><p className="text-xs text-slate-500">Start sending immediately</p></div>
                 </label>
-                <label className="flex items-center gap-3 p-3 border border-dark-100 rounded-lg cursor-pointer hover:bg-dark-50">
-                  <input type="radio" checked={schedule === 'later'} onChange={() => setSchedule('later')} />
-                  <div><p className="text-sm font-medium">Schedule for Later</p><p className="text-xs text-dark-400">Pick a date and time</p></div>
+                <label className="flex items-center gap-3 p-3 border border-white/10 rounded-lg cursor-pointer hover:bg-white/5 transition-colors">
+                  <input type="radio" checked={schedule === 'later'} onChange={() => setSchedule('later')} className="accent-[#25D366]" />
+                  <div><p className="text-sm font-medium text-white">Schedule for Later</p><p className="text-xs text-slate-500">Pick a date and time</p></div>
                 </label>
               </div>
             </div>
             {schedule === 'later' && (
-              <div><label className="text-sm font-medium">Date & Time</label><input type="datetime-local" className="input mt-1" value={scheduleDate} onChange={e => setScheduleDate(e.target.value)} /></div>
+              <div><label className="text-sm font-medium text-slate-300">Date & Time</label><input type="datetime-local" className="input mt-1" value={scheduleDate} onChange={e => setScheduleDate(e.target.value)} /></div>
             )}
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-2">
-              <AlertCircle size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
-              <p className="text-xs text-amber-700">Messages are sent with random 5-15 second delays between each to prevent blocking. Do not close the browser tab while sending is in progress.</p>
+            <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3 flex items-start gap-2">
+              <AlertCircle size={16} className="text-amber-400 flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-amber-400">Messages are sent with random 5-15 second delays between each to prevent blocking. Do not close the browser tab while sending is in progress.</p>
             </div>
             <div className="flex gap-2">
-              <button onClick={() => setStep(2)} className="btn btn-secondary flex-1">Back</button>
-              <button onClick={handleCreate} className="btn btn-primary flex-1">{schedule === 'now' ? 'Create & Send' : 'Create Campaign'}</button>
+              <button onClick={() => setStep(2)} className="flex-1 px-4 py-2.5 rounded-lg bg-white/5 text-slate-300 border border-white/10 hover:bg-white/10 transition-colors">Back</button>
+              <button onClick={handleCreate} className="flex-1 px-4 py-2.5 rounded-lg bg-[#25D366] text-white hover:bg-[#1da851] transition-colors">{schedule === 'now' ? 'Create & Send' : 'Create Campaign'}</button>
             </div>
           </div>
         )}

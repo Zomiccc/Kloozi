@@ -10,6 +10,10 @@ router.get('/leads', analyticsController.getLeadAnalytics);
 router.get('/conversion', analyticsController.getConversionAnalytics);
 router.get('/pipeline', analyticsController.getPipelineAnalytics);
 router.get('/agents', requireManagerOrAbove, analyticsController.getAgentPerformance);
+router.get('/team-stats', analyticsController.getTeamStats);
+router.get('/ai-insight', analyticsController.getAIInsight);
+router.get('/workspace-settings', analyticsController.getWorkspaceSettings);
+router.put('/workspace-settings', analyticsController.updateWorkspaceSettings);
 
 router.get('/notifications', analyticsController.getNotifications);
 router.put('/notifications/:id/read', analyticsController.markNotificationRead);
