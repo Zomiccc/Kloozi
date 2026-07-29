@@ -30,7 +30,7 @@ export default function LeadDistribution() {
         <div className="space-y-3">
           {configs.map(c => (
             <div key={c.id} className="card flex items-center justify-between">
-              <div><p className="font-medium text-ink-primary capitalize">Source: {c.source}</p><p className="text-xs text-ink-tertiary">Mode: {c.mode} | Recipients: {typeof c.recipients === 'string' ? JSON.parse(c.recipients).length : c.recipients?.length || 0}</p></div>
+              <div><p className="font-medium text-ink-primary capitalize">Type: {c.type}</p><p className="text-xs text-ink-tertiary">Recipients: {typeof c.config === 'string' ? JSON.parse(c.config).recipients?.length || 0 : c.config?.recipients?.length || 0}</p></div>
             </div>
           ))}
         </div>
@@ -41,12 +41,11 @@ export default function LeadDistribution() {
   );
 
   function ConfigModal({ onClose, onSaved }) {
-    const [source, setSource] = useState('any');
-    const [mode, setMode] = useState('all');
+    const [type, setType] = useState('round_robin');
     const [recipients, setRecipients] = useState([{ type: 'email', value: '' }]);
 
     const handleSave = async () => {
-      try { await API.put('/automations/distribution', { source, mode, recipients }); toast.success('Distribution saved'); onSaved(); } catch { toast.error('Failed'); }
+      try { await API.put('/automations/distribution', { type, config: { recipients } }); toast.success('Distribution saved'); onSaved(); } catch { toast.error('Failed'); }
     };
 
     const recipientTypes = [{ v: 'email', l: 'Email' }, { v: 'whatsapp', l: 'WhatsApp' }, { v: 'team_member', l: 'Team Member' }];
@@ -56,11 +55,8 @@ export default function LeadDistribution() {
         <div className="bg-white border border-surface-border rounded-2xl p-6 w-full max-w-md shadow-modal">
           <div className="flex items-center justify-between mb-4"><h2 className="text-xl font-bold text-ink-primary">Distribution Config</h2><button onClick={onClose}>✕</button></div>
           <div className="space-y-3">
-            <select className="input" value={source} onChange={e => setSource(e.target.value)}>
-              <option value="any">Any Source</option><option value="facebook">Facebook</option><option value="google">Google</option><option value="tiktok">TikTok</option><option value="website">Website</option>
-            </select>
-            <select className="input" value={mode} onChange={e => setMode(e.target.value)}>
-              <option value="all">All leads to all recipients</option><option value="round_robin">Round Robin</option>
+            <select className="input" value={type} onChange={e => setType(e.target.value)}>
+              <option value="round_robin">Round Robin</option><option value="all">All Recipients</option>
             </select>
             <div>
               <label className="text-sm font-medium text-ink-secondary">Recipients:</label>

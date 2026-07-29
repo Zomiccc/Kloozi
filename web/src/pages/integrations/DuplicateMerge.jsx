@@ -17,7 +17,7 @@ export default function DuplicateMerge() {
   };
 
   const handleMerge = async (leadAId, leadBId) => {
-    try { await API.post('/leads/merge', { source_lead_id: leadBId, target_lead_id: leadAId, merge_strategy: 'keep_both' }); toast.success('Leads merged'); setMerging(null); loadDuplicates(); } catch { toast.error('Merge failed'); }
+    try { await API.post('/leads/merge', { primary_id: leadAId, secondary_id: leadBId }); toast.success('Leads merged'); setMerging(null); loadDuplicates(); } catch { toast.error('Merge failed'); }
   };
 
   const handleDismiss = (pair) => {

@@ -841,6 +841,7 @@ const migrations = [
         workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
         name VARCHAR(255) NOT NULL,
         description TEXT,
+        parent_team_id UUID REFERENCES subteams(id) ON DELETE SET NULL,
         created_at TIMESTAMP DEFAULT NOW()
       );
 
@@ -853,6 +854,7 @@ const migrations = [
         action_type VARCHAR(50) NOT NULL,
         action_config JSONB DEFAULT '{}'::jsonb,
         is_enabled BOOLEAN DEFAULT TRUE,
+        priority INTEGER DEFAULT 0,
         created_at TIMESTAMP DEFAULT NOW(),
         updated_at TIMESTAMP DEFAULT NOW()
       );
@@ -875,6 +877,7 @@ const migrations = [
         response_message TEXT,
         match_type VARCHAR(20) DEFAULT 'exact',
         is_enabled BOOLEAN DEFAULT TRUE,
+        priority INTEGER DEFAULT 0,
         created_at TIMESTAMP DEFAULT NOW(),
         updated_at TIMESTAMP DEFAULT NOW()
       );
@@ -908,8 +911,13 @@ const migrations = [
         workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
         name VARCHAR(255) NOT NULL,
         form_key VARCHAR(255) UNIQUE NOT NULL,
+        title VARCHAR(255),
+        description TEXT,
         fields JSONB DEFAULT '[]'::jsonb,
+        branding JSONB DEFAULT '{}'::jsonb,
+        assigned_to UUID REFERENCES users(id) ON DELETE SET NULL,
         redirect_url VARCHAR(500),
+        thank_you_message TEXT,
         is_active BOOLEAN DEFAULT TRUE,
         created_at TIMESTAMP DEFAULT NOW()
       );
@@ -920,9 +928,79 @@ const migrations = [
         pixel_id VARCHAR(255),
         access_token TEXT,
         is_enabled BOOLEAN DEFAULT FALSE,
+        is_active BOOLEAN DEFAULT FALSE,
         created_at TIMESTAMP DEFAULT NOW(),
         updated_at TIMESTAMP DEFAULT NOW()
       );
+
+      -- Add missing columns to lead_form_pages if they don't exist
+      ALTER TABLE lead_form_pages ADD COLUMN IF NOT EXISTS title VARCHAR(255);
+      ALTER TABLE lead_form_pages ADD COLUMN IF NOT EXISTS description TEXT;
+      ALTER TABLE lead_form_pages ADD COLUMN IF NOT EXISTS branding JSONB DEFAULT '{}'::jsonb;
+      ALTER TABLE lead_form_pages ADD COLUMN IF NOT EXISTS assigned_to UUID REFERENCES users(id) ON DELETE SET NULL;
+      ALTER TABLE lead_form_pages ADD COLUMN IF NOT EXISTS thank_you_message TEXT;
+
+      -- Add missing priority columns if they don't exist
+      ALTER TABLE lead_automation_rules ADD COLUMN IF NOT EXISTS priority INTEGER DEFAULT 0;
+      ALTER TABLE whatsapp_chat_assistant_rules ADD COLUMN IF NOT EXISTS priority INTEGER DEFAULT 0;
+
+      -- Add missing parent_team_id column to subteams if it doesn't exist
+      ALTER TABLE subteams ADD COLUMN IF NOT EXISTS parent_team_id UUID REFERENCES subteams(id) ON DELETE SET NULL;
+
+      -- Add missing subteam_id column to users if it doesn't exist
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS subteam_id UUID REFERENCES subteams(id) ON DELETE SET NULL;
+
+      CREATE TABLE IF NOT EXISTS whatsapp_sequences (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL,
+        description TEXT,
+        steps JSONB DEFAULT '[]'::jsonb,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS whatsapp_sequence_progress (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+        sequence_id UUID REFERENCES whatsapp_sequences(id) ON DELETE CASCADE,
+        lead_id UUID REFERENCES leads(id) ON DELETE CASCADE,
+        current_step INTEGER DEFAULT 0,
+        next_send_at TIMESTAMP,
+        is_completed BOOLEAN DEFAULT FALSE,
+        is_stopped BOOLEAN DEFAULT FALSE,
+        stop_reason VARCHAR(100),
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE(sequence_id, lead_id)
+      );
+
+      CREATE TABLE IF NOT EXISTS whatsapp_ai_agent_config (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE UNIQUE,
+        is_enabled BOOLEAN DEFAULT FALSE,
+        extract_fields JSONB DEFAULT '["name","budget","interest","product"]'::jsonb,
+        system_prompt TEXT,
+        auto_reply BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS whatsapp_auto_create_config (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE UNIQUE,
+        is_enabled BOOLEAN DEFAULT FALSE,
+        auto_assign_to UUID REFERENCES users(id),
+        default_stage VARCHAR(50) DEFAULT 'new',
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_whatsapp_sequences_workspace ON whatsapp_sequences(workspace_id);
+      CREATE INDEX IF NOT EXISTS idx_whatsapp_sequence_progress_sequence ON whatsapp_sequence_progress(sequence_id);
+      CREATE INDEX IF NOT EXISTS idx_whatsapp_sequence_progress_lead ON whatsapp_sequence_progress(lead_id);
+      CREATE INDEX IF NOT EXISTS idx_whatsapp_sequence_progress_next_send ON whatsapp_sequence_progress(next_send_at) WHERE is_completed = FALSE AND is_stopped = FALSE;
     `
   },
 ];

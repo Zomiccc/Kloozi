@@ -24,6 +24,7 @@ const teamRoutes = require('./routes/team');
 const billingRoutes = require('./routes/billing');
 const integrationRoutes = require('./routes/integrations');
 const automationRoutes = require('./routes/automations');
+const { startScheduledJobs } = require('./queues');
 const { getTranslations, getAvailableLanguages } = require('./utils/i18n');
 const path = require('path');
 const fs = require('fs');
@@ -128,6 +129,8 @@ const PORT = config.port;
 server.listen(PORT, () => {
   logger.info(`CRM Final API running on port ${PORT}`);
   logger.info(`Environment: ${config.env}`);
+  // Start scheduled jobs (WhatsApp sequences, etc.)
+  startScheduledJobs();
 });
 
 module.exports = { app, server, io };

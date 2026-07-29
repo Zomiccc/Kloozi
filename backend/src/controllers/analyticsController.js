@@ -1,5 +1,13 @@
 const db = require('../config/database');
 
+// Helper: safely get date string from Date object or string
+function toDateStr(val) {
+  if (!val) return null;
+  if (val instanceof Date) return val.toISOString().split('T')[0];
+  if (typeof val === 'string') return val.split('T')[0];
+  return String(val).split('T')[0];
+}
+
 exports.getDashboard = async (req, res, next) => {
   try {
     const wsId = req.workspaceId;
@@ -14,8 +22,8 @@ exports.getDashboard = async (req, res, next) => {
 
     const stats = {
       total: leads.length,
-      today: leads.filter(l => l.created_at && l.created_at.split('T')[0] === todayStr).length,
-      yesterday: leads.filter(l => l.created_at && l.created_at.split('T')[0] === yesterdayStr).length,
+      today: leads.filter(l => l.created_at && toDateStr(l.created_at) === todayStr).length,
+      yesterday: leads.filter(l => l.created_at && toDateStr(l.created_at) === yesterdayStr).length,
       won: leads.filter(l => l.stage === 'won').length,
       lost: leads.filter(l => l.stage === 'lost').length,
       new: leads.filter(l => l.stage === 'new').length,
@@ -65,26 +73,26 @@ exports.getDashboard = async (req, res, next) => {
     let callsToday = 0;
     try {
       const callsRes = await db.query('SELECT * FROM calls WHERE workspace_id = $1', [wsId]);
-      callsToday = (callsRes.rows || []).filter(c => c.created_at && c.created_at.split('T')[0] === todayStr).length;
+      callsToday = (callsRes.rows || []).filter(c => c.created_at && toDateStr(c.created_at) === todayStr).length;
     } catch {}
 
     let followUpsToday = { total: 0, completed: 0 };
     try {
       const fuRes = await db.query('SELECT * FROM follow_ups WHERE workspace_id = $1', [wsId]);
-      const fus = (fuRes.rows || []).filter(f => f.due_date && f.due_date.split('T')[0] === todayStr);
+      const fus = (fuRes.rows || []).filter(f => f.due_date && toDateStr(f.due_date) === todayStr);
       followUpsToday = { total: fus.length, completed: fus.filter(f => f.status === 'completed').length };
     } catch {}
 
     let emailsToday = 0;
     try {
       const emRes = await db.query('SELECT * FROM emails WHERE workspace_id = $1', [wsId]);
-      emailsToday = (emRes.rows || []).filter(e => e.sent_at && e.sent_at.split('T')[0] === todayStr).length;
+      emailsToday = (emRes.rows || []).filter(e => e.sent_at && toDateStr(e.sent_at) === todayStr).length;
     } catch {}
 
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 86400000);
     const trendMap = {};
     leads.filter(l => l.created_at && new Date(l.created_at) > thirtyDaysAgo).forEach(l => {
-      const d = l.created_at.split('T')[0];
+      const d = toDateStr(l.created_at);
       trendMap[d] = (trendMap[d] || 0) + 1;
     });
     const leadTrend = Object.entries(trendMap).map(([date, count]) => ({ date, count })).sort((a, b) => a.date.localeCompare(b.date));
@@ -146,7 +154,7 @@ exports.getLeadAnalytics = async (req, res, next) => {
     const byAgent = Object.values(agentMap).sort((a, b) => b.count - a.count);
 
     const trendMap = {};
-    leads.forEach(l => { if (l.created_at) { const d = l.created_at.split('T')[0]; trendMap[d] = (trendMap[d] || 0) + 1; } });
+    leads.forEach(l => { if (l.created_at) { const d = toDateStr(l.created_at); trendMap[d] = (trendMap[d] || 0) + 1; } });
     const trend = Object.entries(trendMap).map(([date, count]) => ({ date, count })).sort((a, b) => a.date.localeCompare(b.date));
 
     res.json({ bySource, byCity, byBudget, byAgent, trend });
@@ -279,8 +287,8 @@ exports.getAIInsight = async (req, res, next) => {
     const newLeads = leads.filter(l => l.stage === 'new').length;
     const wonLeads = leads.filter(l => l.stage === 'won').length;
     const lostLeads = leads.filter(l => l.stage === 'lost').length;
-    const leadsToday = leads.filter(l => l.created_at && l.created_at.split('T')[0] === todayStr).length;
-    const leadsYesterday = leads.filter(l => l.created_at && l.created_at.split('T')[0] === yesterdayStr).length;
+    const leadsToday = leads.filter(l => l.created_at && toDateStr(l.created_at) === todayStr).length;
+    const leadsYesterday = leads.filter(l => l.created_at && toDateStr(l.created_at) === yesterdayStr).length;
     const stuckLeads = leads.filter(l => {
       if (l.stage === 'won' || l.stage === 'lost') return false;
       if (!l.last_activity_at) return true;
@@ -393,7 +401,7 @@ exports.getTeamStats = async (req, res, next) => {
     let callsToday = 0, totalMessages = 0;
     try {
       const callsRes = await db.query('SELECT * FROM calls WHERE workspace_id = $1', [wsId]);
-      callsToday = (callsRes.rows || []).filter(c => c.created_at && c.created_at.split('T')[0] === todayStr).length;
+      callsToday = (callsRes.rows || []).filter(c => c.created_at && toDateStr(c.created_at) === todayStr).length;
     } catch {}
     try {
       const waRes = await db.query('SELECT * FROM whatsapp_messages WHERE workspace_id = $1', [wsId]);

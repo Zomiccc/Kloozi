@@ -55,7 +55,7 @@ export default function FacebookIntegration() {
     }
     const redirectUri = `${oauthConfig.apiBase}/api/integrations/oauth/facebook/callback`;
     const workspaceId = localStorage.getItem('workspaceId') || '';
-    const scope = 'pages_show_list,pages_manage_metadata,pages_read_engagement,pages_manage_posts,leads_retrieval';
+    const scope = 'pages_show_list,pages_manage_metadata,business_management';
     window.location.href = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${oauthConfig.fbAppId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&response_type=code&state=${workspaceId}`;
   };
 
@@ -124,7 +124,7 @@ export default function FacebookIntegration() {
           <button onClick={handleOAuth} disabled={loading} className="bg-[#1877F2] text-white px-6 py-3 rounded-lg font-medium flex items-center gap-2 mx-auto ">
             <Facebook size={20} /> Login with Facebook
           </button>
-          <p className="text-xs text-ink-tertiary mt-4">Permissions: pages_show_list, pages_manage_metadata, pages_read_engagement, pages_manage_posts, leads_retrieval</p>
+          <p className="text-xs text-ink-tertiary mt-4">Permissions: pages_show_list, pages_manage_metadata, business_management</p>
         </div>
       </div>
     </div>

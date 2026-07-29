@@ -16,10 +16,10 @@ exports.getAutomationRules = async (req, res, next) => {
 
 exports.createAutomationRule = async (req, res, next) => {
   try {
-    const { name, trigger_source, conditions, actions, is_active, priority } = req.body;
+    const { name, trigger_type, trigger_config, action_type, action_config, is_enabled, priority } = req.body;
     const result = await db.query(
-      `INSERT INTO lead_automation_rules (workspace_id, name, trigger_source, conditions, actions, is_active, priority) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
-      [req.workspaceId, name, trigger_source || 'any', JSON.stringify(conditions || []), JSON.stringify(actions || []), is_active !== false, priority || 0]
+      `INSERT INTO lead_automation_rules (workspace_id, name, trigger_type, trigger_config, action_type, action_config, is_enabled, priority) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+      [req.workspaceId, name, trigger_type || 'any', JSON.stringify(trigger_config || {}), action_type || 'notification', JSON.stringify(action_config || {}), is_enabled !== false, priority || 0]
     );
     res.status(201).json({ rule: result.rows[0] });
   } catch (err) { next(err); }
@@ -28,10 +28,10 @@ exports.createAutomationRule = async (req, res, next) => {
 exports.updateAutomationRule = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { name, trigger_source, conditions, actions, is_active, priority } = req.body;
+    const { name, trigger_type, trigger_config, action_type, action_config, is_enabled, priority } = req.body;
     const result = await db.query(
-      `UPDATE lead_automation_rules SET name=COALESCE($1,name), trigger_source=COALESCE($2,trigger_source), conditions=COALESCE($3,conditions), actions=COALESCE($4,actions), is_active=COALESCE($5,is_active), priority=COALESCE($6,priority) WHERE id=$7 AND workspace_id=$8 RETURNING *`,
-      [name, trigger_source, conditions ? JSON.stringify(conditions) : null, actions ? JSON.stringify(actions) : null, is_active, priority, id, req.workspaceId]
+      `UPDATE lead_automation_rules SET name=COALESCE($1,name), trigger_type=COALESCE($2,trigger_type), trigger_config=COALESCE($3,trigger_config), action_type=COALESCE($4,action_type), action_config=COALESCE($5,action_config), is_enabled=COALESCE($6,is_enabled), priority=COALESCE($7,priority) WHERE id=$8 AND workspace_id=$9 RETURNING *`,
+      [name, trigger_type, trigger_config ? JSON.stringify(trigger_config) : null, action_type, action_config ? JSON.stringify(action_config) : null, is_enabled, priority, id, req.workspaceId]
     );
     if (result.rows.length === 0) return res.status(404).json({ error: 'Rule not found' });
     res.json({ rule: result.rows[0] });
@@ -75,13 +75,13 @@ exports.getDistributionConfig = async (req, res, next) => {
 
 exports.updateDistributionConfig = async (req, res, next) => {
   try {
-    const { source, mode, recipients } = req.body;
-    const existing = await db.query('SELECT id FROM lead_distribution_config WHERE workspace_id=$1 AND source=$2', [req.workspaceId, source]);
+    const { type, config } = req.body;
+    const existing = await db.query('SELECT id FROM lead_distribution_config WHERE workspace_id=$1', [req.workspaceId]);
     if (existing.rows.length > 0) {
-      const result = await db.query('UPDATE lead_distribution_config SET mode=$1, recipients=$2 WHERE workspace_id=$3 AND source=$4 RETURNING *', [mode, JSON.stringify(recipients), req.workspaceId, source]);
+      const result = await db.query('UPDATE lead_distribution_config SET type=$1, config=$2 WHERE workspace_id=$3 RETURNING *', [type, JSON.stringify(config), req.workspaceId]);
       res.json({ config: result.rows[0] });
     } else {
-      const result = await db.query('INSERT INTO lead_distribution_config (workspace_id, source, mode, recipients) VALUES ($1,$2,$3,$4) RETURNING *', [req.workspaceId, source, mode, JSON.stringify(recipients)]);
+      const result = await db.query('INSERT INTO lead_distribution_config (workspace_id, type, config) VALUES ($1,$2,$3) RETURNING *', [req.workspaceId, type, JSON.stringify(config)]);
       res.status(201).json({ config: result.rows[0] });
     }
   } catch (err) { next(err); }
@@ -125,8 +125,8 @@ exports.getOutgoingWebhooks = async (req, res, next) => {
 
 exports.createOutgoingWebhook = async (req, res, next) => {
   try {
-    const { name, url, events, is_active } = req.body;
-    const result = await db.query('INSERT INTO outgoing_webhooks (workspace_id, name, url, events, is_active) VALUES ($1,$2,$3,$4,$5) RETURNING *', [req.workspaceId, name, url, JSON.stringify(events || []), is_active !== false]);
+    const { name, url, trigger_event, headers, is_enabled } = req.body;
+    const result = await db.query('INSERT INTO outgoing_webhooks (workspace_id, name, url, trigger_event, headers, is_enabled) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *', [req.workspaceId, name, url, trigger_event || 'lead.created', JSON.stringify(headers || {}), is_enabled !== false]);
     res.status(201).json({ webhook: result.rows[0] });
   } catch (err) { next(err); }
 };
@@ -212,6 +212,13 @@ exports.serveLeadFormPage = async (req, res, next) => {
     const branding = typeof page.branding === 'string' ? JSON.parse(page.branding) : page.branding || {};
     const fields = typeof page.fields === 'string' ? JSON.parse(page.fields) : page.fields || [];
 
+    // Generate a nonce for CSP
+    const crypto = require('crypto');
+    const nonce = crypto.randomBytes(16).toString('base64');
+
+    // Set CSP header with nonce
+    res.set('Content-Security-Policy', `script-src 'self' 'nonce-${nonce}'`);
+
     const fieldsHtml = fields.map(f => {
       const label = f.label || f.name;
       const type = f.type || 'text';
@@ -236,7 +243,7 @@ exports.serveLeadFormPage = async (req, res, next) => {
       ${branding.logo_url?`<div class="logo"><img src="${branding.logo_url}"></div>`:''}
       <h2>${page.title}</h2>${page.description?`<p class="d">${page.description}</p>`:''}
       <form id="lf">${fieldsHtml}<button type="submit" class="b">Submit</button></form>
-    </div><script>
+    </div><script nonce="${nonce}">
     document.getElementById('lf').addEventListener('submit',function(e){e.preventDefault();var d={};new FormData(this).forEach(function(v,k){d[k]=v});
     fetch('${config.apiUrl}/api/automations/lead-form/${page.form_key}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)})
     .then(function(){document.querySelector('.c').innerHTML='<div class="s">${page.thank_you_message||'Thank you!'}</div>';${page.redirect_url?`setTimeout(function(){window.location='${page.redirect_url}';},2000);`:''}})
@@ -249,25 +256,42 @@ exports.serveLeadFormPage = async (req, res, next) => {
 
 exports.handleLeadFormSubmission = async (req, res, next) => {
   try {
+    const logger = require('../utils/logger');
+    logger.info(`Lead form submission for form_key: ${req.params.formKey}`);
+    logger.info(`Request body:`, req.body);
+    
     const pageRes = await db.query('SELECT * FROM lead_form_pages WHERE form_key=$1 AND is_active=true', [req.params.formKey]);
-    if (pageRes.rows.length === 0) return res.status(404).json({ error: 'Form not found' });
+    if (pageRes.rows.length === 0) {
+      logger.warn(`Form not found for form_key: ${req.params.formKey}`);
+      return res.status(404).json({ error: 'Form not found' });
+    }
     const page = pageRes.rows[0];
     const d = req.body;
     const firstName = d.first_name || d.name?.split(' ')[0] || 'Unknown';
     const lastName = d.last_name || d.name?.split(' ').slice(1).join(' ') || '';
+    
+    logger.info(`Creating lead: ${firstName} ${lastName}, workspace: ${page.workspace_id}`);
+    
     const agentsRes = await db.query(`SELECT id FROM users WHERE workspace_id=$1 AND role='sales_agent' AND status='active' LIMIT 1`, [page.workspace_id]);
     const leadRes = await db.query(
       `INSERT INTO leads (workspace_id, first_name, last_name, phone, email, city, budget, lead_source, notes, stage, assigned_to, custom_fields) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
       [page.workspace_id, firstName, lastName, d.phone, d.email, d.city, d.budget, 'lead_form', d.message || d.notes || `Form: ${page.name}`, 'new', page.assigned_to || agentsRes.rows[0]?.id, JSON.stringify(d)]
     );
     const lead = leadRes.rows[0];
+    
+    logger.info(`Lead created successfully with ID: ${lead.id}`);
+    
     await logActivity(page.workspace_id, lead.id, null, 'lead_created', `Lead from form: ${page.name}`);
     await updateLeadScore(lead.id);
     if (page.assigned_to || agentsRes.rows[0]?.id) {
       await sendPushNotification(page.assigned_to || agentsRes.rows[0].id, 'New Lead from Form', `${firstName} ${lastName}`, { type: 'new_lead', leadId: lead.id }).catch(() => {});
     }
-    res.status(201).json({ success: true });
-  } catch (err) { next(err); }
+    res.status(201).json({ success: true, leadId: lead.id });
+  } catch (err) {
+    const logger = require('../utils/logger');
+    logger.error('Lead form submission error:', err.message);
+    next(err);
+  }
 };
 
 // ─── Meta CAPI ───
@@ -275,7 +299,16 @@ exports.handleLeadFormSubmission = async (req, res, next) => {
 exports.getMetaCAPIConfig = async (req, res, next) => {
   try {
     const result = await db.query('SELECT * FROM meta_capi_config WHERE workspace_id=$1', [req.workspaceId]);
-    res.json({ config: result.rows[0] || null });
+    const dbConfig = result.rows[0] || null;
+    
+    // Check if configured via environment variables
+    const envConfigured = !!(process.env.META_PIXEL_ID && process.env.META_CONVERSIONS_ACCESS_TOKEN);
+    
+    res.json({ 
+      config: dbConfig,
+      is_configured: envConfigured || (dbConfig && dbConfig.pixel_id && dbConfig.access_token),
+      env_configured: envConfigured
+    });
   } catch (err) { next(err); }
 };
 
@@ -298,18 +331,50 @@ exports.markLeadQualified = async (req, res, next) => {
     const leadRes = await db.query('SELECT * FROM leads WHERE id=$1 AND workspace_id=$2', [req.params.id, req.workspaceId]);
     if (leadRes.rows.length === 0) return res.status(404).json({ error: 'Lead not found' });
     const lead = leadRes.rows[0];
-    const capiRes = await db.query('SELECT * FROM meta_capi_config WHERE workspace_id=$1 AND is_active=true', [req.workspaceId]);
-    if (capiRes.rows.length > 0) {
-      const capi = capiRes.rows[0];
+    
+    const pixelId = process.env.META_PIXEL_ID;
+    const accessToken = process.env.META_CONVERSIONS_ACCESS_TOKEN;
+    
+    if (pixelId && accessToken) {
       const axios = require('axios');
       const sha256 = (s) => crypto.createHash('sha256').update(s || '').digest('hex');
       try {
-        await axios.post(`https://graph.facebook.com/v18.0/${capi.pixel_id}/events`, {
-          data: [{ event_name: 'QualifiedLead', event_time: Math.floor(Date.now()/1000), action_source: 'system_generated', user_data: { ph: [sha256(lead.phone)], em: [sha256(lead.email)] } }],
-          access_token: capi.access_token,
+        logger.info('Sending Meta Conversions API event', { 
+          pixelId, 
+          leadId: lead.id, 
+          eventName: 'Contact',
+          email: lead.email,
+          phone: lead.phone
         });
-      } catch (e) { logger.error('Meta CAPI error:', e.message); }
+        
+        const response = await axios.post(`https://graph.facebook.com/v25.0/${pixelId}/events`, {
+          data: [{ 
+            event_name: 'Contact', 
+            event_time: Math.floor(Date.now()/1000), 
+            action_source: 'system_generated', 
+            user_data: { 
+              ph: lead.phone ? [sha256(lead.phone)] : [], 
+              em: lead.email ? [sha256(lead.email)] : [] 
+            } 
+          }],
+          access_token: accessToken,
+        });
+        
+        logger.info('Meta Conversions API response', { 
+          status: response.status, 
+          data: response.data 
+        });
+      } catch (e) { 
+        logger.error('Meta CAPI error:', { 
+          message: e.message, 
+          response: e.response?.data, 
+          status: e.response?.status 
+        }); 
+      }
+    } else {
+      logger.warn('Meta Conversions API not configured', { pixelId: !!pixelId, accessToken: !!accessToken });
     }
+    
     await logActivity(req.workspaceId, req.params.id, req.user.id, 'lead_qualified', 'Lead marked as qualified');
     await cacheDelPattern(`leads:${req.workspaceId}:*`);
     res.json({ message: 'Lead marked as qualified' });
@@ -352,6 +417,185 @@ exports.getDuplicateReport = async (req, res, next) => {
       [req.workspaceId]
     );
     res.json({ duplicates: result.rows });
+  } catch (err) { next(err); }
+};
+
+// ─── WhatsApp Contact Import ───
+
+exports.getWhatsAppContactImport = async (req, res, next) => {
+  try {
+    // Get unique phone numbers from WhatsApp messages that don't have matching leads
+    const result = await db.query(
+      `SELECT DISTINCT wm.phone, 
+              (SELECT message_text FROM whatsapp_messages WHERE phone = wm.phone ORDER BY created_at ASC LIMIT 1) as first_message,
+              (SELECT COUNT(*) FROM whatsapp_messages WHERE phone = wm.phone) as message_count
+       FROM whatsapp_messages wm
+       WHERE wm.workspace_id = $1
+       AND wm.phone IS NOT NULL
+       AND wm.phone != ''
+       AND NOT EXISTS (
+         SELECT 1 FROM leads l 
+         WHERE l.workspace_id = $1 
+         AND REPLACE(REPLACE(l.phone,'+',''),' ','') = REPLACE(REPLACE(wm.phone,'+',''),' ','')
+       )
+       ORDER BY message_count DESC LIMIT 100`,
+      [req.workspaceId]
+    );
+    res.json({ contacts: result.rows });
+  } catch (err) { next(err); }
+};
+
+exports.importWhatsAppContacts = async (req, res, next) => {
+  try {
+    const { phone_numbers } = req.body; // Array of phone numbers to import
+    
+    if (!Array.isArray(phone_numbers) || phone_numbers.length === 0) {
+      return res.status(400).json({ error: 'phone_numbers array required' });
+    }
+
+    const stageResult = await db.query('SELECT id FROM lead_stages WHERE workspace_id = $1 AND is_default = true LIMIT 1', [req.workspaceId]);
+    const agentsResult = await db.query(
+      `SELECT u.id FROM users u WHERE u.workspace_id = $1 AND u.role = $2 AND u.status = $3
+       ORDER BY (SELECT COUNT(*) FROM leads WHERE assigned_to = u.id) ASC LIMIT 1`,
+      [req.workspaceId, 'sales_agent', 'active']
+    );
+
+    const imported = [];
+    const errors = [];
+
+    for (const phone of phone_numbers) {
+      try {
+        // Check if lead already exists
+        const existing = await db.query(
+          `SELECT id FROM leads WHERE workspace_id = $1 AND REPLACE(REPLACE(phone,'+',''),' ','') = REPLACE(REPLACE($2,'+',''),' ','')`,
+          [req.workspaceId, phone]
+        );
+        
+        if (existing.rows.length > 0) {
+          errors.push({ phone, error: 'Lead already exists' });
+          continue;
+        }
+
+        // Create lead
+        const leadResult = await db.query(
+          `INSERT INTO leads (workspace_id, phone, lead_source, stage, stage_id, assigned_to, created_by)
+           VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+          [req.workspaceId, phone, 'whatsapp_import', 'new', stageResult.rows[0]?.id, agentsResult.rows[0]?.id, req.user.id]
+        );
+
+        await logActivity(req.workspaceId, leadResult.rows[0].id, req.user.id, 'lead_created', 'Lead imported from WhatsApp contacts');
+        imported.push({ phone, leadId: leadResult.rows[0].id });
+      } catch (err) {
+        errors.push({ phone, error: err.message });
+      }
+    }
+
+    await cacheDelPattern(`leads:${req.workspaceId}:*`);
+    res.json({ imported, errors, total: imported.length });
+  } catch (err) { next(err); }
+};
+
+// ─── WhatsApp AI Agent Config ───
+
+exports.getWhatsAppAIAgentConfig = async (req, res, next) => {
+  try {
+    const result = await db.query('SELECT * FROM whatsapp_ai_agent_config WHERE workspace_id = $1', [req.workspaceId]);
+    res.json({ config: result.rows[0] || { is_enabled: false, extract_fields: ['name', 'budget', 'interest', 'product'], auto_reply: true } });
+  } catch (err) { next(err); }
+};
+
+exports.updateWhatsAppAIAgentConfig = async (req, res, next) => {
+  try {
+    const { is_enabled, extract_fields, system_prompt, auto_reply } = req.body;
+    const existing = await db.query('SELECT id FROM whatsapp_ai_agent_config WHERE workspace_id = $1', [req.workspaceId]);
+    
+    if (existing.rows.length > 0) {
+      const result = await db.query(
+        `UPDATE whatsapp_ai_agent_config 
+         SET is_enabled = COALESCE($1, is_enabled), 
+             extract_fields = COALESCE($2, extract_fields), 
+             system_prompt = COALESCE($3, system_prompt), 
+             auto_reply = COALESCE($4, auto_reply),
+             updated_at = NOW() 
+         WHERE workspace_id = $5 RETURNING *`,
+        [is_enabled, extract_fields ? JSON.stringify(extract_fields) : null, system_prompt, auto_reply, req.workspaceId]
+      );
+      res.json({ config: result.rows[0] });
+    } else {
+      const result = await db.query(
+        `INSERT INTO whatsapp_ai_agent_config (workspace_id, is_enabled, extract_fields, system_prompt, auto_reply)
+         VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+        [req.workspaceId, is_enabled !== false, JSON.stringify(extract_fields || ['name', 'budget', 'interest', 'product']), system_prompt, auto_reply !== false]
+      );
+      res.status(201).json({ config: result.rows[0] });
+    }
+  } catch (err) { next(err); }
+};
+
+// ─── WhatsApp Auto Create Config ───
+
+exports.getWhatsAppAutoCreateConfig = async (req, res, next) => {
+  try {
+    const result = await db.query('SELECT * FROM whatsapp_auto_create_config WHERE workspace_id = $1', [req.workspaceId]);
+    res.json({ config: result.rows[0] || { is_enabled: false, default_stage: 'new' } });
+  } catch (err) { next(err); }
+};
+
+exports.updateWhatsAppAutoCreateConfig = async (req, res, next) => {
+  try {
+    const { is_enabled, auto_assign_to, default_stage } = req.body;
+    const existing = await db.query('SELECT id FROM whatsapp_auto_create_config WHERE workspace_id = $1', [req.workspaceId]);
+    
+    if (existing.rows.length > 0) {
+      const result = await db.query(
+        `UPDATE whatsapp_auto_create_config 
+         SET is_enabled = COALESCE($1, is_enabled), 
+             auto_assign_to = COALESCE($2, auto_assign_to), 
+             default_stage = COALESCE($3, default_stage),
+             updated_at = NOW() 
+         WHERE workspace_id = $4 RETURNING *`,
+        [is_enabled, auto_assign_to, default_stage, req.workspaceId]
+      );
+      res.json({ config: result.rows[0] });
+    } else {
+      const result = await db.query(
+        `INSERT INTO whatsapp_auto_create_config (workspace_id, is_enabled, auto_assign_to, default_stage)
+         VALUES ($1, $2, $3, $4) RETURNING *`,
+        [req.workspaceId, is_enabled !== false, auto_assign_to, default_stage || 'new']
+      );
+      res.status(201).json({ config: result.rows[0] });
+    }
+  } catch (err) { next(err); }
+};
+
+// ─── WhatsApp Chat Monitoring ───
+
+exports.getWhatsAppChatMonitoring = async (req, res, next) => {
+  try {
+    // Manager-only access
+    if (req.user.role !== 'admin' && req.user.role !== 'owner') {
+      return res.status(403).json({ error: 'Manager access required' });
+    }
+
+    const result = await db.query(
+      `SELECT DISTINCT ON (wm.phone) 
+              wm.phone,
+              l.id as lead_id,
+              l.first_name,
+              l.last_name,
+              u.first_name as agent_first_name,
+              u.last_name as agent_last_name,
+              (SELECT message_text FROM whatsapp_messages WHERE phone = wm.phone ORDER BY created_at DESC LIMIT 1) as last_message,
+              (SELECT created_at FROM whatsapp_messages WHERE phone = wm.phone ORDER BY created_at DESC LIMIT 1) as last_message_time,
+              (SELECT COUNT(*) FROM whatsapp_messages WHERE phone = wm.phone AND direction = 'inbound' AND status != 'read') as unread_count
+       FROM whatsapp_messages wm
+       LEFT JOIN leads l ON REPLACE(REPLACE(l.phone,'+',''),' ','') = REPLACE(REPLACE(wm.phone,'+',''),' ','') AND l.workspace_id = wm.workspace_id
+       LEFT JOIN users u ON l.assigned_to = u.id
+       WHERE wm.workspace_id = $1
+       ORDER BY last_message_time DESC NULLS LAST LIMIT 100`,
+      [req.workspaceId]
+    );
+    res.json({ conversations: result.rows });
   } catch (err) { next(err); }
 };
 

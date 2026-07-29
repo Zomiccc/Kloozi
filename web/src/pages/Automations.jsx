@@ -24,7 +24,7 @@ const leadSourceCards = [
 
 const leadAutomationCards = [
   { id: 'whatsapp_auto', icon: MessageSquare, title: 'WhatsApp Auto-Responder', desc: 'Instantly message new leads on WhatsApp from your own number', route: '/app/automations/whatsapp-auto-responder', logo: 'whatsapp' },
-  { id: 'meta_capi', icon: Zap, title: 'Meta Conversions API', desc: 'Optimise Facebook Lead Ad campaigns', route: '/app/automations/meta-capi', logo: 'meta' },
+  { id: 'meta_capi', icon: Zap, title: 'Meta Conversions API', desc: 'Optimise Facebook Lead Ad campaigns', route: '/app/automations/meta-capi', logo: 'meta', checkEnv: true },
   { id: 'duplicate_merge', icon: GitBranch, title: 'Duplicate Lead Merging', desc: 'Auto merge leads with same phone/email', route: '/app/automations/duplicate-merge' },
   { id: 'automation_rules', icon: Filter, title: 'Lead Automation Rules', desc: 'Assign leads via rules or round robin', route: '/app/automations/rules' },
   { id: 'lead_distribution', icon: Send, title: 'Lead Distribution', desc: 'Forward leads to recipients via WhatsApp/email', route: '/app/automations/distribution' },
@@ -47,9 +47,10 @@ export default function Automations() {
   const [tab, setTab] = useState('all');
   const [integrations, setIntegrations] = useState([]);
   const [accountToken, setAccountToken] = useState('');
+  const [metaCapiConfigured, setMetaCapiConfigured] = useState(false);
   const navigate = useNavigate();
 
-  useEffect(() => { loadIntegrations(); loadToken(); }, []);
+  useEffect(() => { loadIntegrations(); loadToken(); loadMetaCAPIStatus(); }, []);
 
   const loadIntegrations = async () => {
     try {
@@ -65,7 +66,19 @@ export default function Automations() {
     } catch {}
   };
 
-  const isConnected = (type) => integrations.some(i => i.type === type && i.is_connected);
+  const loadMetaCAPIStatus = async () => {
+    try {
+      const res = await API.get('/automations/meta-capi');
+      setMetaCapiConfigured(res.data.is_configured || false);
+    } catch {}
+  };
+
+  const isConnected = (type) => {
+    if (type === 'meta_capi') {
+      return metaCapiConfigured;
+    }
+    return integrations.some(i => i.type === type && i.is_connected);
+  };
 
   const renderCard = (card) => {
     const connected = card.connected || isConnected(card.id) || isConnected(card.oauth ? card.id : card.id);
@@ -94,7 +107,7 @@ export default function Automations() {
             onClick={() => navigate(card.route)}
             className="text-xs font-bold text-accent-blue hover:underline flex items-center gap-1"
           >
-            {connected ? 'Configure' : card.oauth ? 'Connect' : 'Configure'}
+            {connected ? 'Configure' : 'Connect'}
             <ChevronRight size={14} />
           </button>
         </div>

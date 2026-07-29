@@ -44,6 +44,11 @@ import AutomationRules from './pages/integrations/AutomationRules';
 import LeadDistribution from './pages/integrations/LeadDistribution';
 import OutgoingWebhooks from './pages/integrations/OutgoingWebhooks';
 import DuplicateMerge from './pages/integrations/DuplicateMerge';
+import WhatsAppSequences from './pages/integrations/WhatsAppSequences';
+import WhatsAppChatMonitoring from './pages/integrations/WhatsAppChatMonitoring';
+import WhatsAppContactImport from './pages/integrations/WhatsAppContactImport';
+import WhatsAppAIAgent from './pages/integrations/WhatsAppAIAgent';
+import WhatsAppChats from './pages/integrations/WhatsAppChats';
 
 function ProtectedRoute({ children }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -89,13 +94,13 @@ export default function App() {
           <Route path="team" element={<TeamManagement />} />
           <Route path="automations" element={<Automations />} />
           <Route path="automations/facebook" element={<FacebookIntegration />} />
-          <Route path="automations/whatsapp-chats" element={<WhatsAppIntegration />} />
+          <Route path="automations/whatsapp-chats" element={<WhatsAppChats />} />
           <Route path="automations/whatsapp-auto-responder" element={<WhatsAppIntegration />} />
-          <Route path="automations/whatsapp-sequences" element={<WhatsAppIntegration />} />
-          <Route path="automations/whatsapp-contact-import" element={<WhatsAppIntegration />} />
+          <Route path="automations/whatsapp-sequences" element={<WhatsAppSequences />} />
+          <Route path="automations/whatsapp-contact-import" element={<WhatsAppContactImport />} />
           <Route path="automations/whatsapp-widget" element={<WhatsAppIntegration />} />
-          <Route path="automations/whatsapp-ai-agent" element={<WhatsAppIntegration />} />
-          <Route path="automations/chat-monitoring" element={<WhatsAppIntegration />} />
+          <Route path="automations/whatsapp-ai-agent" element={<WhatsAppAIAgent />} />
+          <Route path="automations/chat-monitoring" element={<WhatsAppChatMonitoring />} />
           <Route path="automations/wordpress" element={<WordPressIntegration />} />
           <Route path="automations/google-forms" element={<GoogleFormsIntegration />} />
           <Route path="automations/google-ads" element={<GoogleFormsIntegration />} />

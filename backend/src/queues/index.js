@@ -2,6 +2,9 @@ const logger = require('../utils/logger');
 
 logger.info('Using in-memory job queue (BullMQ/Redis not available)');
 
+// WhatsApp sequence processing interval
+let sequenceInterval = null;
+
 async function enqueueJob(queueName, data, options = {}) {
   try {
     logger.info(`Job enqueued: ${queueName}`);
@@ -16,6 +19,22 @@ async function enqueueJob(queueName, data, options = {}) {
         } else if (queueName === 'whatsapp') {
           const { sendWhatsAppToLead } = require('../services/whatsappService');
           await sendWhatsAppToLead(data);
+        } else if (queueName === 'whatsapp-bulk-send') {
+          const { sendWhatsAppToLead } = require('../services/whatsappService');
+          for (const leadId of data.leadIds) {
+            try {
+              await sendWhatsAppToLead({
+                workspaceId: data.workspaceId,
+                leadId,
+                userId: data.userId,
+                message: data.message,
+                templateId: data.templateId,
+              });
+              await new Promise(resolve => setTimeout(resolve, 200));
+            } catch (err) {
+              logger.error(`Bulk WhatsApp error for lead ${leadId}:`, err.message);
+            }
+          }
         } else if (queueName === 'sms') {
           const { sendSMSToLead } = require('../services/smsService');
           await sendSMSToLead(data);
@@ -83,4 +102,30 @@ async function enqueueJob(queueName, data, options = {}) {
   }
 }
 
-module.exports = { queues: {}, enqueueJob, connection: null };
+// Start scheduled jobs
+function startScheduledJobs() {
+  if (sequenceInterval) return; // Already started
+
+  // WhatsApp sequence processing - runs every minute
+  sequenceInterval = setInterval(async () => {
+    try {
+      const { processDueSequenceSteps } = require('../controllers/whatsappSequenceController');
+      await processDueSequenceSteps();
+    } catch (err) {
+      logger.error('WhatsApp sequence job error:', err.message);
+    }
+  }, 60000); // 1 minute
+
+  logger.info('Scheduled jobs started (WhatsApp sequences: every 1 minute)');
+}
+
+// Stop scheduled jobs
+function stopScheduledJobs() {
+  if (sequenceInterval) {
+    clearInterval(sequenceInterval);
+    sequenceInterval = null;
+    logger.info('Scheduled jobs stopped');
+  }
+}
+
+module.exports = { queues: {}, enqueueJob, connection: null, startScheduledJobs, stopScheduledJobs };

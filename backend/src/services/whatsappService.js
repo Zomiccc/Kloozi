@@ -185,25 +185,60 @@ async function handleWhatsAppWebhook(payload) {
               type: 'whatsapp_reply', leadId: lead.id
             });
           }
+
+          // Stop sequences on reply
+          const { stopSequenceOnReply } = require('../controllers/whatsappSequenceController');
+          await stopSequenceOnReply(workspaceId, leadId);
         } else {
-          const newLead = await importWhatsAppContact(fromPhone, text, changes?.value?.contacts);
-          if (newLead) {
-            leadId = newLead.id;
-            workspaceId = newLead.workspace_id;
+          // Check if auto-create is enabled
+          const autoCreateResult = await db.query(
+            'SELECT * FROM whatsapp_auto_create_config WHERE workspace_id = (SELECT id FROM workspaces LIMIT 1) AND is_enabled = true'
+          );
+          
+          if (autoCreateResult.rows.length > 0) {
+            const autoCreate = autoCreateResult.rows[0];
+            const newLead = await importWhatsAppContactWithConfig(fromPhone, text, changes?.value?.contacts, autoCreate);
+            if (newLead) {
+              leadId = newLead.id;
+              workspaceId = newLead.workspace_id;
 
-            await db.query(
-              `INSERT INTO whatsapp_messages (workspace_id, lead_id, direction, message_text, status, wa_message_id, sent_at)
-               VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
-              [workspaceId, leadId, 'inbound', text, 'delivered', msg.id]
-            );
+              await db.query(
+                `INSERT INTO whatsapp_messages (workspace_id, lead_id, direction, message_text, status, wa_message_id, sent_at)
+                 VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
+                [workspaceId, leadId, 'inbound', text, 'delivered', msg.id]
+              );
 
-            await db.query(
-              `INSERT INTO lead_activities (workspace_id, lead_id, type, description, metadata)
-               VALUES ($1, $2, $3, $4, $5)`,
-              [workspaceId, leadId, 'whatsapp_received', `First WhatsApp message: ${text}`, JSON.stringify({ from: fromPhone, auto_imported: true })]
-            );
+              await db.query(
+                `INSERT INTO lead_activities (workspace_id, lead_id, type, description, metadata)
+                 VALUES ($1, $2, $3, $4, $5)`,
+                [workspaceId, leadId, 'whatsapp_received', `First WhatsApp message: ${text}`, JSON.stringify({ from: fromPhone, auto_imported: true })]
+              );
 
-            await sendAutoResponder(workspaceId, leadId, fromPhone);
+              await sendAutoResponder(workspaceId, leadId, fromPhone);
+              
+              // Process AI Agent for new lead
+              await processAIAgent(workspaceId, leadId, fromPhone, text);
+            }
+          } else {
+            const newLead = await importWhatsAppContact(fromPhone, text, changes?.value?.contacts);
+            if (newLead) {
+              leadId = newLead.id;
+              workspaceId = newLead.workspace_id;
+
+              await db.query(
+                `INSERT INTO whatsapp_messages (workspace_id, lead_id, direction, message_text, status, wa_message_id, sent_at)
+                 VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
+                [workspaceId, leadId, 'inbound', text, 'delivered', msg.id]
+              );
+
+              await db.query(
+                `INSERT INTO lead_activities (workspace_id, lead_id, type, description, metadata)
+                 VALUES ($1, $2, $3, $4, $5)`,
+                [workspaceId, leadId, 'whatsapp_received', `First WhatsApp message: ${text}`, JSON.stringify({ from: fromPhone, auto_imported: true })]
+              );
+
+              await sendAutoResponder(workspaceId, leadId, fromPhone);
+            }
           }
         }
 
@@ -258,6 +293,128 @@ async function importWhatsAppContact(fromPhone, messageText, contactsInfo) {
   } catch (err) {
     logger.error('WhatsApp contact import error:', err.message);
     return null;
+  }
+}
+
+async function importWhatsAppContactWithConfig(fromPhone, messageText, contactsInfo, autoCreateConfig) {
+  try {
+    const cleanPhone = fromPhone.replace(/\D/g, '');
+    const name = contactsInfo?.[0]?.name;
+    const firstName = name?.first_name || (messageText ? messageText.split(' ')[0] : 'WhatsApp');
+    const lastName = name?.last_name || '';
+
+    const workspaceId = autoCreateConfig.workspace_id;
+
+    const stageResult = await db.query(
+      `SELECT id FROM lead_stages WHERE workspace_id = $1 AND name = $2 LIMIT 1`,
+      [workspaceId, autoCreateConfig.default_stage || 'new']
+    );
+    const stageId = stageResult.rows[0]?.id;
+
+    const assignedTo = autoCreateConfig.auto_assign_to;
+
+    const leadResult = await db.query(
+      `INSERT INTO leads (workspace_id, first_name, last_name, phone, lead_source, notes, stage, stage_id, assigned_to)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id, workspace_id`,
+      [workspaceId, firstName, lastName, '+' + cleanPhone, 'whatsapp_auto', `Auto-created from WhatsApp: "${messageText}"`, autoCreateConfig.default_stage || 'new', stageId, assignedTo || null]
+    );
+
+    const lead = leadResult.rows[0];
+    const { updateLeadScore } = require('../utils/activityLog');
+    await updateLeadScore(lead.id);
+
+    const { sendPushNotification } = require('../utils/notifications');
+    if (assignedTo) {
+      await sendPushNotification(assignedTo, 'New WhatsApp Lead', `Auto-created: ${firstName} ${lastName}`, { type: 'new_lead', leadId: lead.id, source: 'whatsapp_auto' });
+    }
+
+    return lead;
+  } catch (err) {
+    logger.error('WhatsApp contact import with config error:', err.message);
+    return null;
+  }
+}
+
+async function processAIAgent(workspaceId, leadId, fromPhone, messageText) {
+  try {
+    const configResult = await db.query(
+      'SELECT * FROM whatsapp_ai_agent_config WHERE workspace_id = $1 AND is_enabled = true',
+      [workspaceId]
+    );
+
+    if (configResult.rows.length === 0) return;
+
+    const config = configResult.rows[0];
+    const { extractLeadInfoFromMessage, generateAIReply } = require('./openaiService');
+
+    // Extract lead info using AI
+    const extractedInfo = await extractLeadInfoFromMessage(messageText, config.extract_fields, config.system_prompt);
+    
+    if (extractedInfo) {
+      // Update lead with extracted info
+      const updateFields = [];
+      const updateValues = [];
+      let paramIndex = 1;
+
+      if (extractedInfo.name) {
+        const nameParts = extractedInfo.name.split(' ');
+        updateFields.push(`first_name = $${paramIndex++}`);
+        updateValues.push(nameParts[0]);
+        if (nameParts.length > 1) {
+          updateFields.push(`last_name = $${paramIndex++}`);
+          updateValues.push(nameParts.slice(1).join(' '));
+        }
+      }
+      if (extractedInfo.budget) {
+        updateFields.push(`budget = $${paramIndex++}`);
+        updateValues.push(parseFloat(extractedInfo.budget));
+      }
+      if (extractedInfo.interest) {
+        updateFields.push(`notes = COALESCE(notes, '') || $${paramIndex++}`);
+        updateValues.push(` Interest: ${extractedInfo.interest}`);
+      }
+
+      if (updateFields.length > 0) {
+        updateValues.push(leadId);
+        await db.query(
+          `UPDATE leads SET ${updateFields.join(', ')}, updated_at = NOW() WHERE id = $${paramIndex}`,
+          updateValues
+        );
+      }
+    }
+
+    // Generate AI reply if enabled
+    if (config.auto_reply) {
+      const aiReply = await generateAIReply(messageText, extractedInfo, config.system_prompt);
+      
+      if (aiReply) {
+        const result = await sendWhatsAppMessage({ to: fromPhone, message: aiReply });
+        
+        await db.query(
+          `INSERT INTO whatsapp_messages (workspace_id, lead_id, direction, message_text, status, wa_message_id, sent_at)
+           VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
+          [workspaceId, leadId, 'outbound', aiReply, result.success ? 'sent' : 'failed', result.messageId || null]
+        );
+
+        await db.query(
+          `INSERT INTO lead_activities (workspace_id, lead_id, type, description, metadata)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [workspaceId, leadId, 'ai_reply_sent', `AI agent replied: ${aiReply}`, JSON.stringify({ ai_generated: true })]
+        );
+      }
+    }
+  } catch (err) {
+    logger.error('AI Agent processing error:', err.message);
+  }
+}
+
+async function processWhatsAppSequences(workspaceId, leadId, messageText) {
+  try {
+    // This is a placeholder - the actual sequence processing is handled by the BullMQ job
+    // The job calls whatsappSequenceController.processDueSequenceSteps
+    logger.info(`Sequence trigger for lead ${leadId} in workspace ${workspaceId}`);
+  } catch (err) {
+    logger.error('Sequence processing error:', err.message);
   }
 }
 

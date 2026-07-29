@@ -146,7 +146,7 @@ export default function LeadProfile() {
         <button onClick={handleEmail} disabled={!lead.email} className="btn btn-ghost" style={{ color: '#0066FF', borderColor: '#0066FF30' }}><Mail size={16} /> Email</button>
         <button onClick={handleSMS} disabled={!lead.phone} className="btn btn-ghost"><Smartphone size={16} /> SMS</button>
         <button onClick={() => setEditing(!editing)} className="btn btn-ghost"><Edit size={16} /> {editing ? 'Cancel' : 'Edit'}</button>
-        {lead.lead_source === 'facebook' && <button onClick={handleMarkQualified} className="btn btn-blue"><Zap size={16} /> Mark Qualified</button>}
+        <button onClick={handleMarkQualified} className="btn btn-blue"><Zap size={16} /> Mark Qualified</button>
         <button onClick={handleDelete} className="btn btn-ghost" style={{ color: '#FF3B5C' }}><Trash2 size={16} /> Delete</button>
       </div>
 

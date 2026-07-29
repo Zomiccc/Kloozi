@@ -50,4 +50,19 @@ router.post('/account-token/regenerate', requireAdminOrAbove, auto.regenerateAcc
 // Duplicate Report
 router.get('/duplicates', auto.getDuplicateReport);
 
+// WhatsApp Contact Import
+router.get('/whatsapp-contact-import', auto.getWhatsAppContactImport);
+router.post('/whatsapp-contact-import', auto.importWhatsAppContacts);
+
+// WhatsApp AI Agent Config
+router.get('/whatsapp-ai-agent', auto.getWhatsAppAIAgentConfig);
+router.put('/whatsapp-ai-agent', requireAdminOrAbove, auto.updateWhatsAppAIAgentConfig);
+
+// WhatsApp Auto Create Config
+router.get('/whatsapp-auto-create', auto.getWhatsAppAutoCreateConfig);
+router.put('/whatsapp-auto-create', requireAdminOrAbove, auto.updateWhatsAppAutoCreateConfig);
+
+// WhatsApp Chat Monitoring
+router.get('/whatsapp-chat-monitoring', auto.getWhatsAppChatMonitoring);
+
 module.exports = router;

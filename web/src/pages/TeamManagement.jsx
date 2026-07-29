@@ -93,15 +93,16 @@ export default function TeamManagement() {
                 const positions = ['2nd', '1st', '3rd'];
                 const actualIdx = idx === 0 ? 1 : idx === 1 ? 0 : 2;
                 const m2 = podium[actualIdx];
+                if (!m2 || !m2.id) return null;
                 const h2 = heights[actualIdx];
                 const c2 = colors[actualIdx];
                 const p2 = positions[actualIdx];
                 return (
                   <div key={m2.id} className="flex flex-col items-center">
                     <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-white text-lg font-extrabold mb-2 shadow-card" style={{ background: 'linear-gradient(135deg, #0066FF, #AF52DE)' }}>
-                      {m2.first_name?.[0] || '?'}
+                      {(m2.first_name || '?')[0]}
                     </div>
-                    <p className="text-sm font-bold text-ink-primary">{m2.first_name} {m2.last_name}</p>
+                    <p className="text-sm font-bold text-ink-primary">{m2.first_name || ''} {m2.last_name || ''}</p>
                     <p className="text-xs text-ink-tertiary mb-2">{m2.lead_count || 0} leads</p>
                     <div className={`${h2} w-full rounded-t-2xl flex items-center justify-center text-white font-extrabold text-lg`} style={{ background: c2 }}>
                       {p2}

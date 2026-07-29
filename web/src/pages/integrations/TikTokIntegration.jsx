@@ -38,7 +38,13 @@ export default function TikTokIntegration() {
     const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:5000';
     const redirectUri = `${apiBase}/api/integrations/oauth/tiktok/callback`;
     const workspaceId = localStorage.getItem('workspaceId') || '';
-    const tiktokAppId = '';
+    const tiktokAppId = import.meta.env.VITE_TIKTOK_APP_ID || '';
+    
+    if (!tiktokAppId || tiktokAppId === 'add_later') {
+      toast.error('TikTok integration is pending approval. Check back soon.');
+      return;
+    }
+    
     const scope = 'creative.management,lead.management';
     window.location.href = `https://business-api.tiktok.com/portal/auth?app_id=${tiktokAppId}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${workspaceId}&scope=${scope}`;
   };

@@ -584,8 +584,9 @@ export default function WhatsAppIntegration() {
           <h3 className="font-semibold text-ink-primary mb-3">WhatsApp Widget for Website</h3>
           <p className="text-sm text-ink-secondary mb-3">Add a floating WhatsApp chat button to your website. Copy this code and paste before closing body tag:</p>
           <div className="bg-surface-page rounded-2xl p-3 border border-surface-border">
-            <code className="text-xs text-ink-secondary block overflow-x-auto">{`<script src="${window.location.origin}/api/whatsapp/widget.js?phone=${connectedPhone.replace(/\D/g, '')}"></script>`}</code>
+            <code className="text-xs text-ink-secondary block overflow-x-auto">{`<script src="${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/whatsapp/widget.js?phone=${connectedPhone.replace(/\D/g, '')}"></script>`}</code>
           </div>
+          <button onClick={() => { navigator.clipboard.writeText(`<script src="${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/whatsapp/widget.js?phone=${connectedPhone.replace(/\D/g, '')}"></script>`); toast.success('Widget code copied!'); }} className="mt-3 text-xs text-accent-blue hover:underline">Copy to clipboard</button>
         </div>
       </div>
     );

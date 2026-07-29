@@ -747,10 +747,14 @@ exports.mergeLeads = async (req, res, next) => {
     if (!primary.budget && secondary.budget) { updateFields.push(`budget = $${idx++}`); updateParams.push(secondary.budget); }
     if (secondary.notes) { updateFields.push(`notes = COALESCE(notes || ' | ', '') || $${idx++}`); updateParams.push(secondary.notes); }
 
-    const mergedTags = [...new Set([...(primary.tags || []), ...(secondary.tags || [])])];
+    const primaryTags = Array.isArray(primary.tags) ? primary.tags : (typeof primary.tags === 'string' ? JSON.parse(primary.tags || '[]') : []);
+    const secondaryTags = Array.isArray(secondary.tags) ? secondary.tags : (typeof secondary.tags === 'string' ? JSON.parse(secondary.tags || '[]') : []);
+    const mergedTags = [...new Set([...primaryTags, ...secondaryTags])];
     if (mergedTags.length > 0) { updateFields.push(`tags = $${idx++}`); updateParams.push(mergedTags); }
 
-    const mergedCustomFields = [...(primary.custom_fields || []), ...(secondary.custom_fields || [])];
+    const primaryCustomFields = Array.isArray(primary.custom_fields) ? primary.custom_fields : (typeof primary.custom_fields === 'string' ? JSON.parse(primary.custom_fields || '[]') : []);
+    const secondaryCustomFields = Array.isArray(secondary.custom_fields) ? secondary.custom_fields : (typeof secondary.custom_fields === 'string' ? JSON.parse(secondary.custom_fields || '[]') : []);
+    const mergedCustomFields = [...primaryCustomFields, ...secondaryCustomFields];
     if (mergedCustomFields.length > 0) { updateFields.push(`custom_fields = $${idx++}`); updateParams.push(JSON.stringify(mergedCustomFields)); }
 
     if (updateFields.length > 0) {

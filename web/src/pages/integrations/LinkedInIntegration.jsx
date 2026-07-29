@@ -36,7 +36,13 @@ export default function LinkedInIntegration() {
     const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:5000';
     const redirectUri = `${apiBase}/api/integrations/oauth/linkedin/callback`;
     const workspaceId = localStorage.getItem('workspaceId') || '';
-    const linkedinClientId = '';
+    const linkedinClientId = import.meta.env.VITE_LINKEDIN_CLIENT_ID || '';
+    
+    if (!linkedinClientId || linkedinClientId === 'add_later') {
+      toast.error('LinkedIn integration is pending approval. Check back soon.');
+      return;
+    }
+    
     const scope = 'r_ads,r_ads_lead_retrieval,r_organization_social,rw_organization';
     window.location.href = `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${linkedinClientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&state=${workspaceId}`;
   };
