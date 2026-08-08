@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import API from '../lib/api';
 import toast from 'react-hot-toast';
-import { Plus, X, UserPlus, Ban, RefreshCw, ArrowRightLeft, MapPin, Activity, BarChart3, Users2, GitBranch, Settings, TrendingUp, Phone, Mail, MessageSquare, CheckCircle2, Clock } from 'lucide-react';
+import { Plus, X, UserPlus, Ban, RefreshCw, ArrowRightLeft, MapPin, Activity, BarChart3, Users2, GitBranch, Settings, TrendingUp, Phone, Mail, MessageSquare, CheckCircle2, Clock, MessageCircle } from 'lucide-react';
+
+import SendPopup from '../components/SendPopup';
 
 export default function TeamManagement() {
   const navigate = useNavigate();
@@ -14,8 +16,23 @@ export default function TeamManagement() {
   const [subteams, setSubteams] = useState([]);
   const [assignmentRules, setAssignmentRules] = useState([]);
   const [stats, setStats] = useState({ totalLeads: 0, newLeads: 0, wonLeads: 0, totalCalls: 0, totalMessages: 0, activeAgents: 0 });
+  const [messageTarget, setMessageTarget] = useState(null);
+  const [showCompose, setShowCompose] = useState(false);
+  const [teamMembers, setTeamMembers] = useState([]);
 
-  useEffect(() => { loadMembers(); loadActivity(); loadSubteams(); loadAssignmentRules(); loadStats(); }, []);
+  useEffect(() => { loadMembers(); loadActivity(); loadSubteams(); loadAssignmentRules(); loadStats(); loadTeamMembersForMail(); }, []);
+
+  const loadTeamMembersForMail = async () => {
+    try { const res = await API.get('/zomic-mail/team-members'); setTeamMembers(res.data.members || []); } catch {}
+  };
+
+  const handleMessageMember = (member) => {
+    setMessageTarget(member);
+  };
+
+  const handleStartCompose = () => {
+    setShowCompose(true);
+  };
 
   const loadMembers = async () => {
     try { const res = await API.get('/team'); setMembers(res.data.members); }
@@ -207,8 +224,15 @@ export default function TeamManagement() {
                     <td className="p-3 text-sm font-semibold text-ink-primary">{m.calls_today}</td>
                     <td className="p-3"><span className="badge capitalize" style={{ background: m.status === 'active' ? '#34C75910' : m.status === 'suspended' ? '#FF3B5C10' : '#FF950010', color: m.status === 'active' ? '#34C759' : m.status === 'suspended' ? '#FF3B5C' : '#FF9500' }}>{m.status}</span></td>
                     <td className="p-3">
-                      {m.status === 'active' ? <button onClick={() => handleSuspend(m.id)} className="p-1.5 rounded-lg hover:bg-red-50 transition-colors" style={{ color: '#FF3B5C' }}><Ban size={16} /></button> :
-                      <button onClick={() => handleReactivate(m.id)} className="p-1.5 rounded-lg hover:bg-green-50 transition-colors" style={{ color: '#34C759' }}><RefreshCw size={16} /></button>}
+                      <div className="flex items-center gap-1">
+                        {m.status === 'active' ? <button onClick={() => handleSuspend(m.id)} className="p-1.5 rounded-lg hover:bg-red-50 transition-colors" style={{ color: '#FF3B5C' }}><Ban size={16} /></button> :
+                        <button onClick={() => handleReactivate(m.id)} className="p-1.5 rounded-lg hover:bg-green-50 transition-colors" style={{ color: '#34C759' }}><RefreshCw size={16} /></button>}
+                        {m.status === 'active' && m.id !== /* can't message self */ 'self' && (
+                          <button onClick={() => handleMessageMember(m)} className="p-1.5 rounded-lg hover:bg-blue-50 transition-colors" style={{ color: '#0066FF' }} title="Message teammate">
+                            <MessageCircle size={16} />
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );
@@ -273,6 +297,22 @@ export default function TeamManagement() {
       )}
 
       {showInvite && <InviteModal onClose={() => setShowInvite(false)} onInvite={handleInvite} />}
+
+      {messageTarget && (
+        <SendPopup
+          recipientName={`${messageTarget.first_name} ${messageTarget.last_name}`}
+          onClose={() => setMessageTarget(null)}
+          onZomicMail={() => { setShowCompose(true); }}
+        />
+      )}
+
+      {showCompose && messageTarget && (
+        <ComposeFromTeam
+          onClose={() => { setShowCompose(false); setMessageTarget(null); }}
+          teamMembers={teamMembers}
+          prefillRecipient={messageTarget.id}
+        />
+      )}
     </div>
   );
 }
@@ -294,6 +334,60 @@ function InviteModal({ onClose, onInvite }) {
           </select>
           <input className="input" placeholder="Designation (optional)" value={form.designation} onChange={(e) => setForm({ ...form, designation: e.target.value })} />
           <button onClick={() => onInvite(form)} className="btn btn-primary w-full">Send Invitation</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ComposeFromTeam({ onClose, teamMembers, prefillRecipient }) {
+  const [toUserId, setToUserId] = useState(prefillRecipient || '');
+  const [subject, setSubject] = useState('');
+  const [body, setBody] = useState('');
+  const [sending, setSending] = useState(false);
+
+  const handleSend = async () => {
+    if (!toUserId) { toast.error('Please select a recipient'); return; }
+    setSending(true);
+    try {
+      await API.post('/zomic-mail/compose', { to_user_id: toUserId, subject, body, is_draft: false });
+      toast.success('Message sent');
+      onClose();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to send');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white border border-surface-border rounded-3xl w-full max-w-lg shadow-modal animate-slide-up">
+        <div className="flex items-center justify-between p-5 border-b border-surface-border">
+          <h2 className="text-lg font-bold text-ink-primary">Send Zomic Mail</h2>
+          <button onClick={onClose} className="text-ink-tertiary hover:text-ink-primary"><X size={20} /></button>
+        </div>
+        <div className="p-5 space-y-3">
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-semibold text-ink-secondary w-12 flex-shrink-0">To</label>
+            <select value={toUserId} onChange={(e) => setToUserId(e.target.value)} className="input flex-1">
+              <option value="">Select team member...</option>
+              {teamMembers.map(m => (
+                <option key={m.id} value={m.id}>{m.first_name} {m.last_name} — {m.role?.replace('_', ' ')}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-semibold text-ink-secondary w-12 flex-shrink-0">Subject</label>
+            <input type="text" value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Subject..." className="input flex-1" />
+          </div>
+          <textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder="Write your message..." className="input" style={{ height: '150px', padding: '12px 16px', resize: 'vertical' }} />
+        </div>
+        <div className="flex justify-end p-5 border-t border-surface-border">
+          <button onClick={handleSend} className="btn btn-primary" disabled={sending}>
+            {sending ? <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" /> : null}
+            Send
+          </button>
         </div>
       </div>
     </div>

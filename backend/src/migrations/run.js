@@ -1003,6 +1003,45 @@ const migrations = [
       CREATE INDEX IF NOT EXISTS idx_whatsapp_sequence_progress_next_send ON whatsapp_sequence_progress(next_send_at) WHERE is_completed = FALSE AND is_stopped = FALSE;
     `
   },
+  {
+    name: '012_create_zomic_mail',
+    sql: `
+      CREATE TABLE IF NOT EXISTS zomic_mail_messages (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+        from_user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+        to_user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+        cc_user_ids JSONB DEFAULT '[]'::jsonb,
+        bcc_user_ids JSONB DEFAULT '[]'::jsonb,
+        subject VARCHAR(500),
+        body TEXT,
+        thread_id UUID DEFAULT gen_random_uuid(),
+        parent_message_id UUID REFERENCES zomic_mail_messages(id) ON DELETE SET NULL,
+        is_read BOOLEAN DEFAULT FALSE,
+        is_starred BOOLEAN DEFAULT FALSE,
+        folder VARCHAR(50) DEFAULT 'inbox',
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_zomic_mail_workspace ON zomic_mail_messages(workspace_id);
+      CREATE INDEX IF NOT EXISTS idx_zomic_mail_from_user ON zomic_mail_messages(from_user_id);
+      CREATE INDEX IF NOT EXISTS idx_zomic_mail_to_user ON zomic_mail_messages(to_user_id);
+      CREATE INDEX IF NOT EXISTS idx_zomic_mail_thread ON zomic_mail_messages(thread_id);
+      CREATE INDEX IF NOT EXISTS idx_zomic_mail_folder ON zomic_mail_messages(folder);
+      CREATE INDEX IF NOT EXISTS idx_zomic_mail_read ON zomic_mail_messages(is_read);
+
+      CREATE TABLE IF NOT EXISTS zomic_mail_attachments (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        message_id UUID REFERENCES zomic_mail_messages(id) ON DELETE CASCADE,
+        file_url VARCHAR(500),
+        file_name VARCHAR(255),
+        file_size BIGINT DEFAULT 0,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_zomic_mail_attachments_message ON zomic_mail_attachments(message_id);
+    `
+  },
 ];
 
 async function runMigrations() {

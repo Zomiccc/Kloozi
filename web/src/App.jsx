@@ -29,6 +29,7 @@ import Automations from './pages/Automations';
 import Analytics from './pages/Analytics';
 import Settings from './pages/Settings';
 import Billing from './pages/Billing';
+import Mailbox from './pages/Mailbox';
 
 import FacebookIntegration from './pages/integrations/FacebookIntegration';
 import WhatsAppIntegration from './pages/integrations/WhatsAppIntegration';
@@ -115,6 +116,7 @@ export default function App() {
           <Route path="automations/outgoing-webhooks" element={<OutgoingWebhooks />} />
           <Route path="automations/duplicate-merge" element={<DuplicateMerge />} />
           <Route path="analytics" element={<Analytics />} />
+          <Route path="mailbox" element={<Mailbox />} />
           <Route path="settings" element={<Settings />} />
           <Route path="billing" element={<Billing />} />
         </Route>

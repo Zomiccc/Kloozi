@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, BarChart3, Plug, FolderOpen, Users2,
   Bell, LogOut, Search, Command, Plus, Settings as SettingsIcon,
   CreditCard, Mail, Send, Workflow, FileText, MessageSquare, Smartphone,
-  Home, ChevronDown
+  Home, ChevronDown, Inbox
 } from 'lucide-react';
 import useAuthStore from '../stores/authStore';
 import API from '../lib/api';
@@ -19,6 +19,7 @@ const mainNav = [
     { to: '/app/email-campaigns', label: 'Campaigns', icon: FileText },
     { to: '/app/email-flows', label: 'Flows', icon: Workflow },
   ]},
+  { to: '/app/mailbox', label: 'Mail', icon: Inbox, badge: true },
   { to: '/app/content', label: 'Content', icon: FolderOpen },
   { to: '/app/team', label: 'Team', icon: Users2 },
   { to: '/app/analytics', label: 'Analytics', icon: BarChart3 },
@@ -28,7 +29,7 @@ const mainNav = [
 const mobileTabs = [
   { to: '/app', label: 'Home', icon: Home, end: true },
   { to: '/app/leads', label: 'Leads', icon: Users },
-  { to: '/app/email-templates', label: 'Emails', icon: Mail },
+  { to: '/app/mailbox', label: 'Mail', icon: Inbox },
   { to: '/app/team', label: 'Team', icon: Users2 },
   { to: '/app/analytics', label: 'Stats', icon: BarChart3 },
 ];
@@ -44,6 +45,7 @@ const allSearchablePages = [
   { to: '/app/billing', label: 'Billing', icon: CreditCard },
 ];
 
+
 export default function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -55,12 +57,19 @@ export default function Layout() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [paletteQuery, setPaletteQuery] = useState('');
   const [showEmailDropdown, setShowEmailDropdown] = useState(false);
+  const [mailUnread, setMailUnread] = useState(0);
   const paletteInputRef = useRef(null);
   const mainRef = useRef(null);
 
   useEffect(() => {
     loadNotifications();
     const interval = setInterval(loadNotifications, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    loadMailUnread();
+    const interval = setInterval(loadMailUnread, 30000);
     return () => clearInterval(interval);
   }, []);
 
@@ -111,6 +120,13 @@ export default function Layout() {
     try {
       await API.put('/analytics/notifications/read-all');
       setNotifications([]);
+    } catch {}
+  };
+
+  const loadMailUnread = async () => {
+    try {
+      const res = await API.get('/zomic-mail/unread-count');
+      setMailUnread(res.data.unreadCount || 0);
     } catch {}
   };
 
@@ -177,9 +193,14 @@ export default function Layout() {
                   key={item.to}
                   to={item.to}
                   end={item.end}
-                  className={({ isActive }) => `nav-link ${isActive ? 'nav-link-active' : ''}`}
+                  className={({ isActive }) => `nav-link relative ${isActive ? 'nav-link-active' : ''}`}
                 >
                   {item.label}
+                  {item.badge && mailUnread > 0 && (
+                    <span className="absolute -top-1 -right-3 w-4 h-4 bg-accent-red text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                      {mailUnread}
+                    </span>
+                  )}
                 </NavLink>
               )
             ))}

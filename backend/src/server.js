@@ -24,6 +24,7 @@ const teamRoutes = require('./routes/team');
 const billingRoutes = require('./routes/billing');
 const integrationRoutes = require('./routes/integrations');
 const automationRoutes = require('./routes/automations');
+const zomicMailRoutes = require('./routes/zomicMail');
 const { startScheduledJobs } = require('./queues');
 const { getTranslations, getAvailableLanguages } = require('./utils/i18n');
 const path = require('path');
@@ -63,6 +64,7 @@ app.use('/api/team', teamRoutes);
 app.use('/api/billing', billingRoutes);
 app.use('/api/integrations', integrationRoutes);
 app.use('/api/automations', automationRoutes);
+app.use('/api/zomic-mail', zomicMailRoutes);
 
 app.get('/api/translations/:lang', (req, res) => {
   res.json({ translations: getTranslations(req.params.lang) });
