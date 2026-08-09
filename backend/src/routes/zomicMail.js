@@ -12,6 +12,7 @@ router.get('/thread/:threadId', zomicMailController.getThread);
 router.get('/team-members', zomicMailController.getTeamMembers);
 router.post('/compose', zomicMailController.compose);
 router.post('/reply/:messageId', zomicMailController.reply);
+router.post('/reply-all/:messageId', zomicMailController.replyAll);
 router.post('/forward/:messageId', zomicMailController.forward);
 router.put('/mark-read/:messageId', zomicMailController.markAsRead);
 router.put('/toggle-star/:messageId', zomicMailController.toggleStar);

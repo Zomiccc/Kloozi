@@ -275,6 +275,79 @@ exports.reply = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+// Reply All to a message
+exports.replyAll = async (req, res, next) => {
+  try {
+    const { messageId } = req.params;
+    const { body } = req.body;
+
+    if (!body) {
+      return res.status(400).json({ error: 'Reply body is required' });
+    }
+
+    // Get the original message
+    const originalRes = await db.query(
+      `SELECT * FROM zomic_mail_messages WHERE id = $1 AND workspace_id = $2 AND (to_user_id = $3 OR from_user_id = $3)`,
+      [messageId, req.workspaceId, req.user.id]
+    );
+
+    if (originalRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Message not found' });
+    }
+
+    const original = originalRes.rows[0];
+    const threadId = original.thread_id;
+    const subject = original.subject.startsWith('Re:') ? original.subject : `Re: ${original.subject}`;
+
+    // Primary recipient: the original sender (if I'm the receiver) or keep original recipient
+    const replyToUserId = original.from_user_id === req.user.id ? original.to_user_id : original.from_user_id;
+
+    // CC: everyone from original CC list (excluding me and the primary recipient)
+    const originalCc = Array.isArray(original.cc_user_ids) ? original.cc_user_ids : [];
+    const ccIds = [...new Set([...originalCc, original.to_user_id].filter(uid => uid !== req.user.id && uid !== replyToUserId))];
+
+    // Create sent copy
+    const sentRes = await db.query(
+      `INSERT INTO zomic_mail_messages (workspace_id, from_user_id, to_user_id, cc_user_ids, subject, body, thread_id, parent_message_id, folder)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'sent') RETURNING *`,
+      [req.workspaceId, req.user.id, replyToUserId, JSON.stringify(ccIds), subject, body, threadId, messageId]
+    );
+
+    // Create inbox copy for primary recipient
+    await db.query(
+      `INSERT INTO zomic_mail_messages (workspace_id, from_user_id, to_user_id, cc_user_ids, subject, body, thread_id, parent_message_id, folder, is_read)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'inbox', FALSE)`,
+      [req.workspaceId, req.user.id, replyToUserId, JSON.stringify(ccIds), subject, body, threadId, messageId]
+    );
+
+    // Create inbox copies for all CC recipients
+    for (const ccId of ccIds) {
+      if (ccId !== replyToUserId) {
+        await db.query(
+          `INSERT INTO zomic_mail_messages (workspace_id, from_user_id, to_user_id, cc_user_ids, subject, body, thread_id, parent_message_id, folder, is_read)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'inbox', FALSE)`,
+          [req.workspaceId, req.user.id, ccId, JSON.stringify(ccIds), subject, body, threadId, messageId]
+        );
+      }
+    }
+
+    // Real-time notifications
+    const io = req.app.get('io');
+    if (io) {
+      const allRecipients = [replyToUserId, ...ccIds];
+      for (const uid of allRecipients) {
+        io.to(`user:${uid}`).emit('zomic-mail:new', {
+          id: sentRes.rows[0].id,
+          subject,
+          from: `${req.user.first_name} ${req.user.last_name}`,
+        });
+      }
+    }
+
+    res.status(201).json({ message: sentRes.rows[0] });
+  } catch (err) { next(err); }
+};
+
 // Forward a message
 exports.forward = async (req, res, next) => {
   try {
@@ -432,7 +505,12 @@ exports.getTeamMembers = async (req, res, next) => {
        FROM users WHERE workspace_id = $1 AND status = 'active' AND id != $2 ORDER BY first_name`,
       [req.workspaceId, req.user.id]
     );
-    res.json({ members: result.rows });
+    // Add internal zomic.email identity for each member
+    const members = result.rows.map(m => ({
+      ...m,
+      zomic_email: `${(m.first_name || '').toLowerCase()}.${(m.last_name || '').toLowerCase()}@zomic.internal`,
+    }));
+    res.json({ members });
   } catch (err) { next(err); }
 };
 

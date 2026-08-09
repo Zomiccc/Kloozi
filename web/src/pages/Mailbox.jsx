@@ -334,6 +334,7 @@ export default function Mailbox() {
 
 function ThreadView({ threadId, messages, onBack, onStar, onTrash, onArchive, teamMembers, onSent }) {
   const [showReply, setShowReply] = useState(false);
+  const [showReplyAll, setShowReplyAll] = useState(false);
   const [showForward, setShowForward] = useState(false);
 
   const lastMessage = messages[messages.length - 1];
@@ -380,6 +381,7 @@ function ThreadView({ threadId, messages, onBack, onStar, onTrash, onArchive, te
                 </div>
                 <p className="text-xs text-ink-tertiary mt-0.5">
                   To: {msg.to_first_name} {msg.to_last_name}
+                  <span className="text-ink-tertiary/60 ml-1">&lt;{(msg.to_first_name || '').toLowerCase()}.{(msg.to_last_name || '').toLowerCase()}@zomic.internal&gt;</span>
                 </p>
               </div>
             </div>
@@ -409,11 +411,14 @@ function ThreadView({ threadId, messages, onBack, onStar, onTrash, onArchive, te
         ))}
       </div>
 
-      {/* Reply / Forward buttons */}
-      {!showReply && !showForward && (
-        <div className="flex gap-3">
+      {/* Reply / Reply All / Forward buttons */}
+      {!showReply && !showReplyAll && !showForward && (
+        <div className="flex gap-3 flex-wrap">
           <button onClick={() => setShowReply(true)} className="btn btn-primary">
             <Reply size={16} /> Reply
+          </button>
+          <button onClick={() => setShowReplyAll(true)} className="btn btn-blue">
+            <Reply size={16} /> Reply All
           </button>
           <button onClick={() => setShowForward(true)} className="btn btn-ghost">
             <Forward size={16} /> Forward
@@ -426,6 +431,14 @@ function ThreadView({ threadId, messages, onBack, onStar, onTrash, onArchive, te
           messageId={lastMessage.id}
           onSent={() => { setShowReply(false); onSent(); }}
           onCancel={() => setShowReply(false)}
+        />
+      )}
+
+      {showReplyAll && (
+        <ReplyAllForm
+          messageId={lastMessage.id}
+          onSent={() => { setShowReplyAll(false); onSent(); }}
+          onCancel={() => setShowReplyAll(false)}
         />
       )}
 
@@ -533,7 +546,7 @@ function ComposeModal({ onClose, teamMembers, onSent, prefillRecipient }) {
               <option value="">Select team member...</option>
               {teamMembers.map(m => (
                 <option key={m.id} value={m.id}>
-                  {m.first_name} {m.last_name} — {m.role?.replace('_', ' ')}
+                  {m.first_name} {m.last_name} — {m.zomic_email || `${m.first_name?.toLowerCase()}.${m.last_name?.toLowerCase()}@zomic.internal`}
                 </option>
               ))}
             </select>
@@ -675,6 +688,53 @@ function ReplyForm({ messageId, onSent, onCancel }) {
         <button onClick={handleSend} className="btn btn-primary" disabled={sending}>
           {sending ? <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" /> : <Reply size={16} />}
           Send Reply
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ReplyAllForm({ messageId, onSent, onCancel }) {
+  const [body, setBody] = useState('');
+  const [sending, setSending] = useState(false);
+
+  const handleSend = async () => {
+    if (!body.trim()) {
+      toast.error('Reply cannot be empty');
+      return;
+    }
+    setSending(true);
+    try {
+      await API.post(`/zomic-mail/reply-all/${messageId}`, { body });
+      toast.success('Reply All sent');
+      onSent();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to reply all');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div className="card space-y-3">
+      <div className="flex items-center justify-between">
+        <h3 className="font-bold text-ink-primary">Reply All</h3>
+        <button onClick={onCancel} className="text-ink-tertiary hover:text-ink-primary">
+          <X size={18} />
+        </button>
+      </div>
+      <textarea
+        value={body}
+        onChange={(e) => setBody(e.target.value)}
+        placeholder="Write your reply to all..."
+        className="input"
+        style={{ height: '120px', padding: '12px 16px', resize: 'vertical' }}
+        autoFocus
+      />
+      <div className="flex justify-end">
+        <button onClick={handleSend} className="btn btn-blue" disabled={sending}>
+          {sending ? <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" /> : <Reply size={16} />}
+          Send Reply All
         </button>
       </div>
     </div>
