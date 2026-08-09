@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, BarChart3, Plug, FolderOpen, Users2,
   Bell, LogOut, Search, Command, Plus, Settings as SettingsIcon,
   CreditCard, Mail, Send, Workflow, FileText, MessageSquare, Smartphone,
-  Home, ChevronDown, Inbox
+  Home, ChevronDown, Inbox, TrendingUp
 } from 'lucide-react';
 import useAuthStore from '../stores/authStore';
 import API from '../lib/api';
@@ -23,6 +23,7 @@ const mainNav = [
   { to: '/app/content', label: 'Content', icon: FolderOpen },
   { to: '/app/team', label: 'Team', icon: Users2 },
   { to: '/app/analytics', label: 'Analytics', icon: BarChart3 },
+  { to: '/app/engagement', label: 'Engagement', icon: TrendingUp },
   { to: '/app/automations', label: 'Automations', icon: Plug },
 ];
 
@@ -32,6 +33,7 @@ const mobileTabs = [
   { to: '/app/mailbox', label: 'Mail', icon: Inbox },
   { to: '/app/team', label: 'Team', icon: Users2 },
   { to: '/app/analytics', label: 'Stats', icon: BarChart3 },
+  { to: '/app/engagement', label: 'Engage', icon: TrendingUp },
 ];
 
 const allSearchablePages = [

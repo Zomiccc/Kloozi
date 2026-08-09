@@ -5,7 +5,7 @@ import toast from 'react-hot-toast';
 import {
   ArrowLeft, Phone, Mail, MessageSquare, Smartphone, Edit, Trash2,
   Calendar, Activity, Zap, FileText,
-  Send, MapPin, DollarSign, Tag, User
+  Send, MapPin, DollarSign, Tag, User, TrendingUp, Eye, Clock, Target
 } from 'lucide-react';
 
 const stageConfig = {
@@ -29,6 +29,7 @@ export default function LeadProfile() {
   const [contentViews, setContentViews] = useState([]);
   const [showMessage, setShowMessage] = useState(false);
   const [messageText, setMessageText] = useState('');
+  const [engagement, setEngagement] = useState(null);
 
   useEffect(() => { loadLead(); }, [id]);
 
@@ -39,6 +40,7 @@ export default function LeadProfile() {
       setForm(res.data.lead);
       loadWhatsappMessages();
       loadContentViews();
+      loadEngagement();
     } catch (err) {
       toast.error('Failed to load lead');
       navigate('/app/leads');
@@ -51,6 +53,10 @@ export default function LeadProfile() {
 
   const loadContentViews = async () => {
     try { const res = await API.get(`/content`, { params: { lead_id: id } }); setContentViews(res.data.files || []); } catch {}
+  };
+
+  const loadEngagement = async () => {
+    try { const res = await API.get(`/analytics/leads/${id}/engagement`); setEngagement(res.data); } catch {}
   };
 
   const handleSave = async () => {
@@ -205,6 +211,7 @@ export default function LeadProfile() {
           <div className="flex gap-1 bg-white border border-surface-border rounded-full p-1 flex-wrap">
             {[
               { key: 'activity', label: 'Activity', icon: Activity },
+              { key: 'engagement', label: 'Engagement', icon: TrendingUp },
               { key: 'whatsapp', label: 'WhatsApp', icon: MessageSquare },
               { key: 'content', label: 'Content Views', icon: FileText },
               { key: 'followups', label: 'Follow-ups', icon: Calendar },
@@ -215,6 +222,11 @@ export default function LeadProfile() {
               </button>
             ))}
           </div>
+
+          {/* Engagement tab */}
+          {activeTab === 'engagement' && (
+            <EngagementSection engagement={engagement} />
+          )}
 
           {/* Activity timeline */}
           {activeTab === 'activity' && (
@@ -304,5 +316,95 @@ export default function LeadProfile() {
 
 function Detail({ icon: Icon, label, value }) {
   return <div className="flex items-center justify-between"><dt className="text-sm font-semibold text-ink-secondary flex items-center gap-1.5"><Icon size={14} /> {label}</dt><dd className="text-sm text-ink-primary font-bold">{value || '-'}</dd></div>;
+}
+
+function EngagementSection({ engagement }) {
+  if (!engagement) {
+    return <div className="card stagger-in"><p className="text-ink-tertiary text-sm">Loading engagement data...</p></div>;
+  }
+
+  const { score, reasons, metrics, activities } = engagement;
+  const scoreColor = score >= 70 ? '#34C759' : score >= 40 ? '#FF9500' : '#FF3B5C';
+
+  return (
+    <div className="space-y-4">
+      {/* Conversion Signal Score */}
+      <div className="card stagger-in">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-bold text-ink-primary flex items-center gap-2">
+            <Target size={18} style={{ color: scoreColor }} /> Conversion Signal
+          </h3>
+          <span className="text-xs text-ink-tertiary">(estimate based on activity)</span>
+        </div>
+
+        {/* Score bar */}
+        <div className="mb-4">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="flex-1 h-3 rounded-full bg-surface-page overflow-hidden">
+              <div className="h-full rounded-full transition-all" style={{ width: `${score}%`, background: scoreColor }} />
+            </div>
+            <span className="text-2xl font-extrabold" style={{ color: scoreColor }}>{score}%</span>
+          </div>
+        </div>
+
+        {/* Reasons */}
+        {reasons && reasons.length > 0 ? (
+          <div className="space-y-2">
+            <p className="text-sm font-semibold text-ink-secondary">Signal Reasons:</p>
+            {reasons.map((r, idx) => (
+              <div key={idx} className="flex items-center justify-between py-1.5 px-3 rounded-xl bg-surface-page">
+                <span className="text-sm text-ink-primary">{r.label}</span>
+                <span className="text-sm font-bold" style={{ color: r.points > 0 ? '#34C759' : '#FF3B5C' }}>
+                  {r.points > 0 ? '+' : ''}{r.points}
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-ink-tertiary">No engagement signals yet. Send emails or share documents to generate signals.</p>
+        )}
+      </div>
+
+      {/* Metrics grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <MetricCard icon={Eye} label="Doc Views" value={metrics?.totalDocViews || 0} color="#0066FF" />
+        <MetricCard icon={Mail} label="Email Opens" value={metrics?.emailOpens || 0} color="#FF9500" />
+        <MetricCard icon={Target} label="Email Clicks" value={metrics?.emailClicks || 0} color="#AF52DE" />
+        <MetricCard icon={Clock} label="Time Spent" value={`${Math.floor((metrics?.totalTimeSpent || 0) / 60)}m ${((metrics?.totalTimeSpent || 0) % 60)}s`} color="#34C759" />
+      </div>
+
+      {/* Activity timeline */}
+      <div className="card stagger-in">
+        <h3 className="text-lg font-bold text-ink-primary mb-4 flex items-center gap-2"><Activity size={18} /> Engagement Timeline</h3>
+        <div className="space-y-3 max-h-64 overflow-y-auto">
+          {activities && activities.length > 0 ? activities.map((act, idx) => (
+            <div key={act.id || idx} className="flex gap-3 pb-3 border-b border-surface-border last:border-0">
+              <div className="w-8 h-8 rounded-xl bg-surface-page flex items-center justify-center flex-shrink-0">
+                <Activity size={14} className="text-accent-blue" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-ink-primary">{act.description}</p>
+                <p className="text-xs text-ink-tertiary mt-0.5">{new Date(act.created_at).toLocaleString()}</p>
+              </div>
+            </div>
+          )) : <p className="text-ink-tertiary text-sm">No activities recorded yet</p>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MetricCard({ icon: Icon, label, value, color }) {
+  return (
+    <div className="card stagger-in flex items-center gap-3" style={{ padding: '16px' }}>
+      <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: `${color}15` }}>
+        <Icon size={20} style={{ color }} />
+      </div>
+      <div>
+        <p className="text-lg font-extrabold text-ink-primary">{value}</p>
+        <p className="text-xs font-semibold text-ink-tertiary">{label}</p>
+      </div>
+    </div>
+  );
 }
 

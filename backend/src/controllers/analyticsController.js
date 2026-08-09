@@ -468,3 +468,141 @@ exports.updateWorkspaceSettings = async (req, res, next) => {
     res.json({ settings: updated });
   } catch (err) { next(err); }
 };
+
+// Phase 4: Engagement Analytics Dashboard
+exports.getEngagementAnalytics = async (req, res, next) => {
+  try {
+    const wsId = req.workspaceId;
+    const { range } = req.query; // today, 7d, 30d, 90d
+
+    let dateFilter = '';
+    let params = [wsId];
+    const now = new Date();
+    if (range === 'today') {
+      const todayStr = now.toISOString().split('T')[0];
+      dateFilter = ` AND created_at >= $2`;
+      params.push(todayStr);
+    } else if (range === '7d') {
+      dateFilter = ` AND created_at >= $2`;
+      params.push(new Date(now.getTime() - 7 * 86400000).toISOString());
+    } else if (range === '30d') {
+      dateFilter = ` AND created_at >= $2`;
+      params.push(new Date(now.getTime() - 30 * 86400000).toISOString());
+    } else if (range === '90d') {
+      dateFilter = ` AND created_at >= $2`;
+      params.push(new Date(now.getTime() - 90 * 86400000).toISOString());
+    }
+
+    // Email engagement
+    let emailStats = { sent: 0, opened: 0, clicked: 0, replied: 0 };
+    try {
+      const emailRes = await db.query(
+        `SELECT COUNT(*) as sent,
+                COUNT(CASE WHEN opened_at IS NOT NULL THEN 1 END) as opened,
+                COUNT(CASE WHEN clicked_at IS NOT NULL THEN 1 END) as clicked,
+                COUNT(CASE WHEN replied_at IS NOT NULL THEN 1 END) as replied
+         FROM emails WHERE workspace_id = $1${dateFilter}`,
+        params
+      );
+      emailStats = {
+        sent: parseInt(emailRes.rows[0].sent) || 0,
+        opened: parseInt(emailRes.rows[0].opened) || 0,
+        clicked: parseInt(emailRes.rows[0].clicked) || 0,
+        replied: parseInt(emailRes.rows[0].replied) || 0,
+      };
+    } catch {}
+
+    // Content/file engagement
+    let contentStats = { totalSent: 0, totalOpened: 0, totalViews: 0, totalTimeSpent: 0 };
+    try {
+      const contentRes = await db.query(
+        `SELECT COUNT(*) as total_sent,
+                COUNT(CASE WHEN first_opened_at IS NOT NULL THEN 1 END) as total_opened,
+                COALESCE(SUM(open_count), 0) as total_views,
+                COALESCE(SUM(time_spent_seconds), 0) as total_time
+         FROM content_tracking WHERE workspace_id = $1${dateFilter}`,
+        params
+      );
+      contentStats = {
+        totalSent: parseInt(contentRes.rows[0].total_sent) || 0,
+        totalOpened: parseInt(contentRes.rows[0].total_opened) || 0,
+        totalViews: parseInt(contentRes.rows[0].total_views) || 0,
+        totalTimeSpent: parseInt(contentRes.rows[0].total_time) || 0,
+      };
+    } catch {}
+
+    // Lead activity
+    let leadActivity = { total: 0, newToday: 0, activeThisWeek: 0, stuck: 0 };
+    try {
+      const leadRes = await db.query('SELECT * FROM leads WHERE workspace_id = $1', [wsId]);
+      const leads = leadRes.rows || [];
+      const todayStr = now.toISOString().split('T')[0];
+      const weekAgo = new Date(now.getTime() - 7 * 86400000);
+      leadActivity = {
+        total: leads.length,
+        newToday: leads.filter(l => l.created_at && toDateStr(l.created_at) === todayStr).length,
+        activeThisWeek: leads.filter(l => l.last_activity_at && new Date(l.last_activity_at) > weekAgo).length,
+        stuck: leads.filter(l => {
+          if (l.stage === 'won' || l.stage === 'lost') return false;
+          if (!l.last_activity_at) return true;
+          return new Date(l.last_activity_at) < new Date(now.getTime() - 14 * 86400000);
+        }).length,
+      };
+    } catch {}
+
+    // Conversion stats
+    let conversionStats = { won: 0, lost: 0, conversionRate: 0, avgSignalScore: 0 };
+    try {
+      const leadRes = await db.query('SELECT * FROM leads WHERE workspace_id = $1', [wsId]);
+      const leads = leadRes.rows || [];
+      const won = leads.filter(l => l.stage === 'won').length;
+      const lost = leads.filter(l => l.stage === 'lost').length;
+      const totalClosed = won + lost;
+      conversionStats = {
+        won,
+        lost,
+        conversionRate: totalClosed > 0 ? ((won / totalClosed) * 100).toFixed(1) : '0.0',
+        avgSignalScore: leads.length > 0 ? Math.round(leads.reduce((sum, l) => sum + (l.score || 0), 0) / leads.length) : 0,
+      };
+    } catch {}
+
+    // Top engaged leads
+    let topLeads = [];
+    try {
+      const topRes = await db.query(
+        `SELECT l.id, l.first_name, l.last_name, l.stage, l.score,
+                COUNT(DISTINCT e.id) as email_count,
+                COUNT(DISTINCT ct.id) as doc_views,
+                COALESCE(SUM(ct.open_count), 0) as total_opens
+         FROM leads l
+         LEFT JOIN emails e ON e.lead_id = l.id AND e.workspace_id = $1
+         LEFT JOIN content_tracking ct ON ct.lead_id = l.id AND ct.workspace_id = $1
+         WHERE l.workspace_id = $1
+         GROUP BY l.id, l.first_name, l.last_name, l.stage, l.score
+         ORDER BY total_opens DESC, email_count DESC
+         LIMIT 10`,
+        [wsId]
+      );
+      topLeads = topRes.rows || [];
+    } catch {}
+
+    res.json({
+      email: emailStats,
+      content: contentStats,
+      leadActivity,
+      conversion: conversionStats,
+      topLeads,
+    });
+  } catch (err) { next(err); }
+};
+
+// Phase 4: Get conversion signal for a specific lead
+exports.getLeadEngagement = async (req, res, next) => {
+  try {
+    const { leadId } = req.params;
+    const { calculateConversionSignal } = require('../utils/conversionSignal');
+    const result = await calculateConversionSignal(leadId, req.workspaceId);
+    if (!result) return res.status(404).json({ error: 'Lead not found' });
+    res.json(result);
+  } catch (err) { next(err); }
+};

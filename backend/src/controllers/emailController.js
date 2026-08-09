@@ -518,3 +518,28 @@ exports.handleWebhook = async (req, res, next) => {
     res.json({ success: true });
   } catch (err) { next(err); }
 };
+
+exports.importTemplate = async (req, res, next) => {
+  try {
+    const { name, subject, body, category } = req.body;
+    if (!body || !body.trim()) {
+      return res.status(400).json({ error: 'Template HTML content is required' });
+    }
+    const variables = extractVariables((subject || '') + ' ' + body);
+    const result = await db.query(
+      `INSERT INTO email_templates (workspace_id, name, subject, body, category, variables, is_draft, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, FALSE, $7) RETURNING *`,
+      [req.workspaceId, name || 'Imported Template', subject || '', body, category || 'imported', JSON.stringify(variables), req.user.id]
+    );
+    res.status(201).json({ template: result.rows[0] });
+  } catch (err) { next(err); }
+};
+
+exports.seedDefaultTemplates = async (req, res, next) => {
+  try {
+    const { seedTemplates } = require('../seeders/templateSeeder');
+    await seedTemplates(req.workspaceId, req.user.id);
+    const result = await db.query('SELECT * FROM email_templates WHERE workspace_id = $1 ORDER BY created_at DESC', [req.workspaceId]);
+    res.json({ templates: result.rows });
+  } catch (err) { next(err); }
+};

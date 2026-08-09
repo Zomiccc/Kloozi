@@ -7,6 +7,8 @@ router.use(authenticate);
 
 router.get('/templates', emailController.getTemplates);
 router.post('/templates', emailController.createTemplate);
+router.post('/templates/import', emailController.importTemplate);
+router.post('/templates/seed-defaults', emailController.seedDefaultTemplates);
 router.put('/templates/:id', emailController.updateTemplate);
 router.delete('/templates/:id', emailController.deleteTemplate);
 router.post('/templates/:id/duplicate', emailController.duplicateTemplate);
