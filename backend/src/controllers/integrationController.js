@@ -1,61 +1,8 @@
 const db = require('../config/database');
 const crypto = require('crypto');
 const axios = require('axios');
-const { logActivity } = require('../utils/activityLog');
-const { sendPushNotification } = require('../utils/notifications');
-const { updateLeadScore } = require('../utils/activityLog');
-const { cacheDelPattern } = require('../config/redis');
 const logger = require('../utils/logger');
-
-async function checkDuplicateLead(workspaceId, leadData) {
-  let dupMode = 'allow';
-  let matchPhone = true;
-  let matchEmail = true;
-  try {
-    const wsRes = await db.query('SELECT settings FROM workspaces WHERE id = $1', [workspaceId]);
-    const wsSettings = wsRes.rows[0]?.settings || {};
-    dupMode = wsSettings.duplicate_mode || 'allow';
-    matchPhone = wsSettings.duplicate_match_phone !== false;
-    matchEmail = wsSettings.duplicate_match_email !== false;
-  } catch {}
-
-  if (dupMode === 'allow' || (!leadData.phone && !leadData.email)) return { mode: 'allow' };
-
-  let dupQuery = 'SELECT id FROM leads WHERE workspace_id = $1 AND (';
-  let dupParams = [workspaceId];
-  let conditions = [];
-  let idx = 2;
-  if (matchPhone && leadData.phone) { conditions.push(`phone = $${idx++}`); dupParams.push(leadData.phone); }
-  if (matchEmail && leadData.email) { conditions.push(`email = $${idx++}`); dupParams.push(leadData.email); }
-  if (conditions.length === 0) return { mode: 'allow' };
-  dupQuery += conditions.join(' OR ') + ') LIMIT 1';
-  const dupResult = await db.query(dupQuery, dupParams);
-  if (dupResult.rows.length > 0) {
-    return { mode: dupMode, existingId: dupResult.rows[0].id };
-  }
-  return { mode: 'allow' };
-}
-
-async function fireOutgoingWebhooks(workspaceId, event, data) {
-  try {
-    const whRes = await db.query('SELECT * FROM outgoing_webhooks WHERE workspace_id = $1 AND is_active = true', [workspaceId]);
-    for (const wh of whRes.rows) {
-      const events = wh.events || [];
-      if (events.length > 0 && !events.includes(event) && !events.includes('*')) continue;
-      const payload = { event, timestamp: new Date().toISOString(), data };
-      try {
-        const response = await axios.post(wh.url, payload, { timeout: 10000 });
-        await db.query('INSERT INTO outgoing_webhook_logs (webhook_id, event, payload, response_code, status) VALUES ($1,$2,$3,$4,$5)',
-          [wh.id, event, JSON.stringify(payload), response.status, 'success']);
-      } catch (err) {
-        await db.query('INSERT INTO outgoing_webhook_logs (webhook_id, event, payload, response_code, status, error_message) VALUES ($1,$2,$3,$4,$5,$6)',
-          [wh.id, event, JSON.stringify(payload), err.response?.status || 0, 'failed', err.message]);
-      }
-    }
-  } catch (err) {
-    logger.error('Fire outgoing webhooks error:', err.message);
-  }
-}
+const { createLead } = require('../services/leadPipeline');
 
 exports.getIntegrations = async (req, res, next) => {
   try {
@@ -80,7 +27,8 @@ exports.connectIntegration = async (req, res, next) => {
 
 exports.disconnectIntegration = async (req, res, next) => {
   try {
-    await db.query('UPDATE integrations SET is_connected = false WHERE id = $1 AND workspace_id = $2', [req.params.id, req.workspaceId]);
+    // Wipe stored tokens — the privacy policy promises they are deleted on disconnect.
+    await db.query("UPDATE integrations SET is_connected = false, credentials = '{}'::jsonb, updated_at = NOW() WHERE id = $1 AND workspace_id = $2", [req.params.id, req.workspaceId]);
     res.json({ message: 'Integration disconnected' });
   } catch (err) { next(err); }
 };
@@ -129,52 +77,11 @@ exports.handleWebhook = async (req, res, next) => {
     if (!leadData.email && data.email) leadData.email = data.email;
     leadData.lead_source = type;
 
-    const dupCheck = await checkDuplicateLead(workspaceId, leadData);
-    if (dupCheck.mode === 'warn') {
-      logger.info(`Duplicate lead skipped from ${type} webhook for workspace ${workspaceId}`);
+    const result = await createLead(workspaceId, leadData, { source: type, duplicateMode: 'workspace' });
+    if (result.status === 'skipped') {
       return res.json({ success: false, message: 'Duplicate lead detected and skipped' });
     }
-    if (dupCheck.mode === 'auto_merge' && dupCheck.existingId) {
-      const updateFields = [];
-      const updateParams = [];
-      let pIdx = 1;
-      if (leadData.first_name) { updateFields.push(`first_name = $${pIdx++}`); updateParams.push(leadData.first_name); }
-      if (leadData.last_name) { updateFields.push(`last_name = $${pIdx++}`); updateParams.push(leadData.last_name); }
-      if (leadData.city) { updateFields.push(`city = $${pIdx++}`); updateParams.push(leadData.city); }
-      if (updateFields.length > 0) {
-        updateFields.push(`updated_at = NOW()`);
-        updateParams.push(dupCheck.existingId, workspaceId);
-        await db.query(`UPDATE leads SET ${updateFields.join(', ')} WHERE id = $${pIdx++} AND workspace_id = $${pIdx++}`, updateParams);
-      }
-      await logActivity(workspaceId, dupCheck.existingId, null, 'lead_merged', `Lead auto-merged from ${type} webhook (duplicate detected)`, { merged_source: type });
-      await updateLeadScore(dupCheck.existingId);
-      await cacheDelPattern(`leads:${workspaceId}:*`);
-      return res.json({ success: true, leadId: dupCheck.existingId, merged: true });
-    }
-
-    const stageResult = await db.query('SELECT id FROM lead_stages WHERE workspace_id = $1 AND is_default = true LIMIT 1', [workspaceId]);
-    const agentsResult = await db.query(
-      `SELECT u.id FROM users u WHERE u.workspace_id = $1 AND u.role = $2 AND u.status = $3
-       ORDER BY (SELECT COUNT(*) FROM leads WHERE assigned_to = u.id) ASC LIMIT 1`,
-      [workspaceId, 'sales_agent', 'active']
-    );
-
-    const leadResult = await db.query(
-      `INSERT INTO leads (workspace_id, first_name, last_name, phone, email, city, lead_source, stage, stage_id, assigned_to, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
-      [workspaceId, leadData.first_name, leadData.last_name, leadData.phone, leadData.email, leadData.city,
-       type, 'new', stageResult.rows[0]?.id, agentsResult.rows[0]?.id, req.user?.id || null]
-    );
-
-    const leadId = leadResult.rows[0].id;
-    await logActivity(workspaceId, leadId, null, 'lead_created', `Lead captured from ${type}`);
-    await updateLeadScore(leadId);
-
-    if (agentsResult.rows[0]?.id) {
-      await sendPushNotification(agentsResult.rows[0].id, `New ${type} Lead`, `New lead: ${leadData.first_name || 'Unknown'}`, { type: 'new_lead', leadId, source: type });
-    }
-
-    res.json({ success: true, leadId });
+    res.json({ success: true, leadId: result.lead.id, merged: result.status === 'merged' });
   } catch (err) { next(err); }
 };
 
@@ -195,7 +102,7 @@ exports.handleTokenWebhook = async (req, res, next) => {
 
     // Build lead data from common field names
     const leadData = {
-      first_name: data.first_name || data.name || data.firstName || '',
+      first_name: data.first_name || data.firstName || '',
       last_name: data.last_name || data.lastName || '',
       phone: data.phone || data.phone_number || data.phoneNumber || data.mobile || '',
       email: data.email || data.email_address || data.emailAddress || '',
@@ -212,7 +119,7 @@ exports.handleTokenWebhook = async (req, res, next) => {
       }
     }
 
-    if (!leadData.first_name && !leadData.phone && !leadData.email) {
+    if (!leadData.first_name && !data.name && !leadData.phone && !leadData.email) {
       return res.status(400).json({ error: 'At least one of name, phone, or email is required' });
     }
 
@@ -223,55 +130,24 @@ exports.handleTokenWebhook = async (req, res, next) => {
       leadData.last_name = parts.slice(1).join(' ') || '';
     }
 
-    const dupCheck = await checkDuplicateLead(workspaceId, leadData);
-    if (dupCheck.mode === 'warn') {
-      logger.info(`Duplicate lead skipped from ${leadData.lead_source} webhook for workspace ${workspaceId}`);
+    const extra = { ...data };
+    ['first_name', 'last_name', 'name', 'firstName', 'lastName', 'phone', 'phone_number', 'phoneNumber', 'mobile',
+     'email', 'email_address', 'emailAddress', 'city', 'location', 'budget', 'price', 'notes', 'message', 'comments',
+     'note', 'source', 'fields'].forEach((k) => delete extra[k]);
+    const customFields = Object.entries(extra)
+      .filter(([, v]) => v !== null && v !== undefined && typeof v !== 'object')
+      .map(([name, value]) => ({ name, value: String(value) }));
+
+    const result = await createLead(workspaceId, { ...leadData, custom_fields: customFields }, {
+      source: leadData.lead_source, duplicateMode: 'workspace',
+    });
+    if (result.status === 'skipped') {
       return res.json({ success: false, message: 'Duplicate lead detected and skipped' });
     }
-    if (dupCheck.mode === 'auto_merge' && dupCheck.existingId) {
-      const updateFields = [];
-      const updateParams = [];
-      let pIdx = 1;
-      if (leadData.first_name) { updateFields.push(`first_name = $${pIdx++}`); updateParams.push(leadData.first_name); }
-      if (leadData.last_name) { updateFields.push(`last_name = $${pIdx++}`); updateParams.push(leadData.last_name); }
-      if (leadData.city) { updateFields.push(`city = $${pIdx++}`); updateParams.push(leadData.city); }
-      if (leadData.notes) { updateFields.push(`notes = COALESCE(notes || ' | ', '') || $${pIdx++}`); updateParams.push(leadData.notes); }
-      if (updateFields.length > 0) {
-        updateFields.push(`updated_at = NOW()`);
-        updateParams.push(dupCheck.existingId, workspaceId);
-        await db.query(`UPDATE leads SET ${updateFields.join(', ')} WHERE id = $${pIdx++} AND workspace_id = $${pIdx++}`, updateParams);
-      }
-      await logActivity(workspaceId, dupCheck.existingId, null, 'lead_merged', `Lead auto-merged from ${leadData.lead_source} webhook (duplicate detected)`, { merged_source: leadData.lead_source });
-      await updateLeadScore(dupCheck.existingId);
-      await cacheDelPattern(`leads:${workspaceId}:*`);
-      return res.json({ success: true, leadId: dupCheck.existingId, merged: true, message: 'Lead auto-merged with existing duplicate' });
+    if (result.status === 'merged') {
+      return res.json({ success: true, leadId: result.lead.id, merged: true, message: 'Lead auto-merged with existing duplicate' });
     }
-
-    const stageResult = await db.query('SELECT id FROM lead_stages WHERE workspace_id = $1 AND is_default = true LIMIT 1', [workspaceId]);
-    const agentsResult = await db.query(
-      `SELECT u.id FROM users u WHERE u.workspace_id = $1 AND u.role = $2 AND u.status = $3
-       ORDER BY (SELECT COUNT(*) FROM leads WHERE assigned_to = u.id) ASC LIMIT 1`,
-      [workspaceId, 'sales_agent', 'active']
-    );
-
-    const leadResult = await db.query(
-      `INSERT INTO leads (workspace_id, first_name, last_name, phone, email, city, budget, lead_source, stage, stage_id, assigned_to, created_by, notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id`,
-      [workspaceId, leadData.first_name, leadData.last_name, leadData.phone, leadData.email, leadData.city,
-       leadData.budget, leadData.lead_source, 'new', stageResult.rows[0]?.id, agentsResult.rows[0]?.id, null, leadData.notes]
-    );
-
-    const leadId = leadResult.rows[0].id;
-    await logActivity(workspaceId, leadId, null, 'lead_created', `Lead captured from ${leadData.lead_source}`);
-    await updateLeadScore(leadId);
-
-    if (agentsResult.rows[0]?.id) {
-      await sendPushNotification(agentsResult.rows[0].id, `New ${leadData.lead_source} Lead`, `New lead: ${leadData.first_name || 'Unknown'}`, { type: 'new_lead', leadId, source: leadData.lead_source });
-    }
-
-    await fireOutgoingWebhooks(workspaceId, 'lead.created', { leadId, ...leadData });
-
-    res.json({ success: true, leadId, message: 'Lead created successfully' });
+    res.json({ success: true, leadId: result.lead.id, message: 'Lead created successfully' });
   } catch (err) { next(err); }
 };
 
@@ -305,27 +181,11 @@ exports.handleEmbedForm = async (req, res, next) => {
     const form = formResult.rows[0];
     const data = req.body;
 
-    const stageResult = await db.query('SELECT id FROM lead_stages WHERE workspace_id = $1 AND is_default = true LIMIT 1', [form.workspace_id]);
-    const agentsResult = await db.query(
-      `SELECT u.id FROM users u WHERE u.workspace_id = $1 AND u.role = $2 AND u.status = $3
-       ORDER BY (SELECT COUNT(*) FROM leads WHERE assigned_to = u.id) ASC LIMIT 1`,
-      [form.workspace_id, 'sales_agent', 'active']
-    );
-
-    const leadResult = await db.query(
-      `INSERT INTO leads (workspace_id, first_name, last_name, phone, email, city, lead_source, stage, stage_id, assigned_to)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
-      [form.workspace_id, data.first_name || data.name, data.last_name, data.phone, data.email, data.city,
-       'website', 'new', stageResult.rows[0]?.id, agentsResult.rows[0]?.id]
-    );
-
-    const leadId = leadResult.rows[0].id;
-    await logActivity(form.workspace_id, leadId, null, 'lead_created', 'Lead from website embed form');
-    await updateLeadScore(leadId);
-
-    if (agentsResult.rows[0]?.id) {
-      await sendPushNotification(agentsResult.rows[0].id, 'New Website Lead', `New lead: ${data.first_name || data.name || 'Unknown'}`, { type: 'new_lead', leadId, source: 'website' });
-    }
+    await createLead(form.workspace_id, {
+      first_name: data.first_name, name: data.name, last_name: data.last_name, phone: data.phone,
+      email: data.email, city: data.city, budget: data.budget, notes: data.message || data.notes,
+      lead_source: 'website',
+    }, { source: 'website', duplicateMode: 'workspace', activityText: `Lead from website form: ${form.name}` });
 
     if (form.redirect_url) {
       res.redirect(form.redirect_url);
@@ -503,26 +363,10 @@ exports.parseLeadFromEmail = async (req, res, next) => {
     }
 
     if (req.body.auto_create && (parsedData.phone || parsedData.email)) {
-      const stageResult = await db.query('SELECT id FROM lead_stages WHERE workspace_id = $1 AND is_default = true LIMIT 1', [req.workspaceId]);
-      const agentsResult = await db.query(
-        `SELECT u.id FROM users u WHERE u.workspace_id = $1 AND u.role = $2 AND u.status = $3
-         ORDER BY (SELECT COUNT(*) FROM leads WHERE assigned_to = u.id) ASC LIMIT 1`,
-        [req.workspaceId, 'sales_agent', 'active']
-      );
-
-      const leadResult = await db.query(
-        `INSERT INTO leads (workspace_id, first_name, last_name, phone, email, city, budget, lead_source, notes, stage, stage_id, assigned_to, created_by)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *`,
-        [req.workspaceId, parsedData.first_name || 'Unknown', parsedData.last_name || null,
-         parsedData.phone, parsedData.email, parsedData.city, parsedData.budget ? parseFloat(parsedData.budget) : null,
-         parsedData.lead_source || 'email_parse', parsedData.notes, 'new', stageResult.rows[0]?.id,
-         agentsResult.rows[0]?.id || req.user.id, req.user.id]
-      );
-
-      await logActivity(req.workspaceId, leadResult.rows[0].id, req.user.id, 'lead_created', 'Lead parsed from email');
-      await updateLeadScore(leadResult.rows[0].id);
-
-      return res.json({ parsed: true, lead: leadResult.rows[0], extractedData: parsedData });
+      const result = await createLead(req.workspaceId, { ...parsedData, lead_source: parsedData.lead_source || 'email_parse' }, {
+        actorId: req.user.id, source: 'email_parse', duplicateMode: 'workspace', activityText: 'Lead parsed from email',
+      });
+      return res.json({ parsed: true, lead: result.lead || result.duplicate, status: result.status, extractedData: parsedData });
     }
 
     res.json({ parsed: true, extractedData: parsedData });

@@ -1,8 +1,15 @@
-const { Pool } = require('pg');
+const { Pool, types, defaults } = require('pg');
 const config = require('./index');
 const logger = require('../utils/logger');
 
+// All times are UTC end-to-end, whatever timezone the Postgres server or the
+// Node host happens to run in: sessions use UTC, TIMESTAMP (without zone)
+// values are read as UTC, and JS Dates are written as UTC.
+types.setTypeParser(1114, (v) => (v === null ? null : new Date(`${v.replace(' ', 'T')}Z`)));
+defaults.parseInputDatesAsUTC = true;
+
 const pool = new Pool({
+  options: '-c timezone=UTC',
   host: config.db.host,
   port: config.db.port,
   database: config.db.name,

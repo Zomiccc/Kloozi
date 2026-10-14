@@ -39,15 +39,24 @@ function replaceVariables(template, data) {
     Times_Opened: data.times_opened || '',
   };
 
-  for (const [key, value] of Object.entries(variables)) {
-    result = result.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), value);
-  }
-
-  result = result.replace(/\{\{Custom_Field_([^}]+)\}\}/g, (match, fieldName) => {
-    const field = (data.custom_fields || []).find(
-      (f) => f.name.toLowerCase() === fieldName.toLowerCase()
+  // Custom fields first: {{Custom_Field_Budget}} (any case)
+  result = result.replace(/\{\{\s*custom_field_([^}]+?)\s*\}\}/gi, (match, fieldName) => {
+    const field = (Array.isArray(data.custom_fields) ? data.custom_fields : []).find(
+      (f) => String(f.name || '').toLowerCase() === fieldName.trim().toLowerCase()
     );
-    return field ? field.value : '';
+    return field ? String(field.value ?? '') : '';
+  });
+
+  // Case- and spacing-insensitive: {{First_Name}}, {{first_name}} and {{ First Name }} all work.
+  // Unknown variables are left untouched so authors notice them.
+  const norm = (k) => String(k).toLowerCase().replace(/[\s_-]+/g, '');
+  const lookup = {};
+  for (const [key, value] of Object.entries(variables)) {
+    lookup[norm(key)] = value === null || value === undefined ? '' : String(value);
+  }
+  result = result.replace(/\{\{\s*([A-Za-z][A-Za-z0-9 _-]*?)\s*\}\}/g, (match, key) => {
+    const k = norm(key);
+    return Object.prototype.hasOwnProperty.call(lookup, k) ? lookup[k] : match;
   });
 
   return result;

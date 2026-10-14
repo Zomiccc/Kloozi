@@ -9,7 +9,7 @@ module.exports = {
   apiUrl: process.env.API_URL || 'http://localhost:5000',
   webUrl: process.env.WEB_URL || 'http://localhost:3000',
   clientUrl: process.env.CLIENT_URL || 'http://localhost:3000',
-  appName: process.env.APP_NAME || 'CRM Final',
+  appName: process.env.APP_NAME || 'Flazyn',
   defaultLanguage: process.env.DEFAULT_LANGUAGE || 'en',
   supportedLanguages: (process.env.SUPPORTED_LANGUAGES || 'en,ur,ar').split(','),
   autoLogoutMinutes: parseInt(process.env.AUTO_LOGOUT_MINUTES, 10) || 60,
@@ -46,8 +46,8 @@ module.exports = {
 
   sendgrid: {
     apiKey: process.env.SENDGRID_API_KEY || '',
-    fromEmail: process.env.SENDGRID_FROM_EMAIL || 'noreply@crmfinal.com',
-    fromName: process.env.SENDGRID_FROM_NAME || 'CRM Final',
+    fromEmail: process.env.SENDGRID_FROM_EMAIL || 'noreply@flazyn.com',
+    fromName: process.env.SENDGRID_FROM_NAME || 'Flazyn',
   },
 
   twilio: {
@@ -72,7 +72,7 @@ module.exports = {
     accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
     region: process.env.AWS_REGION || 'us-east-1',
-    s3Bucket: process.env.AWS_S3_BUCKET || 'crm-final-uploads',
+    s3Bucket: process.env.AWS_S3_BUCKET || 'flazyn-uploads',
   },
 
   openai: {
@@ -102,7 +102,7 @@ module.exports = {
   })(),
 
   whatsapp: {
-    apiUrl: process.env.WHATSAPP_API_URL || 'https://graph.facebook.com/v18.0',
+    apiUrl: process.env.WHATSAPP_API_URL || 'https://graph.facebook.com/v25.0',
     phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID || '',
     accessToken: process.env.WHATSAPP_ACCESS_TOKEN || '',
     businessId: process.env.WHATSAPP_BUSINESS_ACCOUNT_ID || process.env.WHATSAPP_BUSINESS_ID || '',
@@ -114,6 +114,9 @@ module.exports = {
     appId: process.env.FACEBOOK_APP_ID || '',
     appSecret: process.env.FACEBOOK_APP_SECRET || '',
     verifyToken: process.env.FACEBOOK_VERIFY_TOKEN || '',
+    graphVersion: process.env.FACEBOOK_GRAPH_VERSION || 'v25.0',
+    // Facebook Login for Business: permissions live in a dashboard "Configuration"
+    loginConfigId: process.env.FACEBOOK_LOGIN_CONFIG_ID || '',
   },
 
   tiktok: {
@@ -124,6 +127,7 @@ module.exports = {
   linkedin: {
     clientId: process.env.LINKEDIN_CLIENT_ID || '',
     clientSecret: process.env.LINKEDIN_CLIENT_SECRET || '',
+    apiVersion: process.env.LINKEDIN_API_VERSION || '202609',
   },
 
   sentry: {

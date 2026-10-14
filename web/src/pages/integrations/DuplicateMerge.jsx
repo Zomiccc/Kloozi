@@ -2,59 +2,97 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import API from '../../lib/api';
 import toast from 'react-hot-toast';
-import { ArrowLeft, GitBranch, Users, Phone, Mail, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, GitMerge, Phone, Mail } from 'lucide-react';
 
 export default function DuplicateMerge() {
   const navigate = useNavigate();
   const [duplicates, setDuplicates] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [merging, setMerging] = useState(null);
+  const [busyPair, setBusyPair] = useState(null);
 
   useEffect(() => { loadDuplicates(); }, []);
 
   const loadDuplicates = async () => {
-    try { const res = await API.get('/automations/duplicates'); setDuplicates(res.data.duplicates || []); } catch { toast.error('Failed'); } finally { setLoading(false); }
+    try {
+      const res = await API.get('/automations/duplicates');
+      setDuplicates(res.data.duplicates || []);
+    } catch { toast.error('Failed to load duplicates'); }
+    finally { setLoading(false); }
   };
 
   const handleMerge = async (leadAId, leadBId) => {
-    try { await API.post('/leads/merge', { primary_id: leadAId, secondary_id: leadBId }); toast.success('Leads merged'); setMerging(null); loadDuplicates(); } catch { toast.error('Merge failed'); }
+    setBusyPair(`${leadAId}:${leadBId}`);
+    try {
+      await API.post('/leads/merge', { primary_id: leadAId, secondary_id: leadBId });
+      toast.success('Leads merged');
+      loadDuplicates();
+    } catch { toast.error('Merge failed'); }
+    finally { setBusyPair(null); }
   };
 
   const handleDismiss = (pair) => {
-    setDuplicates(duplicates.filter(d => !(d.lead_a_id === pair.lead_a_id && d.lead_b_id === pair.lead_b_id)));
+    setDuplicates(duplicates.filter((d) => !(d.lead_a_id === pair.lead_a_id && d.lead_b_id === pair.lead_b_id)));
     toast.success('Dismissed');
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <button onClick={() => navigate('/app/automations')} className="flex items-center gap-2 text-sm text-ink-secondary hover:text-ink-primary"><ArrowLeft size={16} /> Back to Automations</button>
+    <div className="max-w-4xl mx-auto space-y-8">
+      <button onClick={() => navigate('/app/automations')} className="btn-ghost text-sm font-medium flex items-center gap-1.5">
+        <ArrowLeft size={14} /> Automations
+      </button>
 
-      <div className="flex items-center gap-3">
-        <div className="w-12 h-12 bg-surface-page rounded-xl flex items-center justify-center"><GitBranch size={24} className="text-ink-secondary" /></div>
-        <div><h2 className="text-xl font-bold text-ink-primary">Duplicate Lead Merging</h2><p className="text-sm text-ink-tertiary">Auto merge leads with same phone/email</p></div>
+      <div>
+        <h1 style={{ fontSize: '32px', fontWeight: 650, letterSpacing: '-0.01em' }}>Duplicate Merging</h1>
+        <p className="text-ink-secondary mt-1" style={{ fontSize: '15px' }}>
+          Leads that share a phone number or email. Merging keeps everything — history, files, activities.
+        </p>
       </div>
 
-      {loading ? <div className="flex justify-center py-8"><div className="animate-spin w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full" /></div> :
-       duplicates.length === 0 ? (
-        <div className="card text-center py-12"><CheckCircle2 size={48} className="text-ink-secondary mx-auto mb-3" /><p className="text-ink-secondary font-medium">No duplicates found!</p><p className="text-sm text-ink-tertiary">Your leads are clean.</p></div>
-       ) : (
-        <div className="space-y-4">
-          <p className="text-sm text-ink-secondary">{duplicates.length} duplicate pair(s) detected</p>
+      {loading ? (
+        <div className="space-y-2">{[1, 2].map((i) => <div key={i} className="skeleton h-28" />)}</div>
+      ) : duplicates.length === 0 ? (
+        <div className="pt-16 max-w-[560px]">
+          <p style={{ fontSize: '22px', fontWeight: 600 }}>Your leads are clean.</p>
+          <p className="text-ink-secondary mt-2" style={{ fontSize: '15px' }}>No shared phones or emails — nothing to merge.</p>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          <p className="meta-label">{duplicates.length} suspected pair{duplicates.length === 1 ? '' : 's'}</p>
           {duplicates.map((d, i) => (
-            <div key={i} className="card">
-              <div className="grid grid-cols-2 gap-4">
-                {[{ id: d.lead_a_id, name: d.lead_a_name, phone: d.lead_a_phone, email: d.lead_a_email, created: d.lead_a_created }, { id: d.lead_b_id, name: d.lead_b_name, phone: d.lead_b_phone, email: d.lead_b_email, created: d.lead_b_created }].map((lead, idx) => (
-                  <div key={idx} className="border border-surface-border rounded-lg p-4">
-                    <p className="font-medium text-ink-primary">{lead.name || 'Unknown'}</p>
-                    <p className="text-xs text-ink-tertiary mt-1">{lead.phone || 'No phone'}</p>
-                    <p className="text-xs text-ink-tertiary">{lead.email || 'No email'}</p>
-                    <p className="text-xs text-ink-tertiary mt-1">Added: {new Date(lead.created).toLocaleDateString()}</p>
-                  </div>
-                ))}
+            <div key={i} className="hairline-b pb-6">
+              <div className="grid sm:grid-cols-[1fr_auto_1fr] gap-4 items-stretch">
+                {[{ id: d.lead_a_id, name: d.lead_a_name, phone: d.lead_a_phone, email: d.lead_a_email, created: d.lead_a_created },
+                  null,
+                  { id: d.lead_b_id, name: d.lead_b_name, phone: d.lead_b_phone, email: d.lead_b_email, created: d.lead_b_created }].map((lead, idx) =>
+                  lead === null ? (
+                    <div key={idx} className="hidden sm:flex items-center justify-center">
+                      <span className="mono text-ink-tertiary" style={{ fontSize: '12px' }}>same contact?</span>
+                    </div>
+                  ) : (
+                    <div key={idx} className="hairline p-4 min-w-0">
+                      <p className="font-semibold truncate" style={{ fontSize: '15px' }}>{lead.name || 'Unknown'}</p>
+                      <div className="mt-2 space-y-1">
+                        {lead.phone && (
+                          <p className="text-ink-secondary flex items-center gap-2 truncate" style={{ fontSize: '13px' }}><Phone size={12} /> <span className="mono">{lead.phone}</span></p>
+                        )}
+                        {lead.email && (
+                          <p className="text-ink-secondary flex items-center gap-2 truncate" style={{ fontSize: '13px' }}><Mail size={12} /> <span className="mono">{lead.email}</span></p>
+                        )}
+                      </div>
+                      <p className="meta-label mt-3">added {new Date(lead.created).toLocaleDateString()}</p>
+                    </div>
+                  )
+                )}
               </div>
-              <div className="flex gap-2 mt-4">
-                <button onClick={() => handleMerge(d.lead_a_id, d.lead_b_id)} className="px-4 py-2 rounded-lg btn btn-primary flex-1 flex items-center justify-center gap-2 transition-colors"><GitBranch size={16} /> Merge</button>
-                <button onClick={() => handleDismiss(d)} className="px-4 py-2 rounded-lg bg-surface-hover text-ink-secondary border border-surface-border hover:bg-surface-hover transition-colors">Dismiss</button>
+              <div className="flex gap-3 mt-4">
+                <button
+                  onClick={() => handleMerge(d.lead_a_id, d.lead_b_id)}
+                  disabled={busyPair === `${d.lead_a_id}:${d.lead_b_id}`}
+                  className="btn btn-primary text-sm flex-1"
+                >
+                  <GitMerge size={15} /> {busyPair === `${d.lead_a_id}:${d.lead_b_id}` ? 'Merging…' : `Merge into "${d.lead_a_name || 'first lead'}"`}
+                </button>
+                <button onClick={() => handleDismiss(d)} className="btn btn-secondary text-sm">Not duplicates</button>
               </div>
             </div>
           ))}

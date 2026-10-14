@@ -1,99 +1,73 @@
 import { useState } from 'react';
 import { Mail, Link2, X, AlertCircle } from 'lucide-react';
 
-export default function SendPopup({ onClose, onZomicMail, recipientName }) {
+export default function SendPopup({ onClose, onFlazynMail, recipientName }) {
   const [selected, setSelected] = useState(null);
 
   const handleChoose = (method) => {
-    if (method === 'zomic') {
-      onZomicMail();
+    if (method === 'flazyn') {
+      onFlazynMail();
     } else if (method === 'connected') {
-      // Check if user has a connected personal email (Gmail/Outlook OAuth)
-      // This would require a separate personal email OAuth integration
-      // For now, we flag this to the user
+      // Personal Gmail/Outlook OAuth isn't wired up yet — surface that honestly.
       setSelected('connected');
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white border border-surface-border rounded-3xl w-full max-w-md shadow-modal animate-slide-up overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(28,25,23,0.25)' }} onClick={onClose}>
+      <div className="card-raised w-full max-w-md overflow-hidden !p-0" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b border-surface-border">
-          <h2 className="text-lg font-bold text-ink-primary">Send Message</h2>
-          <button onClick={onClose} className="text-ink-tertiary hover:text-ink-primary transition-colors">
-            <X size={20} />
-          </button>
+        <div className="flex items-center justify-between px-6 pt-6">
+          <h2 style={{ fontSize: '18px', fontWeight: 600 }}>Send message</h2>
+          <button onClick={onClose} className="text-ink-tertiary hover:text-ink-primary transition-colors"><X size={18} /></button>
         </div>
 
-        {/* Recipient info */}
+        {/* Recipient */}
         {recipientName && (
-          <div className="px-5 pt-4">
-            <p className="text-sm text-ink-secondary">
-              To: <span className="font-bold text-ink-primary">{recipientName}</span>
-            </p>
-          </div>
+          <p className="px-6 pt-1 text-ink-secondary" style={{ fontSize: '14px' }}>
+            To <span className="font-semibold text-ink-primary">{recipientName}</span>
+          </p>
         )}
 
         {/* Options */}
-        <div className="p-5 space-y-3">
-          <p className="text-sm font-semibold text-ink-secondary mb-2">How would you like to send this?</p>
-
-          {/* Zomic Mail */}
+        <div className="px-6 py-5 space-y-3">
           <button
-            onClick={() => handleChoose('zomic')}
-            className="w-full flex items-center gap-4 p-4 rounded-2xl border-2 border-surface-border hover:border-accent-red transition-all text-left group"
+            onClick={() => handleChoose('flazyn')}
+            className="w-full flex items-center gap-4 p-4 text-left transition-colors hairline hover:bg-[#1C191708]"
+            style={{ borderRadius: '8px' }}
           >
-            <div
-              className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0"
-              style={{ background: 'linear-gradient(135deg, #FF3B5C, #FF9500)' }}
-            >
-              <Mail size={24} className="text-white" />
-            </div>
-            <div className="flex-1">
-              <p className="font-bold text-ink-primary text-sm">Zomic Mail</p>
-              <p className="text-xs text-ink-tertiary mt-0.5">Send using your internal CRM mailbox</p>
-            </div>
+            <span className="w-10 h-10 flex items-center justify-center flex-shrink-0 text-white" style={{ background: '#EDE9FF', borderRadius: '8px' }}>
+              <Mail size={18} />
+            </span>
+            <span className="flex-1 min-w-0">
+              <span className="font-semibold block" style={{ fontSize: '14px' }}>Flazyn Mail</span>
+              <span className="text-ink-secondary block mt-0.5" style={{ fontSize: '13px' }}>Send from your internal CRM mailbox</span>
+            </span>
           </button>
 
-          {/* Connected Email */}
           <button
             onClick={() => handleChoose('connected')}
-            className="w-full flex items-center gap-4 p-4 rounded-2xl border-2 border-surface-border hover:border-accent-blue transition-all text-left group"
+            className="w-full flex items-center gap-4 p-4 text-left transition-colors hairline hover:bg-[#1C191708]"
+            style={{ borderRadius: '8px' }}
           >
-            <div
-              className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0"
-              style={{ background: '#0066FF15' }}
-            >
-              <Link2 size={24} className="text-accent-blue" />
-            </div>
-            <div className="flex-1">
-              <p className="font-bold text-ink-primary text-sm">Connected Email</p>
-              <p className="text-xs text-ink-tertiary mt-0.5">Send using your connected Gmail/Outlook</p>
-            </div>
+            <span className="w-10 h-10 flex items-center justify-center flex-shrink-0 text-ink-secondary" style={{ border: '1px solid #E7E5E4', borderRadius: '8px' }}>
+              <Link2 size={18} />
+            </span>
+            <span className="flex-1 min-w-0">
+              <span className="font-semibold block" style={{ fontSize: '14px' }}>Connected email</span>
+              <span className="text-ink-secondary block mt-0.5" style={{ fontSize: '13px' }}>Your own Gmail / Outlook</span>
+            </span>
           </button>
 
-          {/* Connected email not available notice */}
           {selected === 'connected' && (
-            <div className="flex items-start gap-2 p-3 rounded-xl bg-accent-red/5 border border-accent-red/20">
-              <AlertCircle size={16} className="text-accent-red flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="text-xs font-semibold text-accent-red">Not yet available</p>
-                <p className="text-xs text-ink-secondary mt-1">
-                  Personal Gmail/Outlook OAuth integration for team messaging hasn't been set up yet.
-                  Please use Zomic Mail for internal team communication.
-                </p>
-              </div>
+            <div className="hairline p-3 flex items-start gap-2" style={{ borderLeft: '2px solid #B45309' }}>
+              <AlertCircle size={14} className="flex-shrink-0 mt-0.5" style={{ color: '#B45309' }} />
+              <p className="text-ink-secondary" style={{ fontSize: '13px' }}>
+                Personal Gmail/Outlook OAuth isn't connected yet — use Flazyn Mail for now.
+                Lead-facing email keeps flowing through SendGrid as usual.
+              </p>
             </div>
           )}
-        </div>
-
-        {/* Footer */}
-        <div className="p-5 border-t border-surface-border">
-          <p className="text-xs text-ink-tertiary text-center">
-            Zomic Mail is for internal team communication only.
-            Lead emails continue through SendGrid as normal.
-          </p>
         </div>
       </div>
     </div>

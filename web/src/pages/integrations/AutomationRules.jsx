@@ -2,103 +2,198 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import API from '../../lib/api';
 import toast from 'react-hot-toast';
-import { ArrowLeft, Filter, Plus, Trash2, Play, ArrowUp, ArrowDown } from 'lucide-react';
+import { Filter, X } from 'lucide-react';
+import { pillStyle } from '../../components/ui';
+import { useAutomationOptions, ActionValueField } from '../../lib/automationOptions';
+
+const SOURCES = [
+  { v: 'any', l: 'Any source' }, { v: 'facebook', l: 'Facebook' }, { v: 'google_ads', l: 'Google Ads' }, { v: 'google', l: 'Google Forms' },
+  { v: 'tiktok', l: 'TikTok' }, { v: 'linkedin', l: 'LinkedIn' }, { v: 'website', l: 'Website' },
+  { v: 'lead_form', l: 'Lead form' }, { v: 'wordpress', l: 'WordPress' }, { v: 'whatsapp', l: 'WhatsApp' },
+  { v: 'import', l: 'CSV import' }, { v: 'manual', l: 'Added manually' },
+];
+const FIELDS = ['first_name', 'last_name', 'phone', 'email', 'city', 'budget', 'lead_source', 'stage', 'notes'];
+const OPERATORS = [
+  { v: 'equals', l: 'Equals' }, { v: 'not_equals', l: 'Does not equal' }, { v: 'contains', l: 'Contains' },
+  { v: 'greater_than', l: 'Greater than' }, { v: 'less_than', l: 'Less than' },
+  { v: 'is_empty', l: 'Is empty' }, { v: 'is_not_empty', l: 'Is not empty' },
+];
+const ACTIONS = [
+  { v: 'assign_agent', l: 'Assign to agent', kind: 'agent' },
+  { v: 'assign_round_robin', l: 'Assign round robin', kind: null },
+  { v: 'add_tag', l: 'Add tag', kind: 'text', placeholder: 'Tag name' },
+  { v: 'change_stage', l: 'Change stage', kind: 'stage' },
+  { v: 'send_to_distribution', l: 'Send to lead distribution', kind: null },
+  { v: 'send_whatsapp', l: 'Send WhatsApp message', kind: 'message' },
+  { v: 'start_sequence', l: 'Start WhatsApp sequence', kind: 'sequence' },
+  { v: 'notify_managers', l: 'Notify managers', kind: 'text', placeholder: 'Notification title' },
+];
+const actionMeta = (type) => ACTIONS.find((a) => a.v === type) || { l: type, kind: 'text' };
+const sourceLabel = (v) => SOURCES.find((s) => s.v === v)?.l || v;
+const opLabel = (v) => OPERATORS.find((o) => o.v === v)?.l.toLowerCase() || v;
+
+function describeRule(r) {
+  const when = (r.conditions || []).map((c) => `${c.field} ${opLabel(c.operator)}${/empty/.test(c.operator) ? '' : ` ${c.value}`}`);
+  const then = (r.actions || []).map((a) => `${actionMeta(a.type).l}${a.value && !['send_whatsapp', 'start_sequence'].includes(a.type) ? ` (${a.value})` : ''}`);
+  return { when: [sourceLabel(r.trigger_source || 'any'), ...when].join(' · '), then: then.join(' → ') || 'No actions' };
+}
 
 export default function AutomationRules() {
   const navigate = useNavigate();
   const [rules, setRules] = useState([]);
   const [showCreate, setShowCreate] = useState(false);
+  const options = useAutomationOptions();
 
   useEffect(() => { loadRules(); }, []);
   const loadRules = async () => { try { const res = await API.get('/automations/rules'); setRules(res.data.rules || []); } catch {} };
 
-  const handleDelete = async (id) => { if (!confirm('Delete?')) return; try { await API.delete(`/automations/rules/${id}`); toast.success('Deleted'); loadRules(); } catch {} };
-  const handleToggle = async (rule) => { try { await API.put(`/automations/rules/${rule.id}`, { is_active: !rule.is_active }); loadRules(); } catch {} };
-  const handleTest = async (rule) => { try { const res = await API.post(`/automations/rules/${rule.id}/test`, { sample_lead: { first_name: 'Test', phone: '+1234567890', city: 'Test City', budget: '500000', lead_source: 'facebook' } }); toast.success(res.data.message); } catch {} };
+  const handleDelete = async (id) => {
+    if (!confirm('Delete this rule?')) return;
+    try { await API.delete(`/automations/rules/${id}`); toast.success('Rule deleted'); loadRules(); } catch { toast.error('Could not delete rule'); }
+  };
+  const handleToggle = async (rule) => {
+    try { await API.put(`/automations/rules/${rule.id}`, { is_active: !rule.is_active }); loadRules(); } catch { toast.error('Could not update rule'); }
+  };
+  const handleTest = async (rule) => {
+    const source = rule.trigger_source && rule.trigger_source !== 'any' ? rule.trigger_source : 'facebook';
+    const sample = { first_name: 'Test', phone: '+1234567890', city: 'Lahore', budget: '500000', lead_source: source, stage: 'new' };
+    try {
+      const res = await API.post(`/automations/rules/${rule.id}/test`, { sample_lead: sample });
+      (res.data.matched ? toast.success : toast)(`${res.data.message} (sample: ${source}, budget 500000, Lahore)`);
+    } catch { toast.error('Test failed'); }
+  };
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
-      <button onClick={() => navigate('/app/automations')} className="flex items-center gap-2 text-sm text-ink-secondary hover:text-ink-primary"><ArrowLeft size={16} /> Back to Automations</button>
+      <button onClick={() => navigate('/app/automations')} className="text-ink-secondary hover:text-ink-primary transition-colors" style={{ fontSize: '13px' }}>← Back to Automations</button>
 
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 bg-surface-page rounded-xl flex items-center justify-center"><Filter size={24} className="text-ink-secondary" /></div>
-          <div><h2 className="text-xl font-bold text-ink-primary">Lead Automation Rules</h2><p className="text-sm text-ink-secondary">Assign leads via rules or round robin</p></div>
+      <div className="flex items-baseline justify-between gap-4">
+        <div>
+          <h1 className="text-ink-primary" style={{ fontSize: '28px', fontWeight: 650, letterSpacing: '-0.01em' }}>Lead Automation Rules</h1>
+          <p className="text-ink-secondary mt-1" style={{ fontSize: '14px' }}>Run on every new lead, in priority order — assign, tag, move stage, relay or message.</p>
         </div>
-        <button onClick={() => setShowCreate(true)} className="px-4 py-2 rounded-lg btn btn-primary flex items-center gap-2 transition-colors"><Plus size={16} /> New Rule</button>
+        <button onClick={() => setShowCreate(true)} className="text-ink-primary hover:text-accent-deep underline underline-offset-4 transition-colors flex-shrink-0" style={{ fontSize: '15px', fontWeight: 600 }}>New rule</button>
       </div>
 
       {rules.length === 0 ? (
-        <div className="card text-center py-12"><Filter size={48} className="text-ink-tertiary mx-auto mb-3" /><p className="text-ink-secondary">No automation rules yet</p></div>
+        <div className="text-center py-20">
+          <Filter size={28} className="text-ink-tertiary mx-auto mb-4" />
+          <p className="text-ink-primary" style={{ fontSize: '22px', fontWeight: 600 }}>No automation rules yet.</p>
+          <p className="text-ink-secondary mt-2" style={{ fontSize: '15px' }}>Example: Facebook leads with budget over 1,000,000 → tag “hot” and assign to your senior agent.</p>
+        </div>
       ) : (
-        <div className="space-y-3">
-          {rules.map(r => (
-            <div key={r.id} className="card">
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2"><span className="font-medium text-ink-primary">{r.name}</span><span className={`badge ${r.is_active ? 'bg-surface-page text-ink-secondary' : 'bg-surface-hover text-ink-secondary'}`}>{r.is_active ? 'Active' : 'Inactive'}</span></div>
-                  <p className="text-xs text-ink-tertiary mt-1">Source: {r.trigger_source} | Priority: {r.priority}</p>
+        <div>
+          {rules.map((r) => {
+            const d = describeRule(r);
+            return (
+              <div key={r.id} className="group hairline-b py-4 flex items-center gap-4">
+                <div className="flex-1 min-w-0">
+                  <p className="text-ink-primary" style={{ fontSize: '14px', fontWeight: 500 }}>{r.name}</p>
+                  <p className="text-ink-tertiary mt-1 truncate" style={{ fontSize: '12px' }}>IF {d.when}</p>
+                  <p className="text-ink-tertiary truncate" style={{ fontSize: '12px' }}>THEN {d.then} · Priority <span className="mono">{r.priority}</span></p>
                 </div>
-                <div className="flex gap-2">
-                  <button onClick={() => handleTest(r)} className="px-3 py-2 rounded-lg bg-surface-hover text-ink-secondary border border-surface-border hover:bg-surface-hover text-sm p-2 transition-colors" title="Test"><Play size={14} /></button>
-                  <button onClick={() => handleToggle(r)} className="px-3 py-2 rounded-lg bg-surface-hover text-ink-secondary border border-surface-border hover:bg-surface-hover text-sm p-2 transition-colors" title="Toggle"><Filter size={14} /></button>
-                  <button onClick={() => handleDelete(r.id)} className="px-3 py-2 rounded-lg bg-surface-page text-ink-secondary border border-surface-border hover:bg-surface-hover text-sm p-2 transition-colors"><Trash2 size={14} /></button>
+                <span className="flex-shrink-0" style={pillStyle(r.is_active ? '#0E8A5F' : '#A8A29E')}>
+                  {r.is_active ? 'Active' : 'Paused'}
+                </span>
+                <div className="flex items-center gap-3 flex-shrink-0 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                  <button onClick={() => handleTest(r)} className="text-ink-primary hover:text-accent-deep transition-colors" style={{ fontSize: '13px' }}>Test</button>
+                  <button onClick={() => handleToggle(r)} className="text-ink-primary hover:text-accent-deep transition-colors" style={{ fontSize: '13px' }}>{r.is_active ? 'Pause' : 'Enable'}</button>
+                  <button onClick={() => handleDelete(r.id)} className="text-ink-tertiary hover:text-ink-primary transition-colors" style={{ fontSize: '13px' }}>Delete</button>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
-      {showCreate && <CreateRuleModal onClose={() => setShowCreate(false)} onCreated={() => { setShowCreate(false); loadRules(); }} />}
+      {showCreate && <CreateRuleModal options={options} onClose={() => setShowCreate(false)} onCreated={() => { setShowCreate(false); loadRules(); }} />}
     </div>
   );
+}
 
-  function CreateRuleModal({ onClose, onCreated }) {
-    const [form, setForm] = useState({ name: '', trigger_source: 'any', conditions: [{ field: 'budget', operator: 'greater_than', value: '' }], actions: [{ type: 'assign_agent', value: '' }], is_active: true, priority: 0 });
-    const fields = ['first_name', 'last_name', 'phone', 'email', 'city', 'budget', 'lead_source', 'stage'];
-    const operators = [{ v: 'equals', l: 'Equals' }, { v: 'contains', l: 'Contains' }, { v: 'greater_than', l: 'Greater Than' }, { v: 'less_than', l: 'Less Than' }];
-    const actionTypes = [{ v: 'assign_agent', l: 'Assign to Agent' }, { v: 'assign_round_robin', l: 'Assign Round Robin' }, { v: 'add_tag', l: 'Add Tag' }, { v: 'change_stage', l: 'Change Stage' }, { v: 'send_to_distribution', l: 'Send to Distribution' }];
+function CreateRuleModal({ options, onClose, onCreated }) {
+  const [form, setForm] = useState({
+    name: '', trigger_source: 'any',
+    conditions: [{ field: 'budget', operator: 'greater_than', value: '' }],
+    actions: [{ type: 'assign_agent', value: '' }],
+    is_active: true, priority: 0,
+  });
+  const [saving, setSaving] = useState(false);
+  const setCondition = (i, patch) => setForm({ ...form, conditions: form.conditions.map((x, idx) => (idx === i ? { ...x, ...patch } : x)) });
+  const setAction = (i, patch) => setForm({ ...form, actions: form.actions.map((x, idx) => (idx === i ? { ...x, ...patch } : x)) });
 
-    const handleCreate = async () => {
-      if (!form.name) return toast.error('Name required');
-      try { await API.post('/automations/rules', form); toast.success('Rule created'); onCreated(); } catch { toast.error('Failed'); }
-    };
+  const handleCreate = async () => {
+    if (!form.name.trim()) return toast.error('Give the rule a name');
+    const missing = form.actions.find((a) => actionMeta(a.type).kind && !String(a.value || '').trim());
+    if (missing) return toast.error(`Fill in the value for “${actionMeta(missing.type).l}”`);
+    setSaving(true);
+    try {
+      await API.post('/automations/rules', form);
+      toast.success('Rule created — it will run on every new lead');
+      onCreated();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Could not create rule');
+    } finally {
+      setSaving(false);
+    }
+  };
 
-    return (
-      <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-        <div className="bg-white border border-surface-border rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-modal">
-          <div className="flex items-center justify-between mb-4"><h2 className="text-xl font-bold text-ink-primary">New Automation Rule</h2><button onClick={onClose}>✕</button></div>
-          <div className="space-y-4">
-            <input className="input" placeholder="Rule name" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
-            <select className="input" value={form.trigger_source} onChange={e => setForm({ ...form, trigger_source: e.target.value })}>
-              <option value="any">Any Source</option><option value="facebook">Facebook</option><option value="google">Google</option><option value="tiktok">TikTok</option><option value="website">Website</option><option value="lead_form">Lead Form</option>
-            </select>
-            <div>
-              <label className="text-sm font-medium text-ink-secondary">Conditions:</label>
-              {form.conditions.map((c, i) => (
-                <div key={i} className="flex gap-2 mt-2">
-                  <select className="input flex-1" value={c.field} onChange={e => setForm({ ...form, conditions: form.conditions.map((x, idx) => idx === i ? { ...x, field: e.target.value } : x) })}>{fields.map(f => <option key={f} value={f}>{f}</option>)}</select>
-                  <select className="input w-32" value={c.operator} onChange={e => setForm({ ...form, conditions: form.conditions.map((x, idx) => idx === i ? { ...x, operator: e.target.value } : x) })}>{operators.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}</select>
-                  <input className="input flex-1" placeholder="Value" value={c.value} onChange={e => setForm({ ...form, conditions: form.conditions.map((x, idx) => idx === i ? { ...x, value: e.target.value } : x) })} />
-                </div>
-              ))}
-              <button onClick={() => setForm({ ...form, conditions: [...form.conditions, { field: 'city', operator: 'equals', value: '' }] })} className="text-xs text-ink-secondary mt-2">+ Add Condition</button>
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(28,25,23,0.25)' }} onClick={onClose}>
+      <div className="card-raised w-full max-w-lg max-h-[90vh] overflow-y-auto animate-scale-in" style={{ borderRadius: '10px' }} onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between hairline-b pb-4 mb-4">
+          <h2 className="text-ink-primary" style={{ fontSize: '22px', fontWeight: 600 }}>New automation rule</h2>
+          <button onClick={onClose} className="text-ink-tertiary hover:text-ink-primary transition-colors"><X size={18} /></button>
+        </div>
+        <div className="space-y-4">
+          <div>
+            <p className="meta-label mb-1">Rule name</p>
+            <input className="input" placeholder="e.g. Hot Facebook leads to Ali" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+          </div>
+          <div className="flex gap-3">
+            <div className="flex-1">
+              <p className="meta-label mb-1">When a new lead arrives from</p>
+              <select className="input" value={form.trigger_source} onChange={(e) => setForm({ ...form, trigger_source: e.target.value })}>
+                {SOURCES.map((s) => <option key={s.v} value={s.v}>{s.l}</option>)}
+              </select>
             </div>
-            <div>
-              <label className="text-sm font-medium text-ink-secondary">Actions:</label>
-              {form.actions.map((a, i) => (
-                <div key={i} className="flex gap-2 mt-2">
-                  <select className="input flex-1" value={a.type} onChange={e => setForm({ ...form, actions: form.actions.map((x, idx) => idx === i ? { ...x, type: e.target.value } : x) })}>{actionTypes.map(a => <option key={a.v} value={a.v}>{a.l}</option>)}</select>
-                  {a.type !== 'assign_round_robin' && a.type !== 'send_to_distribution' && <input className="input flex-1" placeholder="Value" value={a.value} onChange={e => setForm({ ...form, actions: form.actions.map((x, idx) => idx === i ? { ...x, value: e.target.value } : x) })} />}
-                </div>
-              ))}
-              <button onClick={() => setForm({ ...form, actions: [...form.actions, { type: 'add_tag', value: '' }] })} className="text-xs text-ink-secondary mt-2">+ Add Action</button>
+            <div style={{ width: '96px' }}>
+              <p className="meta-label mb-1">Priority</p>
+              <input className="input" type="number" min="0" value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })} />
             </div>
-            <button onClick={handleCreate} className="w-full px-4 py-2.5 rounded-lg btn btn-primary transition-colors">Create Rule</button>
+          </div>
+          <div>
+            <p className="meta-label mb-2">And all of these are true (optional)</p>
+            {form.conditions.map((c, i) => (
+              <div key={i} className="flex gap-2 mb-2">
+                <select className="input flex-1" value={c.field} onChange={(e) => setCondition(i, { field: e.target.value })}>{FIELDS.map((f) => <option key={f} value={f}>{f.replace('_', ' ')}</option>)}</select>
+                <select className="input w-36" value={c.operator} onChange={(e) => setCondition(i, { operator: e.target.value })}>{OPERATORS.map((o) => <option key={o.v} value={o.v}>{o.l}</option>)}</select>
+                {!/empty/.test(c.operator) && <input className="input flex-1" placeholder="Value" value={c.value} onChange={(e) => setCondition(i, { value: e.target.value })} />}
+                <button onClick={() => setForm({ ...form, conditions: form.conditions.filter((_, idx) => idx !== i) })} className="text-ink-tertiary hover:text-ink-primary"><X size={14} /></button>
+              </div>
+            ))}
+            <button onClick={() => setForm({ ...form, conditions: [...form.conditions, { field: 'city', operator: 'equals', value: '' }] })} className="text-ink-secondary hover:text-ink-primary underline underline-offset-4 transition-colors" style={{ fontSize: '13px' }}>+ Add condition</button>
+          </div>
+          <div>
+            <p className="meta-label mb-2">Then do this</p>
+            {form.actions.map((a, i) => {
+              const meta = actionMeta(a.type);
+              return (
+                <div key={i} className="flex gap-2 mb-2 items-start">
+                  <select className="input flex-1" value={a.type} onChange={(e) => setAction(i, { type: e.target.value, value: '' })}>{ACTIONS.map((x) => <option key={x.v} value={x.v}>{x.l}</option>)}</select>
+                  {meta.kind && <ActionValueField kind={meta.kind} value={a.value} placeholder={meta.placeholder} options={options} onChange={(value) => setAction(i, { value })} />}
+                  {form.actions.length > 1 && <button onClick={() => setForm({ ...form, actions: form.actions.filter((_, idx) => idx !== i) })} className="text-ink-tertiary hover:text-ink-primary mt-3"><X size={14} /></button>}
+                </div>
+              );
+            })}
+            <button onClick={() => setForm({ ...form, actions: [...form.actions, { type: 'add_tag', value: '' }] })} className="text-ink-secondary hover:text-ink-primary underline underline-offset-4 transition-colors" style={{ fontSize: '13px' }}>+ Add action</button>
+          </div>
+          <div className="flex justify-end gap-3 hairline pt-4">
+            <button onClick={onClose} className="text-ink-secondary hover:text-ink-primary underline underline-offset-4 transition-colors" style={{ fontSize: '14px' }}>Cancel</button>
+            <button onClick={handleCreate} disabled={saving} className="btn btn-primary">{saving ? 'Saving…' : 'Create rule'}</button>
           </div>
         </div>
       </div>
-    );
-  }
+    </div>
+  );
 }

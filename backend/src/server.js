@@ -12,8 +12,8 @@ const corsOptions = require('./middleware/cors');
 
 const authRoutes = require('./routes/auth');
 const leadRoutes = require('./routes/leads');
-const emailRoutes = require('./routes/emails');
 const campaignRoutes = require('./routes/campaigns');
+const marketingRoutes = require('./routes/marketing');
 const whatsappRoutes = require('./routes/whatsapp');
 const smsRoutes = require('./routes/sms');
 const callRoutes = require('./routes/calls');
@@ -24,7 +24,7 @@ const teamRoutes = require('./routes/team');
 const billingRoutes = require('./routes/billing');
 const integrationRoutes = require('./routes/integrations');
 const automationRoutes = require('./routes/automations');
-const zomicMailRoutes = require('./routes/zomicMail');
+const flazynMailRoutes = require('./routes/flazynMail');
 const { startScheduledJobs } = require('./queues');
 const { getTranslations, getAvailableLanguages } = require('./utils/i18n');
 const path = require('path');
@@ -42,18 +42,22 @@ const io = require('socket.io')(server, {
 });
 
 app.set('io', io);
+require('./utils/realtime').setIO(io);
 
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+// Public tracking (customer websites, document viewer) — open CORS, no cookies.
+app.use('/api/track', cors({ origin: true, credentials: false }), require('./routes/track'));
 app.use(cors(corsOptions));
 app.use(compression());
-app.use(express.json({ limit: '50mb' }));
+// Keep the raw body so platform webhooks (Meta, LinkedIn) can be signature-verified.
+app.use(express.json({ limit: '50mb', verify: (req, res, buf) => { req.rawBody = buf; } }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(cookieParser());
 
 app.use('/api/auth', authRoutes);
 app.use('/api/leads', leadRoutes);
-app.use('/api/emails', emailRoutes);
 app.use('/api/campaigns', campaignRoutes);
+app.use('/api/marketing', marketingRoutes);
 app.use('/api/whatsapp', whatsappRoutes);
 app.use('/api/sms', smsRoutes);
 app.use('/api/calls', callRoutes);
@@ -64,7 +68,11 @@ app.use('/api/team', teamRoutes);
 app.use('/api/billing', billingRoutes);
 app.use('/api/integrations', integrationRoutes);
 app.use('/api/automations', automationRoutes);
-app.use('/api/zomic-mail', zomicMailRoutes);
+app.use('/api/flazyn-mail', flazynMailRoutes);
+app.use('/api/templates', require('./routes/templates'));
+app.use('/api/intel', require('./routes/intel'));
+app.use('/api/connections', require('./routes/connections'));
+app.use('/api/demo', require('./routes/demo'));
 
 app.get('/api/translations/:lang', (req, res) => {
   res.json({ translations: getTranslations(req.params.lang) });
@@ -129,7 +137,7 @@ app.set('io', io);
 
 const PORT = config.port;
 server.listen(PORT, () => {
-  logger.info(`CRM Final API running on port ${PORT}`);
+  logger.info(`Flazyn API running on port ${PORT}`);
   logger.info(`Environment: ${config.env}`);
   // Start scheduled jobs (WhatsApp sequences, etc.)
   startScheduledJobs();

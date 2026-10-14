@@ -1,9 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import API from '../../lib/api';
 import toast from 'react-hot-toast';
-import { ArrowLeft, Music, CheckCircle2, AlertCircle, RefreshCw, Trash2 } from 'lucide-react';
+import { Music } from 'lucide-react';
 import BrandLogo from '../../components/BrandLogo';
+import ManagedConnect from '../../components/ManagedConnect';
+import { pillStyle } from '../../components/ui';
+import { startOAuth } from '../../lib/oauth';
 
 export default function TikTokIntegration() {
   const navigate = useNavigate();
@@ -19,7 +23,7 @@ export default function TikTokIntegration() {
       setConnected(true);
       loadIntegration();
       toast.success('TikTok connected successfully!');
-    } else if (searchParams.get('error') === 'oauth_failed') {
+    } else if (searchParams.get('error')) {
       toast.error('TikTok authentication failed. Please try again.');
     }
   }, [searchParams]);
@@ -34,20 +38,7 @@ export default function TikTokIntegration() {
 
   useEffect(() => { loadIntegration(); }, []);
 
-  const handleOAuth = () => {
-    const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-    const redirectUri = `${apiBase}/api/integrations/oauth/tiktok/callback`;
-    const workspaceId = localStorage.getItem('workspaceId') || '';
-    const tiktokAppId = import.meta.env.VITE_TIKTOK_APP_ID || '';
-    
-    if (!tiktokAppId || tiktokAppId === 'add_later') {
-      toast.error('TikTok integration is pending approval. Check back soon.');
-      return;
-    }
-    
-    const scope = 'creative.management,lead.management';
-    window.location.href = `https://business-api.tiktok.com/portal/auth?app_id=${tiktokAppId}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${workspaceId}&scope=${scope}`;
-  };
+  const handleOAuth = () => startOAuth('tiktok');
 
   const handleDisconnect = async () => {
     try {
@@ -68,21 +59,22 @@ export default function TikTokIntegration() {
   if (connected) {
     return (
       <div className="max-w-2xl mx-auto space-y-6">
-        <button onClick={() => navigate('/app/automations')} className="flex items-center gap-2 text-sm text-ink-secondary hover:text-ink-primary"><ArrowLeft size={16} /> Back to Automations</button>
-        <div className="card">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-12 h-12 bg-surface-hover rounded-xl flex items-center justify-center"><BrandLogo brand="tiktok" /></div>
-            <div><h2 className="text-xl font-bold text-ink-primary">TikTok Lead Generation</h2><p className="text-sm text-ink-secondary">Receive leads from TikTok Lead Generation</p></div>
+        <button onClick={() => navigate('/app/automations')} className="text-ink-secondary hover:text-ink-primary transition-colors" style={{ fontSize: '13px' }}>← Back to Automations</button>
+
+        <div className="flex items-center gap-3">
+          <BrandLogo brand="tiktok" />
+          <div>
+            <h1 className="text-ink-primary" style={{ fontSize: '24px', fontWeight: 650 }}>TikTok Lead Generation</h1>
+            <span className=" flex-shrink-0" style={pillStyle('#0E8A5F')}> Connected
+            </span>
           </div>
-          <div className="text-center py-4">
-            <CheckCircle2 size={32} className="text-ink-secondary mx-auto mb-2" />
-            <p className="font-medium text-ink-primary">TikTok Connected!</p>
-            <p className="text-sm text-ink-secondary">All new TikTok lead form submissions will instantly create leads in Zomic CRM.</p>
-          </div>
-          <div className="flex gap-2 mt-4">
-            <button onClick={handleOAuth} className="px-3 py-2 rounded-lg bg-surface-hover text-ink-secondary border border-surface-border hover:bg-surface-hover flex items-center gap-1 text-sm transition-colors"><RefreshCw size={14} /> Reconnect</button>
-            <button onClick={handleDisconnect} className="px-3 py-2 rounded-lg bg-surface-page text-ink-secondary border border-surface-border hover:bg-surface-hover flex items-center gap-1 text-sm transition-colors"><Trash2 size={14} /> Disconnect</button>
-          </div>
+        </div>
+
+        <p className="text-ink-secondary" style={{ fontSize: '14px' }}>All new TikTok lead form submissions will instantly create leads in Flazyn.</p>
+
+        <div className="hairline pt-4 flex items-center gap-4">
+          <button onClick={handleOAuth} className="text-ink-primary hover:text-accent-deep underline underline-offset-4 transition-colors" style={{ fontSize: '13px' }}>Reconnect</button>
+          <button onClick={handleDisconnect} className="text-ink-tertiary hover:text-ink-primary underline underline-offset-4 transition-colors" style={{ fontSize: '13px' }}>Disconnect</button>
         </div>
       </div>
     );
@@ -90,22 +82,33 @@ export default function TikTokIntegration() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
-      <button onClick={() => navigate('/app/automations')} className="flex items-center gap-2 text-sm text-ink-secondary hover:text-ink-primary"><ArrowLeft size={16} /> Back to Automations</button>
-      <div className="card">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-12 h-12 bg-surface-hover rounded-xl flex items-center justify-center"><BrandLogo brand="tiktok" /></div>
-          <div><h2 className="text-xl font-bold text-ink-primary">TikTok Lead Generation</h2><p className="text-sm text-ink-secondary">Receive leads from TikTok Lead Generation</p></div>
+      <button onClick={() => navigate('/app/automations')} className="text-ink-secondary hover:text-ink-primary transition-colors" style={{ fontSize: '13px' }}>← Back to Automations</button>
+
+      <div className="flex items-center gap-3">
+        <BrandLogo brand="tiktok" />
+        <div>
+          <h1 className="text-ink-primary" style={{ fontSize: '24px', fontWeight: 650 }}>TikTok Lead Generation</h1>
+          <p className="text-ink-secondary mt-1" style={{ fontSize: '14px' }}>Receive leads from TikTok Lead Generation</p>
         </div>
-        <div className="space-y-4">
-          <div className="bg-surface-page border border-surface-border rounded-lg p-4 flex items-start gap-3">
-            <AlertCircle size={20} className="text-ink-secondary flex-shrink-0" />
-            <div><p className="text-sm font-medium text-ink-secondary">Requirements:</p><ul className="text-xs text-ink-secondary/80 mt-1 space-y-1">{requirements.map(r => <li key={r}>• {r}</li>)}</ul></div>
-          </div>
-          <p className="text-sm text-ink-secondary">Click below to login with your TikTok for Business account. You'll be redirected to TikTok's real login page.</p>
-          <button onClick={handleOAuth} disabled={loading} className="bg-white text-ink-primary px-6 py-3 rounded-lg font-medium flex items-center gap-2 mx-auto hover:bg-surface-hover transition-colors">
-            <Music size={20} /> Connect to TikTok
-          </button>
+      </div>
+
+      <ManagedConnect platform="tiktok" />
+
+      <div className="card" style={{ padding: 20 }}>
+        <p style={{ fontWeight: 700, fontSize: 15 }}>One-click TikTok login</p>
+        <p style={{ fontSize: 13, color: 'var(--ink-2)', marginTop: 2 }}>Coming once TikTok approves Flazyn (in review). Until then, the Connect button above works just the same.</p>
+        <div className="space-y-3 mt-4">
+        <div>
+          <p className="meta-label mb-2">Requirements</p>
+          <ul className="space-y-1">
+            {requirements.map((r, idx) => <motion.li key={r} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(idx * 0.04, 0.3), duration: 0.2 }} className="text-ink-secondary" style={{ fontSize: '13px' }}>· {r}</motion.li>)}
+          </ul>
         </div>
+        <p className="text-ink-secondary" style={{ fontSize: '14px' }}>Click below to login with your TikTok for Business account.</p>
+        <button onClick={handleOAuth} disabled={loading || import.meta.env.VITE_TIKTOK_DIRECT !== 'true'} className="btn btn-secondary inline-flex items-center gap-2">
+          <Music size={18} /> Connect to TikTok
+        </button>
+      </div>
       </div>
     </div>
   );

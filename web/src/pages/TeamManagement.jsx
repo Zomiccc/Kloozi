@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import API from '../lib/api';
+import { CountUp, SectionTabs } from '../lib/motion';
 import toast from 'react-hot-toast';
-import { Plus, X, UserPlus, Ban, RefreshCw, ArrowRightLeft, MapPin, Activity, BarChart3, Users2, GitBranch, Settings, TrendingUp, Phone, Mail, MessageSquare, CheckCircle2, Clock, MessageCircle } from 'lucide-react';
+import { Plus, X, UserPlus, RefreshCw, ArrowRightLeft, GitBranch, MessageCircle } from 'lucide-react';
 
 import SendPopup from '../components/SendPopup';
+import { pillStyle } from '../components/ui';
 
 export default function TeamManagement() {
   const navigate = useNavigate();
@@ -23,16 +26,11 @@ export default function TeamManagement() {
   useEffect(() => { loadMembers(); loadActivity(); loadSubteams(); loadAssignmentRules(); loadStats(); loadTeamMembersForMail(); }, []);
 
   const loadTeamMembersForMail = async () => {
-    try { const res = await API.get('/zomic-mail/team-members'); setTeamMembers(res.data.members || []); } catch {}
+    try { const res = await API.get('/flazyn-mail/team-members'); setTeamMembers(res.data.members || []); } catch {}
   };
 
-  const handleMessageMember = (member) => {
-    setMessageTarget(member);
-  };
-
-  const handleStartCompose = () => {
-    setShowCompose(true);
-  };
+  const handleMessageMember = (member) => { setMessageTarget(member); };
+  const handleStartCompose = () => { setShowCompose(true); };
 
   const loadMembers = async () => {
     try { const res = await API.get('/team'); setMembers(res.data.members); }
@@ -72,198 +70,183 @@ export default function TeamManagement() {
     catch { toast.error('Failed'); }
   };
 
-  const roleColors = { super_admin: { bg: '#AF52DE10', color: '#AF52DE' }, admin: { bg: '#0066FF10', color: '#0066FF' }, sales_manager: { bg: '#FF950010', color: '#FF9500' }, sales_agent: { bg: '#34C75910', color: '#34C759' } };
+  const roleDots = { super_admin: '#1C1917', admin: '#2F6FDB', sales_manager: '#EDE9FF', sales_agent: '#0E8A5F' };
 
   const sortedMembers = [...members].filter(m => m.status === 'active').sort((a, b) => (b.lead_count || 0) - (a.lead_count || 0));
-  const podium = sortedMembers.slice(0, 3);
+
+  const tabs = [
+    { key: 'dashboard', label: 'Dashboard' },
+    { key: 'members', label: 'Members' },
+    { key: 'subteams', label: 'Subteams' },
+    { key: 'assignment', label: 'Lead Assignment' },
+  ];
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <h1 className="text-3xl font-extrabold text-ink-primary tracking-tight">Team</h1>
-        <button onClick={() => setShowInvite(true)} className="btn btn-primary"><UserPlus size={16} /> Invite Member</button>
+      {/* Header — editorial */}
+      <div className="flex items-baseline justify-between flex-wrap gap-4">
+        <h1 className="text-ink-primary" style={{ fontSize: '32px', fontWeight: 650, letterSpacing: '-0.01em' }}>Team</h1>
+        <button onClick={() => setShowInvite(true)} className="text-ink-primary hover:text-accent-deep underline underline-offset-4 transition-colors" style={{ fontSize: '15px', fontWeight: 600 }}>Invite member</button>
       </div>
 
-      {/* Tab bar */}
-      <div className="flex gap-1 bg-white border border-surface-border rounded-full p-1 flex-wrap">
-        {[
-          { key: 'dashboard', label: 'Dashboard', icon: BarChart3 },
-          { key: 'members', label: 'Members', icon: Users2 },
-          { key: 'subteams', label: 'Subteams', icon: GitBranch },
-          { key: 'assignment', label: 'Lead Assignment', icon: ArrowRightLeft },
-        ].map(t => (
-          <button key={t.key} onClick={() => setTab(t.key)} className={`tab-pill ${tab === t.key ? 'tab-pill-active bg-accent-red' : 'text-ink-secondary hover:text-ink-primary'}`}>
-            <t.icon size={16} /> {t.label}
-          </button>
-        ))}
-      </div>
+      {/* Tabs — pinned secondary bar */}
+      <SectionTabs layoutId="team-tabs" tabs={tabs} active={tab} onChange={setTab} />
 
       {/* Dashboard tab */}
       {tab === 'dashboard' && (
-        <div className="space-y-6">
-          {/* Podium Leaderboard */}
-          {podium.length > 0 && (
-            <div className="grid grid-cols-3 gap-4 stagger-in">
-              {podium.map((m, idx) => {
-                const heights = ['h-28', 'h-36', 'h-24'];
-                const colors = ['#FF9500', '#8E8E93', '#FF950080'];
-                const positions = ['2nd', '1st', '3rd'];
-                const actualIdx = idx === 0 ? 1 : idx === 1 ? 0 : 2;
-                const m2 = podium[actualIdx];
-                if (!m2 || !m2.id) return null;
-                const h2 = heights[actualIdx];
-                const c2 = colors[actualIdx];
-                const p2 = positions[actualIdx];
-                return (
-                  <div key={m2.id} className="flex flex-col items-center">
-                    <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-white text-lg font-extrabold mb-2 shadow-card" style={{ background: 'linear-gradient(135deg, #0066FF, #AF52DE)' }}>
-                      {(m2.first_name || '?')[0]}
-                    </div>
-                    <p className="text-sm font-bold text-ink-primary">{m2.first_name || ''} {m2.last_name || ''}</p>
-                    <p className="text-xs text-ink-tertiary mb-2">{m2.lead_count || 0} leads</p>
-                    <div className={`${h2} w-full rounded-t-2xl flex items-center justify-center text-white font-extrabold text-lg`} style={{ background: c2 }}>
-                      {p2}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* Stats cards */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <div className="space-y-8">
+          {/* Metrics — hairline row, no cards */}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-0">
             {[
-              { label: 'Total Leads', value: stats.totalLeads, icon: Users2, color: '#0066FF' },
-              { label: 'New Leads', value: stats.newLeads, icon: TrendingUp, color: '#34C759' },
-              { label: 'Won', value: stats.wonLeads, icon: CheckCircle2, color: '#AF52DE' },
-              { label: 'Calls', value: stats.totalCalls, icon: Phone, color: '#FF9500' },
-              { label: 'Messages', value: stats.totalMessages, icon: MessageSquare, color: '#0066FF' },
-              { label: 'Active Agents', value: stats.activeAgents || members.filter(m => m.status === 'active').length, icon: Activity, color: '#FF3B5C' },
-            ].map(s => (
-              <div key={s.label} className="card card-hover stagger-in">
-                <div className="w-10 h-10 rounded-2xl flex items-center justify-center mb-3" style={{ background: `${s.color}15` }}>
-                  <s.icon size={20} style={{ color: s.color }} />
-                </div>
-                <p className="text-2xl font-extrabold text-ink-primary">{s.value}</p>
-                <p className="text-xs font-semibold text-ink-secondary">{s.label}</p>
-              </div>
+              { label: 'Total leads', value: stats.totalLeads },
+              { label: 'New leads', value: stats.newLeads },
+              { label: 'Won', value: stats.wonLeads },
+              { label: 'Calls', value: stats.totalCalls },
+              { label: 'Messages', value: stats.totalMessages },
+              { label: 'Active agents', value: stats.activeAgents || members.filter(m => m.status === 'active').length },
+            ].map((s, i) => (
+              <motion.div key={s.label} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i * 0.04, 0.3), duration: 0.2 }} className={i > 0 ? 'hairline-l pl-4' : ''}>
+                <p className="meta-label mb-1">{s.label}</p>
+                <p className="mono text-ink-primary" style={{ fontSize: '28px', fontWeight: 600 }}><CountUp value={Number(s.value) || 0} /></p>
+              </motion.div>
             ))}
           </div>
 
-          {/* Team performance table */}
-          <div className="card overflow-hidden" style={{ padding: 0 }}>
-            <div className="p-4 border-b border-surface-border"><h3 className="font-bold text-ink-primary">Team Performance</h3></div>
-            <table className="w-full">
-              <thead className="bg-surface-page border-b border-surface-border">
-                <tr>
-                  <th className="p-3 text-left text-xs font-bold text-ink-tertiary uppercase">Agent</th>
-                  <th className="p-3 text-left text-xs font-bold text-ink-tertiary uppercase">Leads</th>
-                  <th className="p-3 text-left text-xs font-bold text-ink-tertiary uppercase">Won</th>
-                  <th className="p-3 text-left text-xs font-bold text-ink-tertiary uppercase">Calls Today</th>
-                  <th className="p-3 text-left text-xs font-bold text-ink-tertiary uppercase">Messages</th>
-                  <th className="p-3 text-left text-xs font-bold text-ink-tertiary uppercase">Win Rate</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-surface-border">
-                {members.filter(m => m.status === 'active').map(m => (
-                  <tr key={m.id} className="hover:bg-surface-page transition-colors">
-                    <td className="p-3"><div className="flex items-center gap-2"><div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white" style={{ background: 'linear-gradient(135deg, #0066FF, #AF52DE)' }}>{m.first_name?.[0] || '?'}</div><div><p className="text-sm font-bold text-ink-primary">{m.first_name} {m.last_name}</p><p className="text-xs text-ink-tertiary">{m.designation || m.role?.replace('_', ' ')}</p></div></div></td>
-                    <td className="p-3 text-sm font-semibold text-ink-primary">{m.lead_count || 0}</td>
-                    <td className="p-3 text-sm font-semibold text-ink-primary">{m.won_count || 0}</td>
-                    <td className="p-3 text-sm font-semibold text-ink-primary">{m.calls_today || 0}</td>
-                    <td className="p-3 text-sm font-semibold text-ink-primary">{m.messages_today || 0}</td>
-                    <td className="p-3 text-sm font-bold text-ink-primary">{m.lead_count > 0 ? Math.round(((m.won_count || 0) / m.lead_count) * 100) : 0}%</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          {/* Leaderboard — hairline rows */}
+          <div>
+            <p className="meta-label mb-3">Leaderboard</p>
+            {sortedMembers.map((m, idx) => (
+              <motion.div key={m.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(idx * 0.04, 0.3), duration: 0.2 }} className="hairline-b py-3 flex items-center gap-3">
+                <span className="mono text-ink-tertiary flex-shrink-0" style={{ fontSize: '14px', fontWeight: 600 }}>{idx + 1}</span>
+                <span className="flex items-center justify-center  flex-shrink-0" style={{ background: '#F5F5F4', color: '#1C1917', width: '28px', height: '28px', borderRadius: '10px', fontSize: '11px', fontWeight: 700 }}>
+                  {(m.first_name || '?')[0]}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-ink-primary truncate" style={{ fontSize: '14px', fontWeight: 500 }}>{m.first_name} {m.last_name}</p>
+                </div>
+                <span className="mono text-ink-secondary flex-shrink-0" style={{ fontSize: '13px' }}>{m.lead_count || 0} leads</span>
+                <span className="mono text-ink-tertiary flex-shrink-0" style={{ fontSize: '13px' }}>{m.won_count || 0} won</span>
+                <span className="mono text-ink-tertiary flex-shrink-0" style={{ fontSize: '13px' }}>{m.lead_count > 0 ? Math.round(((m.won_count || 0) / m.lead_count) * 100) : 0}%</span>
+              </motion.div>
+            ))}
           </div>
 
-          {/* Activity feed */}
-          <div className="card stagger-in">
-            <h3 className="text-lg font-bold text-ink-primary mb-4 flex items-center gap-2"><Activity size={18} /> Team Activity (Last 24h)</h3>
-            {activity.length === 0 ? <p className="text-ink-tertiary text-sm">No recent activity</p> :
-              <div className="space-y-2 max-h-96 overflow-y-auto">
+          {/* Activity feed — hairline rows */}
+          <div>
+            <p className="meta-label mb-3">Team activity (last 24h)</p>
+            {activity.length === 0 ? (
+              <p className="text-ink-tertiary" style={{ fontSize: '14px' }}>No recent activity</p>
+            ) : (
+              <div className="max-h-96 overflow-y-auto">
                 {activity.map((a, idx) => (
-                  <div key={a.id || `activity-${idx}`} className="flex items-center gap-3 py-2 border-b border-surface-border last:border-0">
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white" style={{ background: 'linear-gradient(135deg, #0066FF, #AF52DE)' }}>{a.first_name?.[0] || '?'}</div>
-                    <div className="flex-1"><p className="text-sm text-ink-secondary"><strong className="text-ink-primary">{a.first_name} {a.last_name}</strong> — {a.description}</p><p className="text-xs text-ink-tertiary">{new Date(a.created_at).toLocaleString()}</p></div>
-                  </div>
+                  <motion.div key={a.id || `activity-${idx}`} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(idx * 0.04, 0.3), duration: 0.2 }} className="hairline-b py-3 flex items-center gap-3">
+                    <span className="flex items-center justify-center  flex-shrink-0" style={{ background: '#F5F5F4', color: '#1C1917', width: '28px', height: '28px', borderRadius: '10px', fontSize: '11px', fontWeight: 700 }}>
+                      {(a.first_name || '?')[0]}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-ink-secondary" style={{ fontSize: '14px' }}>
+                        <span className="text-ink-primary font-medium">{a.first_name} {a.last_name}</span> — {a.description}
+                      </p>
+                      <p className="text-ink-tertiary mono" style={{ fontSize: '12px' }}>{new Date(a.created_at).toLocaleString()}</p>
+                    </div>
+                  </motion.div>
                 ))}
               </div>
-            }
+            )}
           </div>
         </div>
       )}
 
       {/* Members tab */}
       {tab === 'members' && (
-        loading ? <div className="flex justify-center py-8"><div className="animate-spin w-8 h-8 border-4 border-accent-blue border-t-transparent rounded-full" /></div> :
-        <div className="card overflow-hidden" style={{ padding: 0 }}>
-          <table className="w-full">
-            <thead className="bg-surface-page border-b border-surface-border">
-              <tr>
-                <th className="p-3 text-left text-xs font-bold text-ink-tertiary uppercase">Name</th>
-                <th className="p-3 text-left text-xs font-bold text-ink-tertiary uppercase">Role</th>
-                <th className="p-3 text-left text-xs font-bold text-ink-tertiary uppercase">Leads</th>
-                <th className="p-3 text-left text-xs font-bold text-ink-tertiary uppercase">Won</th>
-                <th className="p-3 text-left text-xs font-bold text-ink-tertiary uppercase">Calls Today</th>
-                <th className="p-3 text-left text-xs font-bold text-ink-tertiary uppercase">Status</th>
-                <th className="p-3 text-left text-xs font-bold text-ink-tertiary uppercase">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-surface-border">
-              {members.map(m => {
-                const rc = roleColors[m.role] || roleColors.sales_agent;
-                return (
-                  <tr key={m.id} className="hover:bg-surface-page transition-colors">
-                    <td className="p-3"><div className="font-bold text-ink-primary">{m.first_name} {m.last_name}</div><div className="text-xs text-ink-tertiary">{m.email}</div></td>
-                    <td className="p-3"><span className="badge capitalize" style={{ background: rc.bg, color: rc.color }}>{(m.role || 'sales_agent').replace('_', ' ')}</span></td>
-                    <td className="p-3 text-sm font-semibold text-ink-primary">{m.lead_count}</td>
-                    <td className="p-3 text-sm font-semibold text-ink-primary">{m.won_count}</td>
-                    <td className="p-3 text-sm font-semibold text-ink-primary">{m.calls_today}</td>
-                    <td className="p-3"><span className="badge capitalize" style={{ background: m.status === 'active' ? '#34C75910' : m.status === 'suspended' ? '#FF3B5C10' : '#FF950010', color: m.status === 'active' ? '#34C759' : m.status === 'suspended' ? '#FF3B5C' : '#FF9500' }}>{m.status}</span></td>
-                    <td className="p-3">
-                      <div className="flex items-center gap-1">
-                        {m.status === 'active' ? <button onClick={() => handleSuspend(m.id)} className="p-1.5 rounded-lg hover:bg-red-50 transition-colors" style={{ color: '#FF3B5C' }}><Ban size={16} /></button> :
-                        <button onClick={() => handleReactivate(m.id)} className="p-1.5 rounded-lg hover:bg-green-50 transition-colors" style={{ color: '#34C759' }}><RefreshCw size={16} /></button>}
-                        {m.status === 'active' && m.id !== /* can't message self */ 'self' && (
-                          <button onClick={() => handleMessageMember(m)} className="p-1.5 rounded-lg hover:bg-blue-50 transition-colors" style={{ color: '#0066FF' }} title="Message teammate">
-                            <MessageCircle size={16} />
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        loading ? (
+          <div className="space-y-2">
+            {[1, 2, 3, 4, 5].map((i) => <div key={i} className="skeleton h-12" />)}
+          </div>
+        ) : (
+          <div>
+            {/* Header row */}
+            <div className="hairline-b pb-2 flex items-center gap-4">
+              <span className="meta-label flex-shrink-0" style={{ width: '28px' }}></span>
+              <span className="meta-label flex-1">Name</span>
+              <span className="meta-label flex-shrink-0" style={{ width: '100px' }}>Role</span>
+              <span className="meta-label flex-shrink-0 mono" style={{ width: '60px' }}>Leads</span>
+              <span className="meta-label flex-shrink-0 mono" style={{ width: '60px' }}>Won</span>
+              <span className="meta-label flex-shrink-0 mono" style={{ width: '70px' }}>Calls</span>
+              <span className="meta-label flex-shrink-0" style={{ width: '80px' }}>Status</span>
+              <span className="meta-label flex-shrink-0" style={{ width: '80px' }}></span>
+            </div>
+            {members.map((m, idx) => (
+              <motion.div key={m.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(idx * 0.04, 0.3), duration: 0.2 }} className="group hairline-b py-3 flex items-center gap-4">
+                {/* Monogram */}
+                <span className="flex items-center justify-center  flex-shrink-0" style={{ background: '#F5F5F4', color: '#1C1917', width: '28px', height: '28px', borderRadius: '10px', fontSize: '11px', fontWeight: 700 }}>
+                  {(m.first_name || '?')[0]}
+                </span>
+                {/* Name */}
+                <div className="flex-1 min-w-0">
+                  <p className="text-ink-primary truncate" style={{ fontSize: '14px', fontWeight: 500 }}>{m.first_name} {m.last_name}</p>
+                  <p className="text-ink-tertiary truncate" style={{ fontSize: '12px' }}>{m.email}</p>
+                </div>
+                {/* Role */}
+                <span className="capitalize flex-shrink-0" style={pillStyle(roleDots[m.role] || roleDots.sales_agent)}>
+                  {(m.role || 'sales_agent').replace('_', ' ')}
+                </span>
+                {/* Leads */}
+                <span className="mono text-ink-secondary flex-shrink-0" style={{ width: '60px', fontSize: '13px' }}>{m.lead_count || 0}</span>
+                {/* Won */}
+                <span className="mono text-ink-secondary flex-shrink-0" style={{ width: '60px', fontSize: '13px' }}>{m.won_count || 0}</span>
+                {/* Calls */}
+                <span className="mono text-ink-secondary flex-shrink-0" style={{ width: '70px', fontSize: '13px' }}>{m.calls_today || 0}</span>
+                {/* Status */}
+                <span className="capitalize flex-shrink-0" style={pillStyle(m.status === 'active' ? '#0E8A5F' : m.status === 'suspended' ? '#B45309' : '#EDE9FF')}>
+                  {m.status}
+                </span>
+                {/* Actions */}
+                <div className="flex items-center gap-3 flex-shrink-0" style={{ width: '80px' }}>
+                  <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-3">
+                    {m.status === 'active' ? (
+                      <button onClick={() => handleSuspend(m.id)} className="text-ink-tertiary hover:text-ink-primary transition-colors" style={{ fontSize: '13px' }}>Suspend</button>
+                    ) : (
+                      <button onClick={() => handleReactivate(m.id)} className="text-ink-tertiary hover:text-ink-primary transition-colors" style={{ fontSize: '13px' }}>Reactivate</button>
+                    )}
+                  </div>
+                  {m.status === 'active' && (
+                    <button onClick={() => handleMessageMember(m)} className="text-ink-tertiary hover:text-ink-primary transition-colors opacity-0 group-hover:opacity-100" title="Message">
+                      <MessageCircle size={14} />
+                    </button>
+                  )}
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        )
       )}
 
       {/* Subteams tab */}
       {tab === 'subteams' && (
         <div className="space-y-4">
           <div className="flex items-center justify-between flex-wrap gap-4">
-            <p className="text-sm font-semibold text-ink-secondary">Create subteams to organize your agents and distribute leads efficiently.</p>
-            <button onClick={() => toast.success('Create subteam modal')} className="btn btn-primary"><Plus size={16} /> Create Subteam</button>
+            <p className="text-ink-secondary" style={{ fontSize: '14px' }}>Create subteams to organize your agents and distribute leads efficiently.</p>
+            <button onClick={() => toast.success('Create subteam modal')} className="text-ink-primary hover:text-accent-deep underline underline-offset-4 transition-colors" style={{ fontSize: '15px', fontWeight: 600 }}>Create subteam</button>
           </div>
           {subteams.length === 0 ? (
-            <div className="card text-center" style={{ padding: '48px 24px' }}>
-              <div className="w-16 h-16 rounded-3xl bg-surface-page flex items-center justify-center mx-auto mb-4"><GitBranch size={32} className="text-ink-tertiary" /></div>
-              <p className="text-ink-tertiary">No subteams yet</p>
+            <div className="text-center py-20">
+              <GitBranch size={28} className="text-ink-tertiary mx-auto mb-4" />
+              <p className="text-ink-primary" style={{ fontSize: '22px', fontWeight: 600 }}>No subteams yet.</p>
+              <p className="text-ink-secondary mt-2" style={{ fontSize: '15px' }}>Create subteams to organize your agents.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {subteams.map(st => (
-                <div key={st.id} className="card card-hover stagger-in">
-                  <h3 className="font-bold text-ink-primary">{st.name}</h3>
-                  <div className="grid grid-cols-2 gap-2 mt-3 text-sm">
-                    <div><p className="text-ink-tertiary text-xs">Members</p><p className="font-bold text-ink-primary">{st.member_count || 0}</p></div>
-                    <div><p className="text-ink-tertiary text-xs">Leads</p><p className="font-bold text-ink-primary">{st.lead_count || 0}</p></div>
+            <div>
+              {subteams.map((st, idx) => (
+                <motion.div key={st.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(idx * 0.04, 0.3), duration: 0.2 }} className="hairline-b py-4 flex items-center justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-ink-primary font-semibold" style={{ fontSize: '15px' }}>{st.name}</h3>
+                    <div className="flex items-center gap-4 mt-1">
+                      <span className="text-ink-secondary mono" style={{ fontSize: '13px' }}>{st.member_count || 0} members</span>
+                      <span className="text-ink-secondary mono" style={{ fontSize: '13px' }}>{st.lead_count || 0} leads</span>
+                    </div>
                   </div>
-                </div>
+                </motion.div>
               ))}
             </div>
           )}
@@ -273,26 +256,29 @@ export default function TeamManagement() {
       {/* Lead Assignment tab */}
       {tab === 'assignment' && (
         <div className="space-y-4">
-          <div className="rounded-2xl p-4 border border-surface-border bg-surface-page">
-            <p className="text-sm font-semibold text-ink-secondary">Configure how new leads are assigned to your team members. Rules are processed in order of priority.</p>
-          </div>
+          <p className="text-ink-secondary" style={{ fontSize: '14px' }}>Configure how new leads are assigned to your team members. Rules are processed in order of priority.</p>
           {assignmentRules.length === 0 ? (
-            <div className="card text-center" style={{ padding: '48px 24px' }}>
-              <div className="w-16 h-16 rounded-3xl bg-surface-page flex items-center justify-center mx-auto mb-4"><ArrowRightLeft size={32} className="text-ink-tertiary" /></div>
-              <p className="text-ink-tertiary">No assignment rules yet</p>
-              <p className="text-sm text-ink-secondary mt-1">Leads will be assigned round-robin by default</p>
+            <div className="text-center py-20">
+              <ArrowRightLeft size={28} className="text-ink-tertiary mx-auto mb-4" />
+              <p className="text-ink-primary" style={{ fontSize: '22px', fontWeight: 600 }}>No assignment rules yet.</p>
+              <p className="text-ink-secondary mt-2" style={{ fontSize: '15px' }}>Leads will be assigned round-robin by default.</p>
             </div>
           ) : (
-            <div className="space-y-3">
-              {assignmentRules.map(r => (
-                <div key={r.id} className="card card-hover stagger-in flex items-center justify-between">
-                  <div><p className="font-bold text-ink-primary">{r.name}</p><p className="text-xs text-ink-tertiary mt-1">{r.conditions} → {r.action}</p></div>
-                  <span className="badge" style={{ background: r.is_active ? '#34C75910' : '#8E8E9310', color: r.is_active ? '#34C759' : '#8E8E93' }}>{r.is_active ? 'Active' : 'Inactive'}</span>
-                </div>
+            <div>
+              {assignmentRules.map((r, idx) => (
+                <motion.div key={r.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(idx * 0.04, 0.3), duration: 0.2 }} className="hairline-b py-4 flex items-center justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-ink-primary font-semibold" style={{ fontSize: '15px' }}>{r.name}</h3>
+                    <p className="text-ink-tertiary mt-1" style={{ fontSize: '13px' }}>{r.conditions} → {r.action}</p>
+                  </div>
+                  <span className=" flex-shrink-0" style={pillStyle(r.is_active ? '#0E8A5F' : '#A8A29E')}>
+                    {r.is_active ? 'Active' : 'Inactive'}
+                  </span>
+                </motion.div>
               ))}
             </div>
           )}
-          <button onClick={() => navigate('/app/automations/rules')} className="btn btn-primary">Configure Automation Rules</button>
+          <button onClick={() => navigate('/app/automations/rules')} className="text-ink-primary hover:text-accent-deep underline underline-offset-4 transition-colors" style={{ fontSize: '15px', fontWeight: 600 }}>Configure automation rules</button>
         </div>
       )}
 
@@ -302,7 +288,7 @@ export default function TeamManagement() {
         <SendPopup
           recipientName={`${messageTarget.first_name} ${messageTarget.last_name}`}
           onClose={() => setMessageTarget(null)}
-          onZomicMail={() => { setShowCompose(true); }}
+          onFlazynMail={() => { setShowCompose(true); }}
         />
       )}
 
@@ -320,20 +306,41 @@ export default function TeamManagement() {
 function InviteModal({ onClose, onInvite }) {
   const [form, setForm] = useState({ email: '', role: 'sales_agent', first_name: '', last_name: '', designation: '' });
   return (
-    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white border border-surface-border rounded-3xl p-6 w-full max-w-md shadow-modal animate-slide-up">
-        <div className="flex items-center justify-between mb-6"><h2 className="text-xl font-bold text-ink-primary">Invite Team Member</h2><button onClick={onClose} className="text-ink-tertiary hover:text-ink-primary transition-colors"><X size={20} /></button></div>
-        <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <input className="input" placeholder="First name" value={form.first_name} onChange={(e) => setForm({ ...form, first_name: e.target.value })} />
-            <input className="input" placeholder="Last name" value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(28,25,23,0.25)' }} onClick={onClose}>
+      <div className="card-raised w-full max-w-md animate-scale-in" style={{ borderRadius: '10px' }} onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between hairline-b pb-4 mb-4">
+          <h2 className="text-ink-primary" style={{ fontSize: '22px', fontWeight: 600 }}>Invite team member</h2>
+          <button onClick={onClose} className="text-ink-tertiary hover:text-ink-primary transition-colors"><X size={18} /></button>
+        </div>
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="meta-label mb-1">First name</p>
+              <input className="input" value={form.first_name} onChange={(e) => setForm({ ...form, first_name: e.target.value })} />
+            </div>
+            <div>
+              <p className="meta-label mb-1">Last name</p>
+              <input className="input" value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} />
+            </div>
           </div>
-          <input className="input" placeholder="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-          <select className="input" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
-            <option value="sales_agent">Sales Agent</option><option value="sales_manager">Sales Manager</option><option value="admin">Admin</option>
-          </select>
-          <input className="input" placeholder="Designation (optional)" value={form.designation} onChange={(e) => setForm({ ...form, designation: e.target.value })} />
-          <button onClick={() => onInvite(form)} className="btn btn-primary w-full">Send Invitation</button>
+          <div>
+            <p className="meta-label mb-1">Email</p>
+            <input className="input" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+          </div>
+          <div>
+            <p className="meta-label mb-1">Role</p>
+            <select className="input" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
+              <option value="sales_agent">Sales Agent</option><option value="sales_manager">Sales Manager</option><option value="admin">Admin</option>
+            </select>
+          </div>
+          <div>
+            <p className="meta-label mb-1">Designation (optional)</p>
+            <input className="input" value={form.designation} onChange={(e) => setForm({ ...form, designation: e.target.value })} />
+          </div>
+          <div className="flex justify-end gap-3 hairline pt-4">
+            <button onClick={onClose} className="text-ink-secondary hover:text-ink-primary underline underline-offset-4 transition-colors" style={{ fontSize: '14px' }}>Cancel</button>
+            <button onClick={() => onInvite(form)} className="btn btn-primary">Send invitation</button>
+          </div>
         </div>
       </div>
     </div>
@@ -350,7 +357,7 @@ function ComposeFromTeam({ onClose, teamMembers, prefillRecipient }) {
     if (!toUserId) { toast.error('Please select a recipient'); return; }
     setSending(true);
     try {
-      await API.post('/zomic-mail/compose', { to_user_id: toUserId, subject, body, is_draft: false });
+      await API.post('/flazyn-mail/compose', { to_user_id: toUserId, subject, body, is_draft: false });
       toast.success('Message sent');
       onClose();
     } catch (err) {
@@ -361,15 +368,15 @@ function ComposeFromTeam({ onClose, teamMembers, prefillRecipient }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white border border-surface-border rounded-3xl w-full max-w-lg shadow-modal animate-slide-up">
-        <div className="flex items-center justify-between p-5 border-b border-surface-border">
-          <h2 className="text-lg font-bold text-ink-primary">Send Zomic Mail</h2>
-          <button onClick={onClose} className="text-ink-tertiary hover:text-ink-primary"><X size={20} /></button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(28,25,23,0.25)' }} onClick={onClose}>
+      <div className="card-raised w-full max-w-lg animate-scale-in" style={{ borderRadius: '10px' }} onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between hairline-b pb-4 mb-4">
+          <h2 className="text-ink-primary" style={{ fontSize: '22px', fontWeight: 600 }}>Send Flazyn Mail</h2>
+          <button onClick={onClose} className="text-ink-tertiary hover:text-ink-primary transition-colors"><X size={18} /></button>
         </div>
-        <div className="p-5 space-y-3">
-          <div className="flex items-center gap-2">
-            <label className="text-sm font-semibold text-ink-secondary w-12 flex-shrink-0">To</label>
+        <div className="space-y-4">
+          <div className="flex items-center gap-3">
+            <label className="meta-label w-12 flex-shrink-0">To</label>
             <select value={toUserId} onChange={(e) => setToUserId(e.target.value)} className="input flex-1">
               <option value="">Select team member...</option>
               {teamMembers.map(m => (
@@ -377,13 +384,14 @@ function ComposeFromTeam({ onClose, teamMembers, prefillRecipient }) {
               ))}
             </select>
           </div>
-          <div className="flex items-center gap-2">
-            <label className="text-sm font-semibold text-ink-secondary w-12 flex-shrink-0">Subject</label>
+          <div className="flex items-center gap-3">
+            <label className="meta-label w-12 flex-shrink-0">Subject</label>
             <input type="text" value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Subject..." className="input flex-1" />
           </div>
-          <textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder="Write your message..." className="input" style={{ height: '150px', padding: '12px 16px', resize: 'vertical' }} />
+          <textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder="Write your message..." className="input" style={{ height: '150px', resize: 'vertical' }} />
         </div>
-        <div className="flex justify-end p-5 border-t border-surface-border">
+        <div className="flex justify-end gap-3 hairline pt-4 mt-4">
+          <button onClick={onClose} className="text-ink-secondary hover:text-ink-primary underline underline-offset-4 transition-colors" style={{ fontSize: '14px' }}>Cancel</button>
           <button onClick={handleSend} className="btn btn-primary" disabled={sending}>
             {sending ? <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" /> : null}
             Send

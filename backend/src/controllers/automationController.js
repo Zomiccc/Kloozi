@@ -1,40 +1,76 @@
 const db = require('../config/database');
 const crypto = require('crypto');
 const logger = require('../utils/logger');
-const { logActivity, updateLeadScore } = require('../utils/activityLog');
-const { sendPushNotification } = require('../utils/notifications');
+const { logActivity } = require('../utils/activityLog');
 const { cacheDelPattern } = require('../config/redis');
+const { createLead, ruleMatches, ruleActions, ruleConditions } = require('../services/leadPipeline');
 
 // ─── Lead Automation Rules ───
+// Rules run on every new lead (see services/leadPipeline.js). API shape:
+//   { name, trigger_source, conditions: [{field, operator, value}], actions: [{type, value}], is_active, priority }
+
+function presentRule(rule) {
+  return {
+    ...rule,
+    trigger_source: rule.trigger_source || 'any',
+    conditions: ruleConditions(rule),
+    actions: ruleActions(rule),
+    is_active: rule.is_enabled !== false,
+  };
+}
+
+function cleanList(list, key) {
+  return (Array.isArray(list) ? list : []).filter((x) => x && x[key]);
+}
 
 exports.getAutomationRules = async (req, res, next) => {
   try {
-    const result = await db.query('SELECT * FROM lead_automation_rules WHERE workspace_id = $1 ORDER BY priority ASC', [req.workspaceId]);
-    res.json({ rules: result.rows });
+    const result = await db.query('SELECT * FROM lead_automation_rules WHERE workspace_id = $1 ORDER BY priority ASC, created_at ASC', [req.workspaceId]);
+    res.json({ rules: result.rows.map(presentRule) });
   } catch (err) { next(err); }
 };
 
 exports.createAutomationRule = async (req, res, next) => {
   try {
-    const { name, trigger_type, trigger_config, action_type, action_config, is_enabled, priority } = req.body;
+    const { name, trigger_source, conditions, actions, is_active, priority } = req.body;
+    if (!name) return res.status(400).json({ error: 'Rule name is required' });
+    const cleanActions = cleanList(actions, 'type');
+    if (cleanActions.length === 0) return res.status(400).json({ error: 'Add at least one action' });
     const result = await db.query(
-      `INSERT INTO lead_automation_rules (workspace_id, name, trigger_type, trigger_config, action_type, action_config, is_enabled, priority) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
-      [req.workspaceId, name, trigger_type || 'any', JSON.stringify(trigger_config || {}), action_type || 'notification', JSON.stringify(action_config || {}), is_enabled !== false, priority || 0]
+      `INSERT INTO lead_automation_rules
+         (workspace_id, name, trigger_type, trigger_source, trigger_config, conditions, action_type, action_config, actions, is_enabled, priority)
+       VALUES ($1,$2,'new_lead',$3,'{}'::jsonb,$4,$5,'{}'::jsonb,$6,$7,$8) RETURNING *`,
+      [req.workspaceId, name, trigger_source || 'any', JSON.stringify(cleanList(conditions, 'field')),
+       cleanActions[0].type, JSON.stringify(cleanActions), is_active !== false, Number(priority) || 0]
     );
-    res.status(201).json({ rule: result.rows[0] });
+    res.status(201).json({ rule: presentRule(result.rows[0]) });
   } catch (err) { next(err); }
 };
 
 exports.updateAutomationRule = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { name, trigger_type, trigger_config, action_type, action_config, is_enabled, priority } = req.body;
+    const { name, trigger_source, conditions, actions, is_active, priority } = req.body;
+    const cleanActions = actions !== undefined ? cleanList(actions, 'type') : null;
     const result = await db.query(
-      `UPDATE lead_automation_rules SET name=COALESCE($1,name), trigger_type=COALESCE($2,trigger_type), trigger_config=COALESCE($3,trigger_config), action_type=COALESCE($4,action_type), action_config=COALESCE($5,action_config), is_enabled=COALESCE($6,is_enabled), priority=COALESCE($7,priority) WHERE id=$8 AND workspace_id=$9 RETURNING *`,
-      [name, trigger_type, trigger_config ? JSON.stringify(trigger_config) : null, action_type, action_config ? JSON.stringify(action_config) : null, is_enabled, priority, id, req.workspaceId]
+      `UPDATE lead_automation_rules SET
+         name = COALESCE($1, name),
+         trigger_source = COALESCE($2, trigger_source),
+         conditions = COALESCE($3, conditions),
+         actions = COALESCE($4, actions),
+         action_type = COALESCE($5, action_type),
+         is_enabled = COALESCE($6, is_enabled),
+         priority = COALESCE($7, priority),
+         updated_at = NOW()
+       WHERE id = $8 AND workspace_id = $9 RETURNING *`,
+      [name ?? null, trigger_source ?? null,
+       conditions !== undefined ? JSON.stringify(cleanList(conditions, 'field')) : null,
+       cleanActions ? JSON.stringify(cleanActions) : null, cleanActions?.[0]?.type ?? null,
+       typeof is_active === 'boolean' ? is_active : null,
+       priority !== undefined ? Number(priority) || 0 : null, id, req.workspaceId]
     );
     if (result.rows.length === 0) return res.status(404).json({ error: 'Rule not found' });
-    res.json({ rule: result.rows[0] });
+    res.json({ rule: presentRule(result.rows[0]) });
   } catch (err) { next(err); }
 };
 
@@ -50,40 +86,66 @@ exports.testAutomationRule = async (req, res, next) => {
     const ruleRes = await db.query('SELECT * FROM lead_automation_rules WHERE id=$1 AND workspace_id=$2', [req.params.id, req.workspaceId]);
     if (ruleRes.rows.length === 0) return res.status(404).json({ error: 'Rule not found' });
     const rule = ruleRes.rows[0];
-    const conditions = typeof rule.conditions === 'string' ? JSON.parse(rule.conditions) : rule.conditions;
     const sample = req.body.sample_lead || {};
-    const matched = conditions.length === 0 || conditions.every(c => {
-      const v = sample[c.field];
-      if (c.operator === 'equals') return v === c.value;
-      if (c.operator === 'contains') return String(v || '').includes(c.value);
-      if (c.operator === 'greater_than') return parseFloat(v) > parseFloat(c.value);
-      if (c.operator === 'less_than') return parseFloat(v) < parseFloat(c.value);
-      return false;
+    const matched = ruleMatches(rule, sample);
+    res.json({
+      matched,
+      actions: matched ? ruleActions(rule) : [],
+      message: matched ? 'Rule would trigger for this lead' : 'Rule would NOT trigger for this lead',
     });
-    res.json({ matched, message: matched ? 'Rule would trigger' : 'Rule would NOT trigger' });
   } catch (err) { next(err); }
 };
 
 // ─── Lead Distribution ───
+// { type: 'round_robin' | 'all', config: { recipients: [{ type: 'team_member'|'email'|'whatsapp', value }] } }
 
 exports.getDistributionConfig = async (req, res, next) => {
   try {
-    const result = await db.query('SELECT * FROM lead_distribution_config WHERE workspace_id=$1', [req.workspaceId]);
+    const result = await db.query('SELECT * FROM lead_distribution_config WHERE workspace_id=$1 ORDER BY created_at ASC', [req.workspaceId]);
     res.json({ configs: result.rows });
   } catch (err) { next(err); }
 };
 
 exports.updateDistributionConfig = async (req, res, next) => {
   try {
-    const { type, config } = req.body;
-    const existing = await db.query('SELECT id FROM lead_distribution_config WHERE workspace_id=$1', [req.workspaceId]);
-    if (existing.rows.length > 0) {
-      const result = await db.query('UPDATE lead_distribution_config SET type=$1, config=$2 WHERE workspace_id=$3 RETURNING *', [type, JSON.stringify(config), req.workspaceId]);
-      res.json({ config: result.rows[0] });
-    } else {
-      const result = await db.query('INSERT INTO lead_distribution_config (workspace_id, type, config) VALUES ($1,$2,$3) RETURNING *', [req.workspaceId, type, JSON.stringify(config)]);
-      res.status(201).json({ config: result.rows[0] });
+    const { id, name, type, config, is_active } = req.body;
+    const recipients = cleanList(config?.recipients, 'value').map((r) => ({ type: r.type, value: String(r.value).trim() }));
+    if (recipients.length === 0) return res.status(400).json({ error: 'Add at least one recipient' });
+    const strategy = type === 'all' ? 'all' : 'round_robin';
+    if (id) {
+      const result = await db.query(
+        `UPDATE lead_distribution_config
+         SET type = $1, name = COALESCE($2, name), config = jsonb_set(COALESCE(config,'{}'::jsonb), '{recipients}', $3::jsonb),
+             is_active = COALESCE($4, is_active), updated_at = NOW()
+         WHERE id = $5 AND workspace_id = $6 RETURNING *`,
+        [strategy, name ?? null, JSON.stringify(recipients), typeof is_active === 'boolean' ? is_active : null, id, req.workspaceId]
+      );
+      if (result.rows.length === 0) return res.status(404).json({ error: 'Distribution not found' });
+      return res.json({ config: result.rows[0] });
     }
+    const result = await db.query(
+      'INSERT INTO lead_distribution_config (workspace_id, name, type, config, is_active) VALUES ($1,$2,$3,$4,$5) RETURNING *',
+      [req.workspaceId, name || null, strategy, JSON.stringify({ recipients }), is_active !== false]
+    );
+    res.status(201).json({ config: result.rows[0] });
+  } catch (err) { next(err); }
+};
+
+exports.toggleDistributionConfig = async (req, res, next) => {
+  try {
+    const result = await db.query(
+      'UPDATE lead_distribution_config SET is_active = NOT COALESCE(is_active, true), updated_at = NOW() WHERE id = $1 AND workspace_id = $2 RETURNING *',
+      [req.params.id, req.workspaceId]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Distribution not found' });
+    res.json({ config: result.rows[0] });
+  } catch (err) { next(err); }
+};
+
+exports.deleteDistributionConfig = async (req, res, next) => {
+  try {
+    await db.query('DELETE FROM lead_distribution_config WHERE id = $1 AND workspace_id = $2', [req.params.id, req.workspaceId]);
+    res.json({ message: 'Distribution deleted' });
   } catch (err) { next(err); }
 };
 
@@ -99,11 +161,33 @@ exports.getChatAssistantRules = async (req, res, next) => {
 exports.createChatAssistantRule = async (req, res, next) => {
   try {
     const { name, trigger_condition, trigger_value, action_type, action_value, is_active, priority } = req.body;
+    if (!name || !action_type) return res.status(400).json({ error: 'Name and action are required' });
+    if (trigger_condition === 'contains' && !String(trigger_value || '').trim()) {
+      return res.status(400).json({ error: 'Enter the keyword to look for' });
+    }
     const result = await db.query(
-      `INSERT INTO whatsapp_chat_assistant_rules (workspace_id, name, trigger_condition, trigger_value, action_type, action_value, is_active, priority) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
-      [req.workspaceId, name, trigger_condition, trigger_value, action_type, action_value, is_active !== false, priority || 0]
+      `INSERT INTO whatsapp_chat_assistant_rules
+         (workspace_id, name, trigger_condition, trigger_value, trigger_keywords, action_type, action_value, response_message, is_active, is_enabled, priority)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$9,$10) RETURNING *`,
+      [req.workspaceId, name, trigger_condition || 'contains', trigger_value || null,
+       JSON.stringify(String(trigger_value || '').split(',').map((k) => k.trim()).filter(Boolean)),
+       action_type, action_value || null, action_type === 'send_template' ? action_value || null : null,
+       is_active !== false, Number(priority) || 0]
     );
     res.status(201).json({ rule: result.rows[0] });
+  } catch (err) { next(err); }
+};
+
+exports.toggleChatAssistantRule = async (req, res, next) => {
+  try {
+    const result = await db.query(
+      `UPDATE whatsapp_chat_assistant_rules SET is_active = NOT COALESCE(is_active, true),
+         is_enabled = NOT COALESCE(is_active, true), updated_at = NOW()
+       WHERE id = $1 AND workspace_id = $2 RETURNING *`,
+      [req.params.id, req.workspaceId]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Rule not found' });
+    res.json({ rule: result.rows[0] });
   } catch (err) { next(err); }
 };
 
@@ -125,8 +209,15 @@ exports.getOutgoingWebhooks = async (req, res, next) => {
 
 exports.createOutgoingWebhook = async (req, res, next) => {
   try {
-    const { name, url, trigger_event, headers, is_enabled } = req.body;
-    const result = await db.query('INSERT INTO outgoing_webhooks (workspace_id, name, url, trigger_event, headers, is_enabled) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *', [req.workspaceId, name, url, trigger_event || 'lead.created', JSON.stringify(headers || {}), is_enabled !== false]);
+    const { name, url, events, trigger_event, headers, is_active } = req.body;
+    if (!name || !url) return res.status(400).json({ error: 'Name and URL are required' });
+    if (!/^https?:\/\//i.test(url)) return res.status(400).json({ error: 'URL must start with http:// or https://' });
+    const eventList = Array.isArray(events) && events.length ? events : [trigger_event || 'new_lead'];
+    const result = await db.query(
+      `INSERT INTO outgoing_webhooks (workspace_id, name, url, trigger_event, events, headers, is_enabled, is_active)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$7) RETURNING *`,
+      [req.workspaceId, name, url, eventList[0], JSON.stringify(eventList), JSON.stringify(headers || {}), is_active !== false]
+    );
     res.status(201).json({ webhook: result.rows[0] });
   } catch (err) { next(err); }
 };
@@ -144,15 +235,24 @@ exports.testOutgoingWebhook = async (req, res, next) => {
     if (whRes.rows.length === 0) return res.status(404).json({ error: 'Webhook not found' });
     const wh = whRes.rows[0];
     const axios = require('axios');
-    const payload = { event: 'test', timestamp: new Date().toISOString(), data: { message: 'Test from CRM Final' } };
+    const payload = { event: 'test', timestamp: new Date().toISOString(), workspace_id: req.workspaceId, data: { message: 'Test event from Flazyn' } };
+    let ok = true;
+    let status = 0;
+    let errorMessage = null;
     try {
-      const response = await axios.post(wh.url, payload, { timeout: 10000 });
-      await db.query('INSERT INTO outgoing_webhook_logs (webhook_id, event, payload, response_code, status) VALUES ($1,$2,$3,$4,$5)', [wh.id, 'test', JSON.stringify(payload), response.status, 'success']);
-      res.json({ success: true, statusCode: response.status });
+      const response = await axios.post(wh.url, payload, { timeout: 10000, headers: { 'X-Flazyn-Event': 'test' } });
+      status = response.status;
     } catch (err) {
-      await db.query('INSERT INTO outgoing_webhook_logs (webhook_id, event, payload, response_code, status, error_message) VALUES ($1,$2,$3,$4,$5,$6)', [wh.id, 'test', JSON.stringify(payload), err.response?.status || 0, 'failed', err.message]);
-      res.json({ success: false, error: err.message });
+      ok = false;
+      status = err.response?.status || 0;
+      errorMessage = err.message;
     }
+    await db.query(
+      `INSERT INTO outgoing_webhook_logs (webhook_id, workspace_id, event, event_type, payload, request_body, response_code, response_status, status, success, error_message)
+       VALUES ($1,$2,'test','test',$3,$3,$4,$4,$5,$6,$7)`,
+      [wh.id, req.workspaceId, JSON.stringify(payload), status, ok ? 'success' : 'failed', ok, errorMessage]
+    );
+    res.json(ok ? { success: true, statusCode: status } : { success: false, statusCode: status, error: errorMessage });
   } catch (err) { next(err); }
 };
 
@@ -174,11 +274,11 @@ exports.getLeadFormPages = async (req, res, next) => {
 
 exports.createLeadFormPage = async (req, res, next) => {
   try {
-    const { name, title, description, fields, branding, assigned_to, redirect_url, thank_you_message } = req.body;
+    const { name, title, description, fields, branding, assigned_to, redirect_url, thank_you_message, template_id } = req.body;
     const formKey = crypto.randomBytes(8).toString('hex');
     const result = await db.query(
-      `INSERT INTO lead_form_pages (workspace_id, name, form_key, title, description, fields, branding, assigned_to, redirect_url, thank_you_message) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
-      [req.workspaceId, name, formKey, title || name, description, JSON.stringify(fields || []), JSON.stringify(branding || {}), assigned_to, redirect_url, thank_you_message || 'Thank you! We will contact you soon.']
+      `INSERT INTO lead_form_pages (workspace_id, name, form_key, title, description, fields, branding, assigned_to, redirect_url, thank_you_message, template_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
+      [req.workspaceId, name, formKey, title || name, description, JSON.stringify(fields || []), JSON.stringify(branding || {}), assigned_to || null, redirect_url, thank_you_message || 'Thank you! We will contact you soon.', template_id || null]
     );
     res.status(201).json({ page: result.rows[0] });
   } catch (err) { next(err); }
@@ -186,10 +286,13 @@ exports.createLeadFormPage = async (req, res, next) => {
 
 exports.updateLeadFormPage = async (req, res, next) => {
   try {
-    const { name, title, description, fields, branding, assigned_to, redirect_url, thank_you_message, is_active } = req.body;
+    const { name, title, description, fields, branding, assigned_to, redirect_url, thank_you_message, is_active, template_id } = req.body;
     const result = await db.query(
-      `UPDATE lead_form_pages SET name=COALESCE($1,name), title=COALESCE($2,title), description=COALESCE($3,description), fields=COALESCE($4,fields), branding=COALESCE($5,branding), assigned_to=COALESCE($6,assigned_to), redirect_url=COALESCE($7,redirect_url), thank_you_message=COALESCE($8,thank_you_message), is_active=COALESCE($9,is_active) WHERE id=$10 AND workspace_id=$11 RETURNING *`,
-      [name, title, description, fields ? JSON.stringify(fields) : null, branding ? JSON.stringify(branding) : null, assigned_to, redirect_url, thank_you_message, is_active, req.params.id, req.workspaceId]
+      `UPDATE lead_form_pages SET name=COALESCE($1,name), title=COALESCE($2,title), description=COALESCE($3,description), fields=COALESCE($4,fields), branding=COALESCE($5,branding), assigned_to=COALESCE($6,assigned_to), redirect_url=COALESCE($7,redirect_url), thank_you_message=COALESCE($8,thank_you_message), is_active=COALESCE($9,is_active),
+         template_id=CASE WHEN $12::boolean THEN $13::uuid ELSE template_id END
+       WHERE id=$10 AND workspace_id=$11 RETURNING *`,
+      [name, title, description, fields ? JSON.stringify(fields) : null, branding ? JSON.stringify(branding) : null, assigned_to || null, redirect_url, thank_you_message, is_active, req.params.id, req.workspaceId,
+       template_id !== undefined, template_id || null]
     );
     if (result.rows.length === 0) return res.status(404).json({ error: 'Not found' });
     res.json({ page: result.rows[0] });
@@ -205,90 +308,61 @@ exports.deleteLeadFormPage = async (req, res, next) => {
 
 exports.serveLeadFormPage = async (req, res, next) => {
   try {
+    const { renderFormPage, SANDBOX_CSP, DEFAULT_TEMPLATE } = require('../services/formRenderer');
     const result = await db.query('SELECT * FROM lead_form_pages WHERE form_key=$1 AND is_active=true', [req.params.formKey]);
-    if (result.rows.length === 0) return res.status(404).send('<html><body><h2>Form not found</h2></body></html>');
+    if (result.rows.length === 0) return res.status(404).type('html').send('<html><body style="font-family:system-ui;padding:40px">Form not found</body></html>');
     const page = result.rows[0];
+    const tpl = await db.query(
+      `SELECT content FROM templates WHERE (id = $1 AND (workspace_id = $2 OR is_system = true)) OR slug = $3
+       ORDER BY (id = $1) DESC LIMIT 1`,
+      [page.template_id || '00000000-0000-0000-0000-000000000000', page.workspace_id, DEFAULT_TEMPLATE]
+    );
     const config = require('../config');
-    const branding = typeof page.branding === 'string' ? JSON.parse(page.branding) : page.branding || {};
-    const fields = typeof page.fields === 'string' ? JSON.parse(page.fields) : page.fields || [];
-
-    // Generate a nonce for CSP
-    const crypto = require('crypto');
-    const nonce = crypto.randomBytes(16).toString('base64');
-
-    // Set CSP header with nonce
-    res.set('Content-Security-Policy', `script-src 'self' 'nonce-${nonce}'`);
-
-    const fieldsHtml = fields.map(f => {
-      const label = f.label || f.name;
-      const type = f.type || 'text';
-      const req = f.required ? 'required' : '';
-      if (type === 'textarea') return `<div class="f"><label>${label}${f.required?' *':''}</label><textarea name="${f.name}" ${req} rows="3"></textarea></div>`;
-      if (type === 'select' && f.options) return `<div class="f"><label>${label}${f.required?' *':''}</label><select name="${f.name}" ${req}><option value="">Select...</option>${f.options.map(o=>`<option>${o}</option>`).join('')}</select></div>`;
-      return `<div class="f"><label>${label}${f.required?' *':''}</label><input type="${type}" name="${f.name}" ${req} placeholder="${label}"></div>`;
-    }).join('');
-
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${page.title}</title><style>
-      *{margin:0;padding:0;box-sizing:border-box}body{font-family:sans-serif;background:${branding.bg_color||'#f8fafc'};padding:20px}
-      .c{max-width:480px;margin:0 auto;background:#fff;border-radius:16px;padding:32px;box-shadow:0 4px 20px rgba(0,0,0,.08)}
-      .logo{text-align:center;margin-bottom:16px}.logo img{max-height:60px}
-      h2{font-size:22px;font-weight:700;color:#0f172a;margin-bottom:8px;text-align:center}
-      .d{font-size:14px;color:#64748b;text-align:center;margin-bottom:24px}
-      .f{margin-bottom:16px}.f label{display:block;font-size:14px;font-weight:500;color:#374151;margin-bottom:6px}
-      .f input,.f textarea,.f select{width:100%;padding:10px 14px;border:1px solid #d1d5db;border-radius:8px;font-size:15px;outline:none}
-      .f input:focus,.f textarea:focus,.f select:focus{border-color:${branding.primary_color||'#2563eb'}}
-      .b{width:100%;background:${branding.primary_color||'#2563eb'};color:#fff;border:none;padding:14px;border-radius:8px;font-size:16px;font-weight:600;cursor:pointer;margin-top:8px}
-      .s{text-align:center;color:#059669;font-size:18px;padding:30px}
-    </style></head><body><div class="c">
-      ${branding.logo_url?`<div class="logo"><img src="${branding.logo_url}"></div>`:''}
-      <h2>${page.title}</h2>${page.description?`<p class="d">${page.description}</p>`:''}
-      <form id="lf">${fieldsHtml}<button type="submit" class="b">Submit</button></form>
-    </div><script nonce="${nonce}">
-    document.getElementById('lf').addEventListener('submit',function(e){e.preventDefault();var d={};new FormData(this).forEach(function(v,k){d[k]=v});
-    fetch('${config.apiUrl}/api/automations/lead-form/${page.form_key}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)})
-    .then(function(){document.querySelector('.c').innerHTML='<div class="s">${page.thank_you_message||'Thank you!'}</div>';${page.redirect_url?`setTimeout(function(){window.location='${page.redirect_url}';},2000);`:''}})
-    .catch(function(){document.querySelector('.c').innerHTML='<div class="s">${page.thank_you_message||'Thank you!'}</div>';});});
-    </script></body></html>`;
-    res.set('Content-Type', 'text/html');
-    res.send(html);
+    const html = renderFormPage({
+      template: tpl.rows[0]?.content,
+      page,
+      action: `${config.apiUrl}/api/automations/lead-form/${page.form_key}`,
+      // carry the website visitor id (from the tracking script) so prior browsing joins the new lead
+      hidden: { _fz_vid: String(req.query.fz_vid || '').slice(0, 64) },
+    });
+    res.set('Content-Security-Policy', SANDBOX_CSP);
+    res.set('X-Frame-Options', 'SAMEORIGIN');
+    res.type('html').send(html);
   } catch (err) { next(err); }
 };
 
 exports.handleLeadFormSubmission = async (req, res, next) => {
   try {
-    const logger = require('../utils/logger');
-    logger.info(`Lead form submission for form_key: ${req.params.formKey}`);
-    logger.info(`Request body:`, req.body);
-    
     const pageRes = await db.query('SELECT * FROM lead_form_pages WHERE form_key=$1 AND is_active=true', [req.params.formKey]);
-    if (pageRes.rows.length === 0) {
-      logger.warn(`Form not found for form_key: ${req.params.formKey}`);
-      return res.status(404).json({ error: 'Form not found' });
-    }
+    if (pageRes.rows.length === 0) return res.status(404).json({ error: 'Form not found' });
     const page = pageRes.rows[0];
-    const d = req.body;
-    const firstName = d.first_name || d.name?.split(' ')[0] || 'Unknown';
-    const lastName = d.last_name || d.name?.split(' ').slice(1).join(' ') || '';
-    
-    logger.info(`Creating lead: ${firstName} ${lastName}, workspace: ${page.workspace_id}`);
-    
-    const agentsRes = await db.query(`SELECT id FROM users WHERE workspace_id=$1 AND role='sales_agent' AND status='active' LIMIT 1`, [page.workspace_id]);
-    const leadRes = await db.query(
-      `INSERT INTO leads (workspace_id, first_name, last_name, phone, email, city, budget, lead_source, notes, stage, assigned_to, custom_fields) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
-      [page.workspace_id, firstName, lastName, d.phone, d.email, d.city, d.budget, 'lead_form', d.message || d.notes || `Form: ${page.name}`, 'new', page.assigned_to || agentsRes.rows[0]?.id, JSON.stringify(d)]
-    );
-    const lead = leadRes.rows[0];
-    
-    logger.info(`Lead created successfully with ID: ${lead.id}`);
-    
-    await logActivity(page.workspace_id, lead.id, null, 'lead_created', `Lead from form: ${page.name}`);
-    await updateLeadScore(lead.id);
-    if (page.assigned_to || agentsRes.rows[0]?.id) {
-      await sendPushNotification(page.assigned_to || agentsRes.rows[0].id, 'New Lead from Form', `${firstName} ${lastName}`, { type: 'new_lead', leadId: lead.id }).catch(() => {});
+    const d = req.body || {};
+    const visitorId = String(d._fz_vid || '').slice(0, 64);
+    const known = ['first_name', 'last_name', 'name', 'full_name', 'phone', 'mobile', 'email', 'city', 'budget', 'message', 'notes', '_fz_vid'];
+    const customFields = Object.entries(d)
+      .filter(([k, v]) => !known.includes(k) && !k.startsWith('_') && v !== null && v !== undefined && typeof v !== 'object' && String(v).trim() !== '')
+      .map(([name, value]) => ({ name, value: String(value).slice(0, 1000) }));
+
+    const result = await createLead(page.workspace_id, {
+      first_name: d.first_name, last_name: d.last_name, name: d.name || d.full_name, phone: d.phone || d.mobile, email: d.email,
+      city: d.city, budget: d.budget, notes: d.message || d.notes || `Form: ${page.name}`,
+      custom_fields: customFields, assigned_to: page.assigned_to || undefined, lead_source: 'lead_form',
+    }, { source: 'lead_form', duplicateMode: 'workspace', activityText: `Lead from form: ${page.name}` });
+
+    const leadId = result.lead?.id || result.duplicate?.id || null;
+    if (leadId && visitorId) {
+      const { linkVisitorToLead } = require('../services/interestService');
+      await linkVisitorToLead(page.workspace_id, visitorId, leadId).catch(() => {});
     }
-    res.status(201).json({ success: true, leadId: lead.id });
+
+    // Native <form> posts (templates, custom HTML) get a page back; fetch/JSON callers get JSON.
+    if (req.is('application/x-www-form-urlencoded') || req.is('multipart/form-data')) {
+      const { thankYouPage, SANDBOX_CSP } = require('../services/formRenderer');
+      res.set('Content-Security-Policy', SANDBOX_CSP);
+      return res.status(200).type('html').send(thankYouPage(page));
+    }
+    res.status(201).json({ success: true, leadId });
   } catch (err) {
-    const logger = require('../utils/logger');
     logger.error('Lead form submission error:', err.message);
     next(err);
   }
@@ -331,53 +405,19 @@ exports.markLeadQualified = async (req, res, next) => {
     const leadRes = await db.query('SELECT * FROM leads WHERE id=$1 AND workspace_id=$2', [req.params.id, req.workspaceId]);
     if (leadRes.rows.length === 0) return res.status(404).json({ error: 'Lead not found' });
     const lead = leadRes.rows[0];
-    
-    const pixelId = process.env.META_PIXEL_ID;
-    const accessToken = process.env.META_CONVERSIONS_ACCESS_TOKEN;
-    
-    if (pixelId && accessToken) {
-      const axios = require('axios');
-      const sha256 = (s) => crypto.createHash('sha256').update(s || '').digest('hex');
-      try {
-        logger.info('Sending Meta Conversions API event', { 
-          pixelId, 
-          leadId: lead.id, 
-          eventName: 'Contact',
-          email: lead.email,
-          phone: lead.phone
-        });
-        
-        const response = await axios.post(`https://graph.facebook.com/v25.0/${pixelId}/events`, {
-          data: [{ 
-            event_name: 'Contact', 
-            event_time: Math.floor(Date.now()/1000), 
-            action_source: 'system_generated', 
-            user_data: { 
-              ph: lead.phone ? [sha256(lead.phone)] : [], 
-              em: lead.email ? [sha256(lead.email)] : [] 
-            } 
-          }],
-          access_token: accessToken,
-        });
-        
-        logger.info('Meta Conversions API response', { 
-          status: response.status, 
-          data: response.data 
-        });
-      } catch (e) { 
-        logger.error('Meta CAPI error:', { 
-          message: e.message, 
-          response: e.response?.data, 
-          status: e.response?.status 
-        }); 
-      }
-    } else {
-      logger.warn('Meta Conversions API not configured', { pixelId: !!pixelId, accessToken: !!accessToken });
-    }
-    
-    await logActivity(req.workspaceId, req.params.id, req.user.id, 'lead_qualified', 'Lead marked as qualified');
+    await logActivity(req.workspaceId, lead.id, req.user.id, 'lead_qualified', 'Lead marked as qualified');
+    const { sendLeadEvent } = require('../services/metaCapiService');
+    const capi = await sendLeadEvent(req.workspaceId, lead, 'QualifiedLead', req.user.id);
+    const { updateLeadScore } = require('../utils/activityLog');
+    await updateLeadScore(lead.id).catch(() => {});
     await cacheDelPattern(`leads:${req.workspaceId}:*`);
-    res.json({ message: 'Lead marked as qualified' });
+    const note = {
+      sent: 'Lead marked as qualified and sent to Meta',
+      dry_run: 'Lead marked as qualified (test mode: Meta not contacted)',
+      not_configured: 'Lead marked as qualified. Connect Meta CAPI to send it to Meta',
+      failed: `Lead marked as qualified, but Meta rejected the event: ${capi.error}`,
+    }[capi.status];
+    res.json({ message: note, capi });
   } catch (err) { next(err); }
 };
 
@@ -447,50 +487,38 @@ exports.getWhatsAppContactImport = async (req, res, next) => {
 
 exports.importWhatsAppContacts = async (req, res, next) => {
   try {
-    const { phone_numbers } = req.body; // Array of phone numbers to import
-    
+    const { phone_numbers } = req.body;
     if (!Array.isArray(phone_numbers) || phone_numbers.length === 0) {
       return res.status(400).json({ error: 'phone_numbers array required' });
     }
 
-    const stageResult = await db.query('SELECT id FROM lead_stages WHERE workspace_id = $1 AND is_default = true LIMIT 1', [req.workspaceId]);
-    const agentsResult = await db.query(
-      `SELECT u.id FROM users u WHERE u.workspace_id = $1 AND u.role = $2 AND u.status = $3
-       ORDER BY (SELECT COUNT(*) FROM leads WHERE assigned_to = u.id) ASC LIMIT 1`,
-      [req.workspaceId, 'sales_agent', 'active']
-    );
-
     const imported = [];
     const errors = [];
-
     for (const phone of phone_numbers) {
       try {
-        // Check if lead already exists
-        const existing = await db.query(
-          `SELECT id FROM leads WHERE workspace_id = $1 AND REPLACE(REPLACE(phone,'+',''),' ','') = REPLACE(REPLACE($2,'+',''),' ','')`,
+        const first = await db.query(
+          `SELECT message_text FROM whatsapp_messages WHERE workspace_id = $1 AND phone = $2 AND direction = 'inbound'
+           ORDER BY created_at ASC LIMIT 1`,
           [req.workspaceId, phone]
         );
-        
-        if (existing.rows.length > 0) {
+        const result = await createLead(req.workspaceId, {
+          phone, lead_source: 'whatsapp_import',
+          notes: first.rows[0]?.message_text ? `First WhatsApp message: "${first.rows[0].message_text}"` : null,
+        }, { actorId: req.user.id, source: 'whatsapp_import', duplicateMode: 'skip', activityText: 'Lead imported from WhatsApp contacts' });
+        if (result.status !== 'created') {
           errors.push({ phone, error: 'Lead already exists' });
           continue;
         }
-
-        // Create lead
-        const leadResult = await db.query(
-          `INSERT INTO leads (workspace_id, phone, lead_source, stage, stage_id, assigned_to, created_by)
-           VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
-          [req.workspaceId, phone, 'whatsapp_import', 'new', stageResult.rows[0]?.id, agentsResult.rows[0]?.id, req.user.id]
+        await db.query(
+          'UPDATE whatsapp_messages SET lead_id = $1 WHERE workspace_id = $2 AND phone = $3 AND lead_id IS NULL',
+          [result.lead.id, req.workspaceId, phone]
         );
-
-        await logActivity(req.workspaceId, leadResult.rows[0].id, req.user.id, 'lead_created', 'Lead imported from WhatsApp contacts');
-        imported.push({ phone, leadId: leadResult.rows[0].id });
+        imported.push({ phone, leadId: result.lead.id });
       } catch (err) {
         errors.push({ phone, error: err.message });
       }
     }
 
-    await cacheDelPattern(`leads:${req.workspaceId}:*`);
     res.json({ imported, errors, total: imported.length });
   } catch (err) { next(err); }
 };

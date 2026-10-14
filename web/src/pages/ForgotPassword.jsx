@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 import API from '../lib/api';
 
@@ -23,32 +24,37 @@ export default function ForgotPassword() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-600 to-primary-900 p-4">
-      <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
-        <div className="flex items-center gap-2 mb-8">
-          <div className="w-10 h-10 bg-primary-600 rounded-lg flex items-center justify-center text-white font-bold text-xl">C</div>
-          <span className="font-bold text-2xl text-dark-900">CRM Final</span>
+    <div className="min-h-screen flex items-center justify-center page-bg px-4">
+      <motion.div className="w-full max-w-[400px]" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+        <div className="flex flex-col items-center mb-8">
+          <div className="w-12 h-12 flex items-center justify-center text-white font-bold text-xl mb-3" style={{ background: '#EDE9FF', borderRadius: '8px' }}>F</div>
+          <h1 className="text-ink-primary" style={{ fontSize: '24px', fontWeight: 650, letterSpacing: '-0.01em' }}>Flazyn</h1>
         </div>
-        {sent ? (
-          <>
-            <h1 className="text-2xl font-bold text-dark-900 mb-2">Check your email</h1>
-            <p className="text-dark-400 mb-6">If an account exists with that email, a reset link has been sent.</p>
-            <Link to="/login" className="btn btn-primary w-full block text-center">Back to login</Link>
-          </>
-        ) : (
-          <>
-            <h1 className="text-2xl font-bold text-dark-900 mb-2">Forgot password?</h1>
-            <p className="text-dark-400 mb-6">Enter your email to receive a reset link</p>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="input" required placeholder="you@company.com" />
-              <button type="submit" disabled={loading} className="btn btn-primary w-full">{loading ? 'Sending...' : 'Send reset link'}</button>
-            </form>
-            <div className="mt-6 text-center">
-              <Link to="/login" className="text-sm text-primary-600 hover:underline">Back to login</Link>
-            </div>
-          </>
-        )}
-      </div>
+
+        <div className="hairline pt-6 space-y-6">
+          {sent ? (
+            <>
+              <div className="space-y-2">
+                <h2 className="text-ink-primary" style={{ fontSize: '20px', fontWeight: 600 }}>Check your email</h2>
+                <p className="text-ink-secondary" style={{ fontSize: '14px' }}>If an account exists with that email, a reset link has been sent.</p>
+              </div>
+              <Link to="/login" className="text-ink-primary hover:text-accent-deep underline underline-offset-4 transition-colors" style={{ fontSize: '14px' }}>Back to login</Link>
+            </>
+          ) : (
+            <>
+              <div className="space-y-2">
+                <h2 className="text-ink-primary" style={{ fontSize: '20px', fontWeight: 600 }}>Forgot password?</h2>
+                <p className="text-ink-secondary" style={{ fontSize: '14px' }}>Enter your email to receive a reset link</p>
+              </div>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div><p className="meta-label mb-1">Email</p><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="input" required placeholder="you@company.com" /></div>
+                <button type="submit" disabled={loading} className="btn btn-primary w-full disabled:opacity-50 transition-opacity">{loading ? 'Sending...' : 'Send reset link'}</button>
+              </form>
+              <Link to="/login" className="text-ink-primary hover:text-accent-deep underline underline-offset-4 transition-colors" style={{ fontSize: '14px' }}>Back to login</Link>
+            </>
+          )}
+        </div>
+      </motion.div>
     </div>
   );
 }

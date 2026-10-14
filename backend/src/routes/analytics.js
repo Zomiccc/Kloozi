@@ -13,6 +13,7 @@ router.get('/agents', requireManagerOrAbove, analyticsController.getAgentPerform
 router.get('/team-stats', analyticsController.getTeamStats);
 router.get('/ai-insight', analyticsController.getAIInsight);
 router.get('/engagement', analyticsController.getEngagementAnalytics);
+router.get('/interest-board', require('../controllers/interestController').board);
 router.get('/leads/:leadId/engagement', analyticsController.getLeadEngagement);
 router.get('/workspace-settings', analyticsController.getWorkspaceSettings);
 router.put('/workspace-settings', analyticsController.updateWorkspaceSettings);

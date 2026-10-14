@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import API from '../../lib/api';
 import toast from 'react-hot-toast';
-import { ArrowLeft, Plus, Trash2, Edit, Play, Square, Clock, CheckCircle2, XCircle, MessageSquare } from 'lucide-react';
-import BrandLogo from '../../components/BrandLogo';
+import { ArrowLeft, Plus, Trash2, Clock, CheckCircle2, XCircle, Square } from 'lucide-react';
+import useCreateRegistry from '../../stores/createStore';
 
 export default function WhatsAppSequences() {
   const navigate = useNavigate();
@@ -12,6 +13,13 @@ export default function WhatsAppSequences() {
   const [showBuilder, setShowBuilder] = useState(false);
   const [editingSequence, setEditingSequence] = useState(null);
   const [loading, setLoading] = useState(true);
+  const register = useCreateRegistry((s) => s.register);
+  const clearRegistry = useCreateRegistry((s) => s.clear);
+
+  useEffect(() => {
+    register([{ label: 'New sequence', icon: <Plus size={14} />, run: () => { setEditingSequence(null); setShowBuilder(true); } }]);
+    return () => clearRegistry();
+  }, [register, clearRegistry]);
 
   useEffect(() => { loadSequences(); loadProgress(); }, []);
 
@@ -39,90 +47,106 @@ export default function WhatsAppSequences() {
     } catch { toast.error('Failed to delete'); }
   };
 
-  const handleStartSequence = async (sequenceId, leadId) => {
-    try {
-      await API.post('/whatsapp/sequences/start', { sequence_id: sequenceId, lead_id });
-      toast.success('Sequence started');
-      loadProgress();
-    } catch { toast.error('Failed to start sequence'); }
-  };
-
   const handleStopSequence = async (sequenceId, leadId) => {
     try {
-      await API.post('/whatsapp/sequences/stop', { sequence_id: sequenceId, lead_id, reason: 'manual' });
+      await API.post('/whatsapp/sequences/stop', { sequence_id: sequenceId, lead_id: leadId, reason: 'manual' });
       toast.success('Sequence stopped');
       loadProgress();
-    } catch { toast.error('Failed to stop sequence'); }
+    } catch { toast.error('Failed to stop'); }
   };
 
-  const getSequenceById = (id) => sequences.find(s => s.id === id);
+  const getSequenceById = (id) => sequences.find((s) => s.id === id);
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
-      <button onClick={() => navigate('/app/automations')} className="flex items-center gap-2 text-sm text-ink-secondary hover:text-ink-primary"><ArrowLeft size={16} /> Back to Automations</button>
+    <div className="max-w-5xl mx-auto space-y-8">
+      <button onClick={() => navigate('/app/automations')} className="btn-ghost text-sm font-medium flex items-center gap-1.5">
+        <ArrowLeft size={14} /> Automations
+      </button>
 
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 bg-surface-page rounded-xl flex items-center justify-center"><BrandLogo brand="whatsapp" /></div>
-          <div><h2 className="text-xl font-bold text-ink-primary">Automated WhatsApp Sequences</h2><p className="text-sm text-ink-secondary">Multi-step sequences over multiple days</p></div>
-        </div>
-        <button onClick={() => { setEditingSequence(null); setShowBuilder(true); }} className="px-4 py-2 rounded-lg btn btn-primary flex items-center gap-2 transition-colors"><Plus size={16} /> New Sequence</button>
+      <div>
+        <h1 style={{ fontSize: '32px', fontWeight: 650, letterSpacing: '-0.01em' }}>WhatsApp Sequences</h1>
+        <p className="text-ink-secondary mt-1" style={{ fontSize: '15px' }}>
+          Multi-step message cadences over days — written once, delivered on schedule.
+        </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid lg:grid-cols-[1.2fr_1fr] gap-10 items-start">
+        {/* Sequences */}
         <div>
-          <h3 className="font-semibold text-ink-primary mb-4">Sequences</h3>
-          {loading ? <div className="flex justify-center py-8"><div className="animate-spin w-8 h-8 border-4 border-surface-border border-t-accent-blue rounded-full" /></div> :
-            sequences.length === 0 ? (
-              <div className="card text-center py-12"><MessageSquare size={48} className="text-ink-tertiary mx-auto mb-3" /><p className="text-ink-secondary">No sequences yet</p></div>
-            ) : (
-              <div className="space-y-3">
-                {sequences.map(s => (
-                  <div key={s.id} className="card flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2"><span className="font-medium text-ink-primary">{s.name}</span><span className={`badge ${s.is_active ? 'bg-surface-page text-ink-secondary' : 'bg-surface-hover text-ink-secondary'}`}>{s.is_active ? 'Active' : 'Inactive'}</span></div>
-                      <p className="text-xs text-ink-tertiary mt-1">{s.steps?.length || 0} steps</p>
+          <p className="meta-label mb-3">Sequences</p>
+          {loading ? (
+            <div className="space-y-2">{[1, 2].map((i) => <div key={i} className="skeleton h-16" />)}</div>
+          ) : sequences.length === 0 ? (
+            <div className="py-14 text-center">
+              <p style={{ fontSize: '20px', fontWeight: 600 }}>No sequences yet.</p>
+              <p className="text-ink-secondary mt-2" style={{ fontSize: '14px' }}>Step 1 today, step 2 tomorrow — you write it once.</p>
+            </div>
+          ) : (
+            <div>
+              {sequences.map((s, idx) => (
+                <motion.div
+                  key={s.id}
+                  initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: Math.min(idx * 0.04, 0.3), duration: 0.2 }}
+                  className="group hairline-b py-4 flex items-center justify-between gap-4 hover-accent-left"
+                >
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <h3 className="font-semibold" style={{ fontSize: '15px' }}>{s.name}</h3>
+                      <span className={`badge ${s.is_active ? 'badge-success' : 'badge-neutral'}`}>{s.is_active ? 'Active' : 'Off'}</span>
                     </div>
-                    <div className="flex gap-2">
-                      <button onClick={() => { setEditingSequence(s); setShowBuilder(true); }} className="text-ink-secondary p-2 hover:text-accent-blue transition-colors"><Edit size={16} /></button>
-                      <button onClick={() => handleDelete(s.id)} className="text-ink-secondary p-2 hover:text-red-300 transition-colors"><Trash2 size={16} /></button>
-                    </div>
+                    <p className="text-ink-secondary mt-0.5" style={{ fontSize: '13px' }}>
+                      {s.steps?.length || 0} step{(s.steps?.length || 0) === 1 ? '' : 's'}
+                      {s.description ? <> · {s.description}</> : null}
+                    </p>
                   </div>
-                ))}
-              </div>
-            )}
+                  <div className="flex items-center gap-4 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity flex-shrink-0">
+                    <button onClick={() => { setEditingSequence(s); setShowBuilder(true); }} className="btn-ghost text-sm font-medium">Edit</button>
+                    <button onClick={() => handleDelete(s.id)} className="btn-danger text-sm font-medium"><Trash2 size={14} /></button>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          )}
         </div>
 
+        {/* Progress */}
         <div>
-          <h3 className="font-semibold text-ink-primary mb-4">Active Progress</h3>
+          <p className="meta-label mb-3">In progress</p>
           {progress.length === 0 ? (
-            <div className="card text-center py-12"><Clock size={48} className="text-ink-tertiary mx-auto mb-3" /><p className="text-ink-secondary">No active sequences</p></div>
+            <div className="py-14 text-center">
+              <p className="text-ink-secondary" style={{ fontSize: '15px' }}>Nobody is mid-sequence right now.</p>
+            </div>
           ) : (
-            <div className="space-y-3 max-h-96 overflow-y-auto">
-              {progress.map(p => {
+            <div className="space-y-0 max-h-[480px] overflow-y-auto">
+              {progress.map((p) => {
                 const seq = getSequenceById(p.sequence_id);
                 if (!seq) return null;
                 const totalSteps = seq.steps?.length || 0;
                 const nextSendIn = p.next_send_at ? new Date(p.next_send_at) - new Date() : null;
                 const hoursUntil = nextSendIn ? Math.floor(nextSendIn / (1000 * 60 * 60)) : 0;
                 return (
-                  <div key={p.id} className="card">
-                    <div className="flex items-start justify-between mb-2">
-                      <div>
-                        <p className="font-medium text-ink-primary">{p.first_name} {p.last_name}</p>
-                        <p className="text-xs text-ink-secondary">{seq.name}</p>
+                  <div key={p.id} className="hairline-b py-3 hover-accent-left">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-semibold truncate" style={{ fontSize: '14px' }}>{p.first_name} {p.last_name}</p>
+                        <p className="text-ink-secondary truncate" style={{ fontSize: '13px' }}>{seq.name}</p>
                       </div>
-                      <div className="flex items-center gap-1">
-                        {p.is_completed ? <CheckCircle2 size={16} className="text-emerald-500" /> : p.is_stopped ? <XCircle size={16} className="text-red-400" /> : <Clock size={16} className="text-amber-400" />}
-                      </div>
+                      {!p.is_completed && !p.is_stopped && <Clock size={15} className="text-ink-tertiary flex-shrink-0 mt-0.5" />}
+                      {p.is_completed && <CheckCircle2 size={15} className="flex-shrink-0 mt-0.5" style={{ color: '#0E8A5F' }} />}
+                      {p.is_stopped && <XCircle size={15} className="text-ink-tertiary flex-shrink-0 mt-0.5" />}
                     </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-ink-secondary">Step {p.current_step + 1} of {totalSteps}</span>
-                      {!p.is_completed && !p.is_stopped && <span className="text-ink-tertiary">{hoursUntil > 0 ? `Next in ${hoursUntil}h` : 'Due now'}</span>}
+                    <div className="flex items-center justify-between gap-3 mt-2">
+                      <span className="mono text-ink-secondary" style={{ fontSize: '12px' }}>
+                        step {Math.min((p.current_step ?? 0) + 1, totalSteps)}/{totalSteps}
+                        {!p.is_completed && !p.is_stopped && (hoursUntil > 0 ? ` · next in ${hoursUntil}h` : ' · due now')}
+                      </span>
+                      {!p.is_completed && !p.is_stopped && (
+                        <button onClick={() => handleStopSequence(p.sequence_id, p.lead_id)} className="btn-danger flex items-center gap-1" style={{ fontSize: '12px', fontWeight: 500 }}>
+                          <Square size={11} /> Stop
+                        </button>
+                      )}
                     </div>
-                    {!p.is_completed && !p.is_stopped && (
-                      <button onClick={() => handleStopSequence(p.sequence_id, p.lead_id)} className="mt-2 text-xs text-red-400 hover:text-red-300 flex items-center gap-1"><Square size={12} /> Stop</button>
-                    )}
                   </div>
                 );
               })}
@@ -139,27 +163,21 @@ export default function WhatsAppSequences() {
 function SequenceBuilder({ sequence, onClose, onSaved }) {
   const [name, setName] = useState(sequence?.name || '');
   const [description, setDescription] = useState(sequence?.description || '');
-  const [steps, setSteps] = useState(sequence?.steps || []);
+  const [steps, setSteps] = useState(sequence?.steps?.length ? sequence.steps : [{ message: '', delay_hours: 24 }]);
   const [isActive, setIsActive] = useState(sequence?.is_active !== false);
 
-  const addStep = () => {
-    setSteps([...steps, { message: '', delay_hours: 24 }]);
-  };
-
+  const addStep = () => setSteps([...steps, { message: '', delay_hours: 24 }]);
   const updateStep = (index, field, value) => {
     const newSteps = [...steps];
-    newSteps[index][field] = value;
+    newSteps[index] = { ...newSteps[index], [field]: value };
     setSteps(newSteps);
   };
-
-  const removeStep = (index) => {
-    setSteps(steps.filter((_, i) => i !== index));
-  };
+  const removeStep = (index) => setSteps(steps.filter((_, i) => i !== index));
 
   const handleSave = async () => {
     if (!name) return toast.error('Name required');
     if (steps.length === 0) return toast.error('Add at least one step');
-    
+    if (steps.some((s) => !String(s.message).trim())) return toast.error('Every step needs a message');
     try {
       if (sequence) {
         await API.put(`/whatsapp/sequences/${sequence.id}`, { name, description, steps, is_active: isActive });
@@ -172,41 +190,59 @@ function SequenceBuilder({ sequence, onClose, onSaved }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white border border-surface-border rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-modal">
+    <div className="fixed inset-0 z-50 flex items-start justify-center p-0 sm:p-6 overflow-y-auto" style={{ background: 'rgba(28,25,23,0.25)' }} onClick={onClose}>
+      <div className="card-raised w-full max-w-2xl my-auto max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold text-ink-primary">{sequence ? 'Edit Sequence' : 'New Sequence'}</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors"><XCircle size={20} /></button>
+          <h2 style={{ fontSize: '18px', fontWeight: 600 }}>{sequence ? 'Edit sequence' : 'New sequence'}</h2>
+          <button onClick={onClose} className="text-ink-tertiary hover:text-ink-primary transition-colors">✕</button>
         </div>
 
-        <div className="space-y-4">
-          <div><label className="text-sm font-medium text-slate-300">Sequence Name *</label><input className="input mt-1" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Welcome Sequence" /></div>
-          <div><label className="text-sm font-medium text-slate-300">Description</label><textarea className="input mt-1" rows={2} value={description} onChange={e => setDescription(e.target.value)} placeholder="Describe what this sequence does" /></div>
-          
+        <div className="space-y-5">
           <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-sm font-medium text-slate-300">Steps</label>
-              <button onClick={addStep} className="text-xs text-accent-blue hover:underline flex items-center gap-1"><Plus size={12} /> Add Step</button>
+            <p className="meta-label mb-1">Name *</p>
+            <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Welcome sequence" />
+          </div>
+          <div>
+            <p className="meta-label mb-1">Description</p>
+            <textarea className="input" rows={2} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What this sequence achieves" />
+          </div>
+
+          <div className="hairline pt-5">
+            <div className="flex items-center justify-between mb-3">
+              <p className="meta-label">Steps</p>
+              <button onClick={addStep} className="btn-ghost text-sm font-medium flex items-center gap-1"><Plus size={13} /> Add step</button>
             </div>
-            <div className="space-y-3">
+            <div className="space-y-4">
               {steps.map((step, i) => (
-                <div key={i} className="bg-surface-page border border-surface-border rounded-lg p-4">
-                  <div className="flex items-start justify-between mb-2">
-                    <span className="text-sm font-medium text-ink-primary">Step {i + 1}</span>
-                    <button onClick={() => removeStep(i)} className="text-red-400 hover:text-red-300"><Trash2 size={14} /></button>
+                <div key={i} className="hairline p-4">
+                  <div className="flex items-start justify-between gap-3 mb-3">
+                    <span className="mono font-semibold" style={{ fontSize: '13px' }}>{String(i + 1).padStart(2, '0')}</span>
+                    {steps.length > 1 && <button onClick={() => removeStep(i)} className="btn-danger"><Trash2 size={13} /></button>}
                   </div>
-                  <div className="space-y-2">
-                    <div><label className="text-xs text-ink-secondary">Message *</label><textarea className="input mt-1" rows={2} value={step.message} onChange={e => updateStep(i, 'message', e.target.value)} placeholder="Hi {{first_name}, here's more info..." /></div>
-                    <div><label className="text-xs text-ink-secondary">Delay (hours) *</label><input type="number" className="input mt-1" value={step.delay_hours} onChange={e => updateStep(i, 'delay_hours', parseInt(e.target.value) || 0)} placeholder="24" /></div>
+                  <textarea
+                    className="input"
+                    rows={2}
+                    value={step.message}
+                    onChange={(e) => updateStep(i, 'message', e.target.value)}
+                    placeholder={'Hi {{first_name}}, here\'s more info…'}
+                  />
+                  <div className="mt-3 flex items-end gap-3">
+                    <div style={{ width: '140px' }}>
+                      <p className="meta-label mb-1">Send after (hours)</p>
+                      <input type="number" min="0" className="input mono" value={step.delay_hours} onChange={(e) => updateStep(i, 'delay_hours', parseInt(e.target.value) || 0)} />
+                    </div>
                   </div>
                 </div>
               ))}
             </div>
           </div>
 
-          <label className="flex items-center gap-2"><input type="checkbox" checked={isActive} onChange={e => setIsActive(e.target.checked)} /> <span className="text-sm text-ink-secondary">Active</span></label>
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
+            <span className="text-sm text-ink-secondary">Sequence is active</span>
+          </label>
 
-          <button onClick={handleSave} className="w-full px-4 py-2.5 rounded-lg btn btn-primary transition-colors">{sequence ? 'Update Sequence' : 'Create Sequence'}</button>
+          <button onClick={handleSave} className="btn btn-primary w-full">{sequence ? 'Save changes' : 'Create sequence'}</button>
         </div>
       </div>
     </div>

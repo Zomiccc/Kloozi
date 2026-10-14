@@ -67,10 +67,10 @@ exports.sendFile = async (req, res, next) => {
       await sendWhatsAppToLead({ workspaceId: req.workspaceId, leadId: lead_id, userId: req.user.id, message: `Here's the file you requested: ${trackableUrl}`, mediaUrl: file.url, mediaType: file.file_type });
     } else if (channel === 'email') {
       const { sendTrackedEmail } = require('../services/emailService');
-      await sendTrackedEmail({ workspaceId: req.workspaceId, leadId, userId: req.user.id, overrideSubject: `Document: ${file.name}`, overrideBody: `<p>Please find the document here: <a href="${trackableUrl}">${file.name}</a></p>` });
+      await sendTrackedEmail({ workspaceId: req.workspaceId, leadId: lead_id, userId: req.user.id, overrideSubject: `Document: ${file.name}`, overrideBody: `<p>Please find the document here: <a href="${trackableUrl}">${file.name}</a></p>` });
     } else if (channel === 'sms') {
       const { sendSMSToLead } = require('../services/smsService');
-      await sendSMSToLead({ workspaceId: req.workspaceId, leadId, userId: req.user.id, message: `Document: ${trackableUrl}` });
+      await sendSMSToLead({ workspaceId: req.workspaceId, leadId: lead_id, userId: req.user.id, message: `Document: ${trackableUrl}` });
     }
 
     res.json({ message: 'File sent successfully', trackingUrl: trackableUrl });

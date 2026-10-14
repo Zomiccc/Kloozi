@@ -20,14 +20,31 @@ try {
 }
 
 async function sendPushNotification(userId, title, body, data = {}) {
+  if (!userId) return;
+  // In-app notification first — web users have no device token but still
+  // need to see it in the bell and get it live over the socket.
+  try {
+    const inserted = await db.query(
+      `INSERT INTO notifications (user_id, workspace_id, type, title, body, data, created_at)
+       SELECT $1, workspace_id, $2, $3, $4, $5, NOW()
+       FROM users WHERE id = $1
+       RETURNING *`,
+      [userId, data.type || 'general', title, body, JSON.stringify(data)]
+    );
+    if (inserted.rows[0]) {
+      const { emitToUser } = require('./realtime');
+      emitToUser(userId, 'notification:new', inserted.rows[0]);
+    }
+  } catch (err) {
+    logger.error('Notification insert error:', err.message);
+  }
+
   try {
     const tokensResult = await db.query(
       'SELECT token FROM device_tokens WHERE user_id = $1 AND active = true',
       [userId]
     );
-
     if (tokensResult.rows.length === 0) return;
-
     const tokens = tokensResult.rows.map((r) => r.token);
 
     if (firebaseApp) {
@@ -37,18 +54,11 @@ async function sendPushNotification(userId, title, body, data = {}) {
         data: Object.keys(data).reduce((acc, k) => ({ ...acc, [k]: String(data[k]) }), {}),
         tokens,
       };
-      const response = await admin.messaging().sendMulticast(message);
+      const response = await admin.messaging().sendEachForMulticast(message);
       logger.info(`Push sent: ${response.successCount} success, ${response.failureCount} failed`);
     } else {
       logger.info(`Push notification (no Firebase): ${title} -> ${tokens.length} devices`);
     }
-
-    await db.query(
-      `INSERT INTO notifications (user_id, workspace_id, type, title, body, data, created_at)
-       SELECT $1, workspace_id, $2, $3, $4, $5, NOW()
-       FROM users WHERE id = $1`,
-      [userId, data.type || 'general', title, body, JSON.stringify(data)]
-    );
   } catch (err) {
     logger.error('Push notification error:', err.message);
   }

@@ -39,3 +39,6 @@ coverage/
 *.seed
 *.pid.lock
 .DS_Store
+
+# local demo login
+backend/DEMO_LOGIN.local.md

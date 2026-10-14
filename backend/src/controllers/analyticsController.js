@@ -463,7 +463,15 @@ exports.updateWorkspaceSettings = async (req, res, next) => {
   try {
     const wsRes = await db.query('SELECT settings FROM workspaces WHERE id = $1', [req.workspaceId]);
     const current = wsRes.rows[0]?.settings || {};
-    const updated = { ...current, ...req.body };
+    // Keys owned by the server (sandbox flag, WhatsApp routing) can't be set from the settings form.
+    const PROTECTED = ['demo', 'demo_expires_at', 'whatsapp_phone_number_id', 'whatsapp_waba_id', 'whatsapp_connected', 'whatsapp_connection'];
+    const incoming = { ...(req.body || {}) };
+    for (const k of PROTECTED) delete incoming[k];
+    if ('auto_update_request_days' in incoming) {
+      const d = parseInt(incoming.auto_update_request_days, 10);
+      incoming.auto_update_request_days = Number.isFinite(d) ? Math.min(Math.max(d, 0), 30) : 3;
+    }
+    const updated = { ...current, ...incoming };
     await db.query('UPDATE workspaces SET settings = $1, updated_at = NOW() WHERE id = $2', [JSON.stringify(updated), req.workspaceId]);
     res.json({ settings: updated });
   } catch (err) { next(err); }

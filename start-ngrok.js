@@ -1,5 +1,5 @@
 /**
- * Start ngrok tunnel for Zomic CRM webhooks
+ * Start ngrok tunnel for Flazyn webhooks
  * Usage: node start-ngrok.js
  */
 const http = require('http');
@@ -25,7 +25,7 @@ async function checkNgrokApi() {
 
 async function main() {
   console.log('╔════════════════════════════════════════════════════╗');
-  console.log('║     ZOMIC CRM - ngrok Tunnel Setup                ║');
+  console.log('║     FLAZYN CRM - ngrok Tunnel Setup                ║');
   console.log('╚════════════════════════════════════════════════════╝');
   
   // Check if ngrok is already running
@@ -64,7 +64,7 @@ function printWebhookUrls(baseUrl) {
   console.log('─'.repeat(50));
   console.log(`   Go to: https://developers.facebook.com/apps/1750888202818247/whatsapp/business/wa-dev-console`);
   console.log(`   Callback URL: ${baseUrl}/api/whatsapp/webhook`);
-  console.log(`   Verify Token: zomic_wa_verify_2026`);
+  console.log(`   Verify Token: flazyn_wa_verify_2026`);
   console.log(`   Subscribe: messages`);
   
   console.log('\n📘 Facebook Lead Ads (OAuth):');
@@ -77,13 +77,13 @@ function printWebhookUrls(baseUrl) {
   console.log('─'.repeat(50));
   console.log(`   Go to: https://developers.facebook.com/apps/1750888202818247/webhooks/`);
   console.log(`   Callback URL: ${baseUrl}/api/integrations/webhook/facebook`);
-  console.log(`   Verify Token: zomic_verify_2026`);
+  console.log(`   Verify Token: flazyn_verify_2026`);
   console.log(`   Subscribe: leadgen`);
   
   console.log('\n🧪 Webhook Verification Tests:');
   console.log('─'.repeat(50));
-  console.log(`   WhatsApp: curl -G "${baseUrl}/api/whatsapp/webhook" --data-urlencode "hub.mode=subscribe" --data-urlencode "hub.verify_token=zomic_wa_verify_2026" --data-urlencode "hub.challenge=test123"`);
-  console.log(`   Facebook: curl -G "${baseUrl}/api/integrations/webhook/facebook" --data-urlencode "hub.mode=subscribe" --data-urlencode "hub.verify_token=zomic_verify_2026" --data-urlencode "hub.challenge=test456"`);
+  console.log(`   WhatsApp: curl -G "${baseUrl}/api/whatsapp/webhook" --data-urlencode "hub.mode=subscribe" --data-urlencode "hub.verify_token=flazyn_wa_verify_2026" --data-urlencode "hub.challenge=test123"`);
+  console.log(`   Facebook: curl -G "${baseUrl}/api/integrations/webhook/facebook" --data-urlencode "hub.mode=subscribe" --data-urlencode "hub.verify_token=flazyn_verify_2026" --data-urlencode "hub.challenge=test456"`);
   console.log(`   OAuth:    ${baseUrl}/api/integrations/oauth/config`);
   
   console.log('\n✅ Webhook URLs ready for Meta Developer Console configuration!');

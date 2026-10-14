@@ -24,5 +24,11 @@ export default function AuthCallback() {
     }
   }, []);
 
-  return <div className="min-h-screen flex items-center justify-center bg-surface-page"><p className="text-ink-secondary font-semibold">Processing authentication...</p></div>;
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center page-bg">
+      <div className="w-12 h-12 flex items-center justify-center text-white font-bold text-xl mb-4" style={{ background: '#EDE9FF', borderRadius: '8px' }}>F</div>
+      <p className="text-ink-secondary" style={{ fontSize: '14px' }}>Signing you in…</p>
+      <div className="skeleton h-0.5 w-40 mt-4" />
+    </div>
+  );
 }

@@ -1,7 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
+import { motion } from 'framer-motion';
 import API from '../lib/api';
+import { CountUp, SectionTabs } from '../lib/motion';
 import toast from 'react-hot-toast';
-import { Upload, Trash2, FolderPlus, FileText, Image, Video, Send, X, BarChart3, Plus, Repeat } from 'lucide-react';
+import { Upload, Trash2, FileText, Image, Video, Send, X, BarChart3, Plus, Repeat } from 'lucide-react';
+import { pillStyle } from '../components/ui';
 
 export default function ContentLibrary() {
   const [files, setFiles] = useState([]);
@@ -71,67 +74,69 @@ export default function ContentLibrary() {
   };
 
   const fileIcon = (type) => {
-    if (type?.startsWith('image')) return <Image size={20} style={{ color: '#0066FF' }} />;
-    if (type?.startsWith('video')) return <Video size={20} style={{ color: '#AF52DE' }} />;
-    return <FileText size={20} style={{ color: '#8E8E93' }} />;
+    if (type?.startsWith('image')) return <Image size={16} className="text-ink-tertiary" />;
+    if (type?.startsWith('video')) return <Video size={16} className="text-ink-tertiary" />;
+    return <FileText size={16} className="text-ink-tertiary" />;
   };
+
+  const tabs = [
+    { key: 'sequences', label: 'Sequences' },
+    { key: 'messages', label: 'Messages' },
+    { key: 'files', label: 'Files' },
+    { key: 'pages', label: 'Pages' },
+  ];
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <h1 className="text-3xl font-extrabold text-ink-primary tracking-tight">Content</h1>
-        {tab === 'sequences' && <button onClick={() => setShowNewSeq(true)} className="btn btn-primary"><Plus size={16} /> New Sequence</button>}
-        {tab === 'messages' && <button onClick={() => toast.success('New message editor')} className="btn btn-primary"><Plus size={16} /> New Message</button>}
-        {tab === 'files' && <button onClick={() => fileRef.current?.click()} className="btn btn-primary"><Upload size={16} /> Upload File</button>}
-        {tab === 'pages' && <button onClick={() => toast.success('New page builder')} className="btn btn-primary"><Plus size={16} /> New Page</button>}
-        <input ref={fileRef} type="file" className="hidden" onChange={handleUpload} />
+      {/* Header — editorial */}
+      <div className="flex items-baseline justify-between flex-wrap gap-4">
+        <h1 className="text-ink-primary" style={{ fontSize: '32px', fontWeight: 650, letterSpacing: '-0.01em' }}>Content</h1>
+        <div className="flex items-center gap-4">
+          {tab === 'sequences' && <button onClick={() => setShowNewSeq(true)} className="text-ink-primary hover:text-accent-deep underline underline-offset-4 transition-colors" style={{ fontSize: '15px', fontWeight: 600 }}>New sequence</button>}
+          {tab === 'messages' && <button onClick={() => toast.success('New message editor')} className="text-ink-primary hover:text-accent-deep underline underline-offset-4 transition-colors" style={{ fontSize: '15px', fontWeight: 600 }}>New message</button>}
+          {tab === 'files' && <button onClick={() => fileRef.current?.click()} className="text-ink-primary hover:text-accent-deep underline underline-offset-4 transition-colors" style={{ fontSize: '15px', fontWeight: 600 }}>Upload file</button>}
+          {tab === 'pages' && <button onClick={() => toast.success('New page builder')} className="text-ink-primary hover:text-accent-deep underline underline-offset-4 transition-colors" style={{ fontSize: '15px', fontWeight: 600 }}>New page</button>}
+          <input ref={fileRef} type="file" className="hidden" onChange={handleUpload} />
+        </div>
       </div>
 
-      {/* Tab bar */}
-      <div className="flex gap-1 bg-white border border-surface-border rounded-full p-1 flex-wrap">
-        {['sequences', 'messages', 'files', 'pages'].map(t => (
-          <button key={t} onClick={() => setTab(t)} className={`tab-pill capitalize ${tab === t ? 'tab-pill-active bg-accent-red' : 'text-ink-secondary hover:text-ink-primary'}`}>{t}</button>
-        ))}
-      </div>
+      {/* Tab rail — pinned secondary bar, never under the title */}
+      <SectionTabs
+        layoutId="content-tabs"
+        tabs={tabs}
+        active={tab}
+        onChange={setTab}
+      />
 
       {/* Sequences tab */}
       {tab === 'sequences' && (
         <div className="space-y-4">
-          <div className="rounded-2xl p-4 border border-surface-border bg-surface-page">
-            <p className="text-sm font-bold text-ink-primary">⚡ Manage Automated Sequence Triggers</p>
-            <p className="text-xs text-ink-secondary mt-1">Configure lead automation rules to automatically add new leads to specific sequences.</p>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-bold text-ink-secondary">{sequences.length} TOTAL SEQUENCE(S)</span>
-            <select className="input w-auto text-sm"><option>SORT BY: TITLE (A-Z)</option><option>SORT BY: DATE (NEWEST)</option></select>
-          </div>
-          {loading ? <div className="flex justify-center py-8"><div className="animate-spin w-8 h-8 border-4 border-accent-blue border-t-transparent rounded-full" /></div> :
-           sequences.length === 0 ? (
-            <div className="card text-center" style={{ padding: '48px 24px' }}>
-              <div className="w-16 h-16 rounded-3xl bg-surface-page flex items-center justify-center mx-auto mb-4">
-                <Repeat size={32} className="text-ink-tertiary" />
-              </div>
-              <p className="text-lg font-bold text-ink-primary">Welcome to your Sequences</p>
-              <p className="text-sm text-ink-secondary mt-1 max-w-md mx-auto">Create sequences that prompt you to contact clients and share content at the right time, helping you stay on track and streamline your workflow.</p>
+          {loading ? (
+            <div className="space-y-2">
+              {[1, 2, 3].map((i) => <div key={i} className="skeleton h-12" />)}
+            </div>
+          ) : sequences.length === 0 ? (
+            <div className="text-center py-20">
+              <Repeat size={28} className="text-ink-tertiary mx-auto mb-4" />
+              <p className="text-ink-primary" style={{ fontSize: '22px', fontWeight: 600 }}>No sequences yet.</p>
+              <p className="text-ink-secondary mt-2" style={{ fontSize: '15px' }}>Create sequences to automate your outreach at the right time.</p>
             </div>
           ) : (
-            <div className="space-y-3">
-              {sequences.map(seq => (
-                <div key={seq.id} className="card card-hover stagger-in">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <span className="badge" style={{ background: seq.trigger_type === 'automatic' ? '#34C75910' : '#0066FF10', color: seq.trigger_type === 'automatic' ? '#34C759' : '#0066FF' }}>
-                        {seq.trigger_type === 'automatic' ? 'Auto' : 'Manual'}
-                      </span>
-                      <h3 className="font-bold text-ink-primary">{seq.name}</h3>
-                    </div>
-                    <span className="flex items-center gap-1.5 text-xs font-bold" style={{ color: '#34C759' }}>
-                      <span className="w-2 h-2 rounded-full" style={{ background: '#34C759' }} /> Active
+            <div>
+              {sequences.map((seq, idx) => (
+                <motion.div key={seq.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(idx * 0.04, 0.3), duration: 0.2 }} className="hairline-b py-4">
+                  <div className="flex items-baseline gap-3">
+                    <h3 className="text-ink-primary font-semibold" style={{ fontSize: '15px' }}>{seq.name}</h3>
+                    <span className="capitalize flex-shrink-0" style={pillStyle(seq.trigger_type === 'automatic' ? '#0E8A5F' : '#2F6FDB')}>
+                      {seq.trigger_type || 'manual'}
+                    </span>
+                    <span className=" flex-shrink-0" style={pillStyle('#0E8A5F')}>
+                      Active
                     </span>
                   </div>
-                  {seq.description && <p className="text-sm text-ink-secondary mb-2">{seq.description}</p>}
-                  <p className="text-xs text-ink-tertiary">{seq.steps_count || 0} steps over {seq.duration_days || 0} days | {seq.enrolled_count || 0} clients in sequence</p>
-                </div>
+                  {seq.description && <p className="text-ink-secondary mt-1" style={{ fontSize: '14px' }}>{seq.description}</p>}
+                  <p className="text-ink-tertiary mono mt-1" style={{ fontSize: '12px' }}>{seq.steps_count || 0} steps · {seq.duration_days || 0} days · {seq.enrolled_count || 0} enrolled</p>
+                </motion.div>
               ))}
             </div>
           )}
@@ -140,75 +145,109 @@ export default function ContentLibrary() {
 
       {/* Messages tab */}
       {tab === 'messages' && (
-        <div className="space-y-3">
-          {messages.length === 0 ? <div className="card text-center" style={{ padding: '48px 24px' }}><p className="text-ink-tertiary">No message templates yet</p></div> :
-            messages.map(msg => (
-              <div key={msg.id} className="card card-hover stagger-in flex items-center justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-bold text-ink-primary">{msg.name}</h3>
-                    <span className="badge" style={{ background: '#34C75910', color: '#34C759' }}>WhatsApp</span>
+        <div>
+          {messages.length === 0 ? (
+            <div className="text-center py-20">
+              <p className="text-ink-primary" style={{ fontSize: '22px', fontWeight: 600 }}>No message templates yet.</p>
+              <p className="text-ink-secondary mt-2" style={{ fontSize: '15px' }}>Create WhatsApp message templates to reuse in your campaigns.</p>
+            </div>
+          ) : (
+            <div>
+              {messages.map((msg, idx) => (
+                <motion.div key={msg.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(idx * 0.04, 0.3), duration: 0.2 }} className="hairline-b py-4">
+                  <div className="flex items-baseline gap-3">
+                    <h3 className="text-ink-primary font-semibold" style={{ fontSize: '15px' }}>{msg.name}</h3>
+                    <span className=" flex-shrink-0" style={pillStyle('#0E8A5F')}>
+                      WhatsApp
+                    </span>
                   </div>
-                  <p className="text-xs text-ink-secondary mt-1 truncate">{msg.content?.substring(0, 100)}...</p>
-                  <p className="text-xs text-ink-tertiary mt-1">Sent: {msg.send_count || 0} times</p>
-                </div>
-              </div>
-            ))
-          }
+                  <p className="text-ink-secondary truncate mt-1" style={{ fontSize: '14px' }}>{msg.content?.substring(0, 100)}</p>
+                  <p className="text-ink-tertiary mono mt-1" style={{ fontSize: '12px' }}>Sent {msg.send_count || 0} times</p>
+                </motion.div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
       {/* Files tab */}
       {tab === 'files' && (
         <div>
-          {loading ? <div className="flex justify-center py-8"><div className="animate-spin w-8 h-8 border-4 border-accent-blue border-t-transparent rounded-full" /></div> :
-           files.length === 0 ? <div className="card text-center" style={{ padding: '48px 24px' }}>
-             <div className="w-16 h-16 rounded-3xl bg-surface-page flex items-center justify-center mx-auto mb-4"><FileText size={32} className="text-ink-tertiary" /></div>
-             <p className="text-ink-tertiary">No files uploaded yet</p>
-           </div> :
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {files.map(f => (
-                <div key={f.id} className="card card-hover stagger-in">
-                  <div className="flex items-center gap-3 mb-3">
-                    {fileIcon(f.mime_type)}
-                    <div className="flex-1 min-w-0"><p className="text-sm font-bold text-ink-primary truncate">{f.name}</p><p className="text-xs text-ink-tertiary">{(f.size_bytes / 1024 / 1024).toFixed(2)} MB</p></div>
-                  </div>
-                  <div className="flex gap-1.5">
-                    <button onClick={() => setShowSend(f)} className="btn btn-ghost flex-1" style={{ minHeight: '36px' }}><Send size={14} /></button>
-                    <button onClick={() => loadStats(f.id)} className="btn btn-ghost flex-1" style={{ minHeight: '36px' }}><BarChart3 size={14} /></button>
-                    <button onClick={() => handleDelete(f.id)} className="btn btn-ghost flex-1" style={{ minHeight: '36px', color: '#FF3B5C' }}><Trash2 size={14} /></button>
+          {loading ? (
+            <div className="space-y-2">
+              {[1, 2, 3, 4].map((i) => <div key={i} className="skeleton h-12" />)}
+            </div>
+          ) : files.length === 0 ? (
+            <div className="text-center py-20">
+              <FileText size={28} className="text-ink-tertiary mx-auto mb-4" />
+              <p className="text-ink-primary" style={{ fontSize: '22px', fontWeight: 600 }}>No files uploaded yet.</p>
+              <p className="text-ink-secondary mt-2" style={{ fontSize: '15px' }}>Upload brochures, images, and documents to share with leads.</p>
+            </div>
+          ) : (
+            <div>
+              {files.map((f, idx) => (
+                <motion.div key={f.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(idx * 0.04, 0.3), duration: 0.2 }} className="group hairline-b py-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-start gap-3 flex-1 min-w-0">
+                      {fileIcon(f.mime_type)}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-ink-primary truncate" style={{ fontSize: '14px', fontWeight: 500 }}>{f.name}</p>
+                        <p className="text-ink-tertiary mono" style={{ fontSize: '12px' }}>{(f.size_bytes / 1024 / 1024).toFixed(2)} MB</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                      <button onClick={() => setShowSend(f)} className="text-ink-tertiary hover:text-ink-primary transition-colors" style={{ fontSize: '13px' }}>Send</button>
+                      <button onClick={() => loadStats(f.id)} className="text-ink-tertiary hover:text-ink-primary transition-colors" style={{ fontSize: '13px' }}>Stats</button>
+                      <button onClick={() => handleDelete(f.id)} className="text-ink-tertiary hover:text-ink-primary transition-colors" style={{ fontSize: '13px' }}>Delete</button>
+                    </div>
                   </div>
                   {stats?.id === f.id && (
-                    <div className="mt-3 pt-3 border-t border-surface-border grid grid-cols-3 gap-2 text-center text-xs">
-                      <div><p className="font-bold text-ink-primary">{stats.total_sends}</p><p className="text-ink-tertiary">Sends</p></div>
-                      <div><p className="font-bold text-ink-primary">{stats.total_opens}</p><p className="text-ink-tertiary">Opens</p></div>
-                      <div><p className="font-bold text-ink-primary">{stats.open_rate}%</p><p className="text-ink-tertiary">Open Rate</p></div>
+                    <div className="mt-3 grid grid-cols-3 gap-0">
+                      <div className="pr-4">
+                        <p className="meta-label mb-1">Sends</p>
+                        <p className="mono text-ink-primary" style={{ fontSize: '22px', fontWeight: 600 }}><CountUp value={Number(stats.total_sends) || 0} /></p>
+                      </div>
+                      <div className="hairline-l pl-4 pr-4">
+                        <p className="meta-label mb-1">Opens</p>
+                        <p className="mono text-ink-primary" style={{ fontSize: '22px', fontWeight: 600 }}><CountUp value={Number(stats.total_opens) || 0} /></p>
+                      </div>
+                      <div className="hairline-l pl-4">
+                        <p className="meta-label mb-1">Open rate</p>
+                        <p className="mono text-ink-primary" style={{ fontSize: '22px', fontWeight: 600 }}><CountUp value={Number(stats.open_rate) || 0} suffix="%" /></p>
+                      </div>
                     </div>
                   )}
-                </div>
+                </motion.div>
               ))}
             </div>
-          }
+          )}
         </div>
       )}
 
       {/* Pages tab */}
       {tab === 'pages' && (
-        <div className="space-y-3">
-          {pages.length === 0 ? <div className="card text-center" style={{ padding: '48px 24px' }}>
-            <div className="w-16 h-16 rounded-3xl bg-surface-page flex items-center justify-center mx-auto mb-4"><FileText size={32} className="text-ink-tertiary" /></div>
-            <p className="text-ink-tertiary">No lead form pages yet</p>
-          </div> :
-            pages.map((p, idx) => (
-              <div key={p.id || `page-${idx}`} className="card card-hover stagger-in flex items-center justify-between">
-                <div className="flex-1">
-                  <h3 className="font-bold text-ink-primary">{p.name}</h3>
-                  <p className="text-xs text-ink-tertiary mt-1">Views: {p.views || 0} | Submissions: {p.submissions || 0} | Rate: {p.views > 0 ? Math.round((p.submissions / p.views) * 100) : 0}%</p>
-                </div>
-                <button onClick={() => window.open(`/api/automations/lead-form/${p.form_key}`, '_blank')} className="btn btn-ghost">View Page</button>
-              </div>
-            ))
-          }
+        <div>
+          {pages.length === 0 ? (
+            <div className="text-center py-20">
+              <FileText size={28} className="text-ink-tertiary mx-auto mb-4" />
+              <p className="text-ink-primary" style={{ fontSize: '22px', fontWeight: 600 }}>No lead form pages yet.</p>
+              <p className="text-ink-secondary mt-2" style={{ fontSize: '15px' }}>Create landing pages to capture leads from your campaigns.</p>
+            </div>
+          ) : (
+            <div>
+              {pages.map((p, idx) => (
+                <motion.div key={p.id || `page-${idx}`} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(idx * 0.04, 0.3), duration: 0.2 }} className="group hairline-b py-4 flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-ink-primary font-semibold" style={{ fontSize: '15px' }}>{p.name}</h3>
+                    <p className="text-ink-tertiary mono mt-1" style={{ fontSize: '12px' }}>{p.views || 0} views · {p.submissions || 0} submissions · {p.views > 0 ? Math.round((p.submissions / p.views) * 100) : 0}% rate</p>
+                  </div>
+                  <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                    <button onClick={() => window.open(`/api/automations/lead-form/${p.form_key}`, '_blank')} className="text-ink-tertiary hover:text-ink-primary transition-colors" style={{ fontSize: '13px' }}>View page</button>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -222,15 +261,27 @@ function SendFileModal({ file, onClose, onSend }) {
   const [leadId, setLeadId] = useState('');
   const [channel, setChannel] = useState('email');
   return (
-    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white border border-surface-border rounded-3xl p-6 w-full max-w-md shadow-modal animate-slide-up">
-        <div className="flex items-center justify-between mb-6"><h2 className="text-xl font-bold text-ink-primary">Send: {file.name}</h2><button onClick={onClose} className="text-ink-tertiary hover:text-ink-primary transition-colors"><X size={20} /></button></div>
-        <div className="space-y-3">
-          <input className="input" placeholder="Lead ID" value={leadId} onChange={(e) => setLeadId(e.target.value)} />
-          <select className="input" value={channel} onChange={(e) => setChannel(e.target.value)}>
-            <option value="email">Email</option><option value="whatsapp">WhatsApp</option><option value="sms">SMS</option>
-          </select>
-          <button onClick={() => onSend(file.id, leadId, channel)} className="btn btn-primary w-full">Send File</button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(28,25,23,0.25)' }} onClick={onClose}>
+      <div className="card-raised w-full max-w-md animate-scale-in" style={{ borderRadius: '10px' }} onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between hairline-b pb-4 mb-4">
+          <h2 className="text-ink-primary" style={{ fontSize: '22px', fontWeight: 600 }}>Send: {file.name}</h2>
+          <button onClick={onClose} className="text-ink-tertiary hover:text-ink-primary transition-colors"><X size={18} /></button>
+        </div>
+        <div className="space-y-4">
+          <div>
+            <p className="meta-label mb-1">Lead ID</p>
+            <input className="input" value={leadId} onChange={(e) => setLeadId(e.target.value)} />
+          </div>
+          <div>
+            <p className="meta-label mb-1">Channel</p>
+            <select className="input" value={channel} onChange={(e) => setChannel(e.target.value)}>
+              <option value="email">Email</option><option value="whatsapp">WhatsApp</option><option value="sms">SMS</option>
+            </select>
+          </div>
+          <div className="flex justify-end gap-3 hairline pt-4">
+            <button onClick={onClose} className="text-ink-secondary hover:text-ink-primary underline underline-offset-4 transition-colors" style={{ fontSize: '14px' }}>Cancel</button>
+            <button onClick={() => onSend(file.id, leadId, channel)} className="btn btn-primary">Send file</button>
+          </div>
         </div>
       </div>
     </div>
@@ -258,27 +309,48 @@ function NewSequenceModal({ onClose, onCreated }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white border border-surface-border rounded-3xl shadow-modal p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto animate-slide-up">
-        <div className="flex items-center justify-between mb-6"><h2 className="text-xl font-bold text-ink-primary">New Sequence</h2><button onClick={onClose} className="text-ink-tertiary hover:text-ink-primary transition-colors"><X size={20} /></button></div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(28,25,23,0.25)' }} onClick={onClose}>
+      <div className="card-raised w-full max-w-lg max-h-[90vh] overflow-y-auto animate-scale-in" style={{ borderRadius: '10px' }} onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between hairline-b pb-4 mb-4">
+          <h2 className="text-ink-primary" style={{ fontSize: '22px', fontWeight: 600 }}>New sequence</h2>
+          <button onClick={onClose} className="text-ink-tertiary hover:text-ink-primary transition-colors"><X size={18} /></button>
+        </div>
         <div className="space-y-4">
-          <div><label className="text-sm font-bold text-ink-primary">Sequence Name *</label><input className="input mt-1.5" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. New Lead Follow-up" /></div>
-          <div><label className="text-sm font-bold text-ink-primary">Description</label><textarea className="input mt-1.5" rows={2} value={description} onChange={e => setDescription(e.target.value)} /></div>
-          <div className="grid grid-cols-2 gap-3">
-            <div><label className="text-sm font-bold text-ink-primary">Trigger</label><select className="input mt-1.5" value={triggerType} onChange={e => setTriggerType(e.target.value)}><option value="manual">Manual</option><option value="automatic">Automatic</option></select></div>
-            <div><label className="text-sm font-bold text-ink-primary">Channel</label><select className="input mt-1.5" value={channel} onChange={e => setChannel(e.target.value)}><option value="whatsapp">WhatsApp</option><option value="email">Email</option><option value="sms">SMS</option></select></div>
+          <div>
+            <p className="meta-label mb-1">Name</p>
+            <input className="input" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. New Lead Follow-up" />
           </div>
           <div>
-            <div className="flex items-center justify-between mb-2"><label className="text-sm font-bold text-ink-primary">Steps</label><button onClick={addStep} className="text-xs font-bold text-accent-blue flex items-center gap-1 hover:underline"><Plus size={14} /> Add Step</button></div>
+            <p className="meta-label mb-1">Description</p>
+            <textarea className="input" rows={2} value={description} onChange={e => setDescription(e.target.value)} />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="meta-label mb-1">Trigger</p>
+              <select className="input" value={triggerType} onChange={e => setTriggerType(e.target.value)}><option value="manual">Manual</option><option value="automatic">Automatic</option></select>
+            </div>
+            <div>
+              <p className="meta-label mb-1">Channel</p>
+              <select className="input" value={channel} onChange={e => setChannel(e.target.value)}><option value="whatsapp">WhatsApp</option><option value="email">Email</option><option value="sms">SMS</option></select>
+            </div>
+          </div>
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <p className="meta-label">Steps</p>
+              <button onClick={addStep} className="text-ink-secondary hover:text-ink-primary underline underline-offset-4 transition-colors flex items-center gap-1" style={{ fontSize: '14px' }}><Plus size={12} /> Add step</button>
+            </div>
             {steps.map((s, i) => (
-              <div key={i} className="flex items-center gap-2 mb-2">
-                <span className="text-xs font-semibold text-ink-tertiary w-16">Day {s.day}</span>
+              <div key={i} className="hairline-b py-2 flex items-center gap-3">
+                <span className="text-ink-tertiary mono flex-shrink-0" style={{ fontSize: '12px' }}>Day {s.day}</span>
                 <input className="input flex-1" placeholder="Message content" value={s.message} onChange={e => updateStep(i, 'message', e.target.value)} />
-                <button onClick={() => removeStep(i)} className="p-1" style={{ color: '#FF3B5C' }}><Trash2 size={14} /></button>
+                <button onClick={() => removeStep(i)} className="text-ink-tertiary hover:text-ink-primary transition-colors"><Trash2 size={14} /></button>
               </div>
             ))}
           </div>
-          <button onClick={handleCreate} className="btn btn-primary w-full">Create Sequence</button>
+          <div className="flex justify-end gap-3 hairline pt-4">
+            <button onClick={onClose} className="text-ink-secondary hover:text-ink-primary underline underline-offset-4 transition-colors" style={{ fontSize: '14px' }}>Cancel</button>
+            <button onClick={handleCreate} className="btn btn-primary">Create sequence</button>
+          </div>
         </div>
       </div>
     </div>

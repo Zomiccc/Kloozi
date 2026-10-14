@@ -1,6 +1,6 @@
 /**
- * CRM Final - Google Forms Add-on
- * Automatically sends Google Forms responses to your CRM Final account.
+ * Flazyn - Google Forms Add-on
+ * Automatically sends Google Forms responses to your Flazyn account.
  *
  * Setup:
  * 1. Open your Google Form, click three dots > Script editor
@@ -21,14 +21,14 @@ function setupTriggers() {
     if (t.getHandlerFunction() === 'onFormSubmit') ScriptApp.deleteTrigger(t);
   });
   ScriptApp.newTrigger('onFormSubmit').forForm(form).onFormSubmit().create();
-  Logger.log('CRM Final trigger installed successfully.');
+  Logger.log('Flazyn trigger installed successfully.');
 }
 
 function removeTriggers() {
   ScriptApp.getProjectTriggers().forEach(function(t) {
     if (t.getHandlerFunction() === 'onFormSubmit') ScriptApp.deleteTrigger(t);
   });
-  Logger.log('CRM Final triggers removed.');
+  Logger.log('Flazyn triggers removed.');
 }
 
 function onFormSubmit(e) {
@@ -37,7 +37,7 @@ function onFormSubmit(e) {
     var leadData = extractLeadData(e);
     sendLeadToCRM(leadData);
   } catch (err) {
-    Logger.log('CRM Final error: ' + err.message);
+    Logger.log('Flazyn error: ' + err.message);
   }
 }
 
@@ -71,7 +71,7 @@ function extractLeadData(e) {
 function sendLeadToCRM(leadData) {
   var token = CONFIG.ACCOUNT_TOKEN;
   if (!token || token === 'YOUR_ACCOUNT_TOKEN') {
-    Logger.log('CRM Final: No token configured. Edit CONFIG.ACCOUNT_TOKEN.');
+    Logger.log('Flazyn: No token configured. Edit CONFIG.ACCOUNT_TOKEN.');
     return;
   }
   var url = CONFIG.API_URL + '/api/integrations/lead/' + token + '/google_forms';
@@ -80,8 +80,8 @@ function sendLeadToCRM(leadData) {
     payload: JSON.stringify(leadData), muteHttpExceptions: true
   });
   var code = resp.getResponseCode();
-  if (code >= 200 && code < 300) Logger.log('CRM Final: Lead sent OK');
-  else Logger.log('CRM Final: API error ' + code + ' - ' + resp.getContentText());
+  if (code >= 200 && code < 300) Logger.log('Flazyn: Lead sent OK');
+  else Logger.log('Flazyn: API error ' + code + ' - ' + resp.getContentText());
 }
 
 function testConnection() {
@@ -91,5 +91,5 @@ function testConnection() {
     message: 'Test lead from Google Apps Script', source: CONFIG.SITE_NAME || 'Google Forms Test'
   };
   sendLeadToCRM(testData);
-  Logger.log('Test lead sent. Check CRM Final to verify.');
+  Logger.log('Test lead sent. Check Flazyn to verify.');
 }

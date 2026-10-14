@@ -19,10 +19,13 @@ router.post('/rules/:id/test', auto.testAutomationRule);
 // Lead Distribution
 router.get('/distribution', auto.getDistributionConfig);
 router.put('/distribution', auto.updateDistributionConfig);
+router.put('/distribution/:id/toggle', auto.toggleDistributionConfig);
+router.delete('/distribution/:id', auto.deleteDistributionConfig);
 
 // WhatsApp Chat Assistant Rules
 router.get('/chat-assistant', auto.getChatAssistantRules);
 router.post('/chat-assistant', auto.createChatAssistantRule);
+router.put('/chat-assistant/:id/toggle', auto.toggleChatAssistantRule);
 router.delete('/chat-assistant/:id', auto.deleteChatAssistantRule);
 
 // Outgoing Webhooks
@@ -44,6 +47,10 @@ router.put('/meta-capi', auto.updateMetaCAPIConfig);
 router.post('/meta-capi/lead/:id/qualified', auto.markLeadQualified);
 
 // Account Token
+const tracking = require('../controllers/trackingController');
+router.get('/tracking', tracking.getSetup);
+router.put('/tracking', requireAdminOrAbove, tracking.updateSetup);
+router.post('/tracking/regenerate', requireAdminOrAbove, tracking.regenerateKey);
 router.get('/account-token', auto.getAccountToken);
 router.post('/account-token/regenerate', requireAdminOrAbove, auto.regenerateAccountToken);
 

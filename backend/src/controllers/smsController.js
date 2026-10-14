@@ -52,8 +52,21 @@ exports.getInbox = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+function isFromTwilio(req) {
+  const config = require('../config');
+  const token = config.twilio?.authToken;
+  if (!token || process.env.SMS_WEBHOOK_VERIFY === 'false') return true;
+  const sig = req.get('x-twilio-signature');
+  if (!sig) return false;
+  const twilio = require('twilio');
+  const host = req.get('x-forwarded-host') || req.get('host');
+  return [`${config.apiUrl}${req.originalUrl}`, `https://${host}${req.originalUrl}`, `${req.protocol}://${host}${req.originalUrl}`]
+    .some((u) => twilio.validateRequest(token, sig, u, req.body || {}));
+}
+
 exports.webhook = async (req, res, next) => {
   try {
+    if (!isFromTwilio(req)) return res.status(403).send('Forbidden');
     await handleSMSWebhook(req.body);
     res.set('Content-Type', 'text/xml');
     res.send('<Response></Response>');

@@ -1,9 +1,13 @@
 import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import API from '../lib/api';
-import { BarChart3, TrendingUp, Users, Phone, Mail, Target, Download } from 'lucide-react';
-import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { CountUp } from '../lib/motion';
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { Segmented } from '../components/ui';
 
-const COLORS = ['#0066FF', '#34C759', '#FF9500', '#FF3B5C', '#AF52DE', '#FF9500'];
+const CHART_COLOR = '#EDE9FF';
+const GRID_COLOR = '#E7E5E4';
+const TICK_COLOR = '#A8A29E';
 
 export default function Analytics() {
   const [tab, setTab] = useState('leads');
@@ -31,151 +35,185 @@ export default function Analytics() {
     { key: 'dashboard', label: 'Overview' },
   ];
 
+  const tooltipStyle = {
+    background: '#FFFFFF', border: '1px solid #E7E5E4', borderRadius: '10px',
+    color: '#1C1917', fontFamily: 'IBM Plex Mono, monospace', fontSize: '12px',
+    boxShadow: '0 2px 12px rgba(28,25,23,0.06)',
+  };
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <h1 className="text-3xl font-extrabold text-ink-primary tracking-tight">Analytics & Reports</h1>
-        <div className="flex gap-2">
-          <input type="date" value={dateRange.from} onChange={(e) => setDateRange({ ...dateRange, from: e.target.value })} className="input w-auto" />
-          <input type="date" value={dateRange.to} onChange={(e) => setDateRange({ ...dateRange, to: e.target.value })} className="input w-auto" />
+      {/* Header — editorial */}
+      <div className="flex items-baseline justify-between flex-wrap gap-4">
+        <h1 className="text-ink-primary" style={{ fontSize: '32px', fontWeight: 650, letterSpacing: '-0.01em' }}>Analytics</h1>
+        <div className="flex items-center gap-3">
+          <input type="date" value={dateRange.from} onChange={(e) => setDateRange({ ...dateRange, from: e.target.value })} className="input" style={{ width: 'auto', fontSize: '13px' }} />
+          <span className="text-ink-tertiary" style={{ fontSize: '13px' }}>to</span>
+          <input type="date" value={dateRange.to} onChange={(e) => setDateRange({ ...dateRange, to: e.target.value })} className="input" style={{ width: 'auto', fontSize: '13px' }} />
         </div>
       </div>
 
-      {/* Tab bar */}
-      <div className="flex gap-1 bg-white border border-surface-border rounded-full p-1 flex-wrap">
-        {tabs.map(t => (
-          <button key={t.key} onClick={() => setTab(t.key)} className={`tab-pill ${tab === t.key ? 'tab-pill-active bg-accent-red' : 'text-ink-secondary hover:text-ink-primary'}`}>{t.label}</button>
-        ))}
+      {/* Scope switch — segmented pill control (Section 7) */}
+      <div style={{ marginBottom: '24px' }}>
+        <Segmented layoutId="analytics-tab" options={tabs} value={tab} onChange={setTab} />
       </div>
 
-      {loading ? <div className="flex justify-center py-8"><div className="animate-spin w-8 h-8 border-4 border-accent-blue border-t-transparent rounded-full" /></div> :
-        <div className="space-y-6">
+      {loading ? (
+        <div className="space-y-2">
+          {[1, 2, 3, 4].map((i) => <div key={i} className="skeleton h-32" />)}
+        </div>
+      ) : (
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={tab}
+            initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
+            className="space-y-8"
+          >
           {tab === 'leads' && data && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <ChartCard title="Leads by Source" data={data.bySource?.map(s => ({ name: s.lead_source, count: parseInt(s.count) })) || []} type="bar" />
-              <ChartCard title="Leads by City" data={data.byCity?.map(c => ({ name: c.city, count: parseInt(c.count) })) || []} type="bar" />
-              <ChartCard title="Lead Trend" data={data.trend?.map(t => ({ name: new Date(t.date).toLocaleDateString('en', { month: 'short', day: 'numeric' }), count: parseInt(t.count) })) || []} type="line" />
-              <ChartCard title="Leads by Budget Range" data={data.byBudget?.map(b => ({ name: b.range, count: parseInt(b.count) })) || []} type="bar" />
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <ChartPanel title="Leads by source" data={data.bySource?.map(s => ({ name: s.lead_source, count: parseInt(s.count) })) || []} type="bar" tooltipStyle={tooltipStyle} />
+              <ChartPanel title="Leads by city" data={data.byCity?.map(c => ({ name: c.city, count: parseInt(c.count) })) || []} type="bar" tooltipStyle={tooltipStyle} />
+              <ChartPanel title="Lead trend" data={data.trend?.map(t => ({ name: new Date(t.date).toLocaleDateString('en', { month: 'short', day: 'numeric' }), count: parseInt(t.count) })) || []} type="line" tooltipStyle={tooltipStyle} />
+              <ChartPanel title="Leads by budget range" data={data.byBudget?.map(b => ({ name: b.range, count: parseInt(b.count) })) || []} type="bar" tooltipStyle={tooltipStyle} />
             </div>
           )}
           {tab === 'conversion' && data && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <ChartCard title="Conversion by Source" data={data.bySource?.map(s => ({ name: s.lead_source, count: parseFloat(s.conversion_rate) })) || []} type="bar" />
-              <ChartCard title="Conversion by Agent" data={data.byAgent?.map(a => ({ name: `${a.first_name} ${a.last_name}`, count: parseFloat(a.conversion_rate) })) || []} type="bar" />
-              <div className="card stagger-in">
-                <h3 className="text-lg font-bold text-ink-primary mb-2">Average Time to Close</h3>
-                <p className="text-4xl font-extrabold" style={{ color: '#0066FF' }}>{data.avgTimeToClose} days</p>
+            <div className="space-y-8">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <ChartPanel title="Conversion by source" data={data.bySource?.map(s => ({ name: s.lead_source, count: parseFloat(s.conversion_rate) })) || []} type="bar" tooltipStyle={tooltipStyle} />
+                <ChartPanel title="Conversion by agent" data={data.byAgent?.map(a => ({ name: `${a.first_name} ${a.last_name}`, count: parseFloat(a.conversion_rate) })) || []} type="bar" tooltipStyle={tooltipStyle} />
+              </div>
+              <div>
+                <p className="meta-label mb-1">Average time to close</p>
+                <p className="mono text-ink-primary" style={{ fontSize: '48px', fontWeight: 600 }}>
+                  <CountUp value={Number(data.avgTimeToClose) || 0} /><span className="text-ink-tertiary" style={{ fontSize: '20px', fontWeight: 400 }}> days</span>
+                </p>
               </div>
             </div>
           )}
           {tab === 'pipeline' && data && (
-            <div className="card stagger-in">
-              <h3 className="text-lg font-bold text-ink-primary mb-4">Pipeline Stages</h3>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-                {data.stages?.map(s => (
-                  <div key={s.name} className="rounded-2xl border p-4 text-center" style={{ borderColor: `${s.color}40`, background: `${s.color}08` }}>
-                    <p className="text-2xl font-extrabold text-ink-primary">{parseInt(s.count)}</p>
-                    <p className="text-sm font-semibold" style={{ color: s.color }}>{s.name}</p>
-                  </div>
-                ))}
+            <div className="space-y-6">
+              <div>
+                <p className="meta-label mb-3">Pipeline stages</p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-0">
+                  {data.stages?.map((s, i) => (
+                    <motion.div
+                      key={s.name}
+                      initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.06, duration: 0.25 }}
+                      className={i > 0 ? 'hairline-l pl-4' : ''}
+                    >
+                      <p className="mono text-ink-primary" style={{ fontSize: '28px', fontWeight: 600 }}>
+                        <CountUp value={parseInt(s.count) || 0} />
+                      </p>
+                      <p className="text-ink-secondary" style={{ fontSize: '13px' }}>{s.name}</p>
+                    </motion.div>
+                  ))}
+                </div>
               </div>
-              <div className="mt-4 grid grid-cols-2 gap-4">
-                <div className="rounded-2xl p-4 border border-surface-border bg-surface-page">
-                  <p className="text-sm font-semibold text-ink-secondary">Moved This Week</p>
-                  <p className="text-2xl font-extrabold" style={{ color: '#0066FF' }}>{data.movedThisWeek}</p>
-                </div>
-                <div className="rounded-2xl p-4 border border-surface-border bg-surface-page">
-                  <p className="text-sm font-semibold text-ink-secondary">Stuck Leads (7+ days)</p>
-                  <p className="text-2xl font-extrabold" style={{ color: '#FF3B5C' }}>{data.stuckLeads}</p>
-                </div>
+              <div className="grid grid-cols-2 gap-0">
+                <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3, duration: 0.25 }} className="pr-4">
+                  <p className="meta-label mb-1">Moved this week</p>
+                  <p className="mono text-ink-primary" style={{ fontSize: '28px', fontWeight: 600 }}><CountUp value={Number(data.movedThisWeek) || 0} /></p>
+                </motion.div>
+                <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4, duration: 0.25 }} className="hairline-l pl-4">
+                  <p className="meta-label mb-1">Stuck leads (7+ days)</p>
+                  <p className="mono" style={{ fontSize: '28px', fontWeight: 600, color: '#B45309' }}><CountUp value={Number(data.stuckLeads) || 0} /></p>
+                </motion.div>
               </div>
             </div>
           )}
           {tab === 'agents' && data && (
-            <div className="card overflow-hidden" style={{ padding: 0 }}>
-              <table className="w-full">
-                <thead className="bg-surface-page border-b border-surface-border">
-                  <tr>
-                    <th className="p-3 text-left text-xs font-bold text-ink-tertiary uppercase">Agent</th>
-                    <th className="p-3 text-left text-xs font-bold text-ink-tertiary uppercase">Calls</th>
-                    <th className="p-3 text-left text-xs font-bold text-ink-tertiary uppercase">Emails</th>
-                    <th className="p-3 text-left text-xs font-bold text-ink-tertiary uppercase">WhatsApp</th>
-                    <th className="p-3 text-left text-xs font-bold text-ink-tertiary uppercase">SMS</th>
-                    <th className="p-3 text-left text-xs font-bold text-ink-tertiary uppercase">Won</th>
-                    <th className="p-3 text-left text-xs font-bold text-ink-tertiary uppercase">Lost</th>
-                    <th className="p-3 text-left text-xs font-bold text-ink-tertiary uppercase">Total Leads</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-surface-border">
-                  {data.agents?.map(a => (
-                    <tr key={a.id} className="hover:bg-surface-page transition-colors">
-                      <td className="p-3 font-bold text-ink-primary">{a.first_name} {a.last_name}</td>
-                      <td className="p-3 font-semibold text-ink-secondary">{parseInt(a.calls)}</td>
-                      <td className="p-3 font-semibold text-ink-secondary">{parseInt(a.emails)}</td>
-                      <td className="p-3 font-semibold text-ink-secondary">{parseInt(a.whatsapp)}</td>
-                      <td className="p-3 font-semibold text-ink-secondary">{parseInt(a.sms)}</td>
-                      <td className="p-3 font-bold" style={{ color: '#34C759' }}>{parseInt(a.won)}</td>
-                      <td className="p-3 font-bold" style={{ color: '#FF3B5C' }}>{parseInt(a.lost)}</td>
-                      <td className="p-3 font-semibold text-ink-primary">{parseInt(a.total_leads)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div>
+              {/* Header row */}
+              <div className="hairline-b pb-2 flex items-center gap-4">
+                <span className="meta-label flex-1">Agent</span>
+                <span className="meta-label mono flex-shrink-0" style={{ width: '60px' }}>Calls</span>
+                <span className="meta-label mono flex-shrink-0" style={{ width: '60px' }}>Emails</span>
+                <span className="meta-label mono flex-shrink-0" style={{ width: '80px' }}>WhatsApp</span>
+                <span className="meta-label mono flex-shrink-0" style={{ width: '50px' }}>SMS</span>
+                <span className="meta-label mono flex-shrink-0" style={{ width: '50px' }}>Won</span>
+                <span className="meta-label mono flex-shrink-0" style={{ width: '50px' }}>Lost</span>
+                <span className="meta-label mono flex-shrink-0" style={{ width: '80px' }}>Total</span>
+              </div>
+              {data.agents?.map(a => (
+                <div key={a.id} className="hairline-b py-3 flex items-center gap-4">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-ink-primary truncate" style={{ fontSize: '14px', fontWeight: 500 }}>{a.first_name} {a.last_name}</p>
+                  </div>
+                  <span className="mono text-ink-secondary flex-shrink-0" style={{ width: '60px', fontSize: '13px' }}>{parseInt(a.calls)}</span>
+                  <span className="mono text-ink-secondary flex-shrink-0" style={{ width: '60px', fontSize: '13px' }}>{parseInt(a.emails)}</span>
+                  <span className="mono text-ink-secondary flex-shrink-0" style={{ width: '80px', fontSize: '13px' }}>{parseInt(a.whatsapp)}</span>
+                  <span className="mono text-ink-secondary flex-shrink-0" style={{ width: '50px', fontSize: '13px' }}>{parseInt(a.sms)}</span>
+                  <span className="mono text-ink-primary flex-shrink-0" style={{ width: '50px', fontSize: '13px', fontWeight: 600 }}>{parseInt(a.won)}</span>
+                  <span className="mono text-ink-tertiary flex-shrink-0" style={{ width: '50px', fontSize: '13px' }}>{parseInt(a.lost)}</span>
+                  <span className="mono text-ink-secondary flex-shrink-0" style={{ width: '80px', fontSize: '13px' }}>{parseInt(a.total_leads)}</span>
+                </div>
+              ))}
             </div>
           )}
           {tab === 'dashboard' && data && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-              <StatBox label="Total Leads" value={data.leadStats?.totalLeads} icon={Users} color="#0066FF" />
-              <StatBox label="Conversion Rate" value={`${data.conversionRate}%`} icon={Target} color="#34C759" />
-              <StatBox label="Calls Today" value={data.callsToday} icon={Phone} color="#AF52DE" />
-              <StatBox label="Emails Today" value={data.emailsToday} icon={Mail} color="#FF9500" />
-              <StatBox label="Won" value={data.leadStats?.won} icon={TrendingUp} color="#34C759" />
-              <StatBox label="Stuck Leads" value={data.stuckLeads} icon={BarChart3} color="#FF3B5C" />
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-0">
+              {[
+                { label: 'Total leads', value: data.leadStats?.totalLeads },
+                { label: 'Conversion rate', value: `${data.conversionRate}%` },
+                { label: 'Calls today', value: data.callsToday },
+                { label: 'Emails today', value: data.emailsToday },
+                { label: 'Won', value: data.leadStats?.won },
+                { label: 'Stuck leads', value: data.stuckLeads },
+              ].map((s, i) => (
+                <motion.div
+                  key={s.label}
+                  initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.05, duration: 0.25 }}
+                  className={i > 0 ? 'hairline-l pl-4' : ''}
+                >
+                  <p className="meta-label mb-1">{s.label}</p>
+                  <p className="mono text-ink-primary" style={{ fontSize: '28px', fontWeight: 600 }}>
+                    {typeof s.value === 'number' || (s.value && !String(s.value).includes('%'))
+                      ? <CountUp value={parseFloat(String(s.value)) || 0} />
+                      : (s.value ?? 0)}
+                  </p>
+                </motion.div>
+              ))}
             </div>
           )}
-        </div>
-      }
+          </motion.div>
+        </AnimatePresence>
+      )}
     </div>
   );
 }
 
-function ChartCard({ title, data, type }) {
+function ChartPanel({ title, data, type, tooltipStyle }) {
   return (
-    <div className="card stagger-in">
-      <h3 className="text-lg font-bold text-ink-primary mb-4">{title}</h3>
-      <ResponsiveContainer width="100%" height={250}>
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+      <p className="meta-label mb-3">{title}</p>
+      <ResponsiveContainer width="100%" height={240}>
         {type === 'line' ? (
           <LineChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#E5E5EA" />
-            <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#8E8E93', fontFamily: 'SF Pro Display' }} />
-            <YAxis tick={{ fontSize: 12, fill: '#8E8E93', fontFamily: 'SF Pro Display' }} />
-            <Tooltip contentStyle={{ background: '#FFFFFF', border: '1px solid #E5E5EA', borderRadius: 12, color: '#1D1D1F', fontFamily: 'SF Pro Display', boxShadow: '0 4px 24px rgba(0,0,0,0.08)' }} />
-            <Line type="monotone" dataKey="count" stroke="#0066FF" strokeWidth={2.5} dot={{ fill: '#0066FF', r: 4 }} activeDot={{ r: 6 }} />
+            <CartesianGrid strokeDasharray="3 3" stroke={GRID_COLOR} />
+            <XAxis dataKey="name" tick={{ fontSize: 11, fill: TICK_COLOR, fontFamily: 'IBM Plex Mono, monospace' }} axisLine={{ stroke: GRID_COLOR }} tickLine={false} />
+            <YAxis tick={{ fontSize: 11, fill: TICK_COLOR, fontFamily: 'IBM Plex Mono, monospace' }} axisLine={false} tickLine={false} />
+            <Tooltip contentStyle={tooltipStyle} />
+            {/* Line traces itself in */}
+            <Line type="monotone" dataKey="count" stroke={CHART_COLOR} strokeWidth={2}
+              dot={{ fill: CHART_COLOR, r: 3 }} activeDot={{ r: 5 }}
+              isAnimationActive animationDuration={900} animationEasing="ease-out" />
           </LineChart>
         ) : (
           <BarChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#E5E5EA" />
-            <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#8E8E93', fontFamily: 'SF Pro Display' }} />
-            <YAxis tick={{ fontSize: 12, fill: '#8E8E93', fontFamily: 'SF Pro Display' }} />
-            <Tooltip contentStyle={{ background: '#FFFFFF', border: '1px solid #E5E5EA', borderRadius: 12, color: '#1D1D1F', fontFamily: 'SF Pro Display', boxShadow: '0 4px 24px rgba(0,0,0,0.08)' }} />
-            <Bar dataKey="count" fill="#0066FF" radius={[8, 8, 0, 0]} />
+            <CartesianGrid strokeDasharray="3 3" stroke={GRID_COLOR} />
+            <XAxis dataKey="name" tick={{ fontSize: 11, fill: TICK_COLOR, fontFamily: 'IBM Plex Mono, monospace' }} axisLine={{ stroke: GRID_COLOR }} tickLine={false} />
+            <YAxis tick={{ fontSize: 11, fill: TICK_COLOR, fontFamily: 'IBM Plex Mono, monospace' }} axisLine={false} tickLine={false} />
+            <Tooltip contentStyle={tooltipStyle} cursor={{ fill: '#FAFAF9' }} />
+            {/* Bars grow out of the baseline */}
+            <Bar dataKey="count" fill={CHART_COLOR} radius={[2, 2, 0, 0]}
+              isAnimationActive animationDuration={700} animationEasing="ease-out" />
           </BarChart>
         )}
       </ResponsiveContainer>
-    </div>
-  );
-}
-
-function StatBox({ label, value, icon: Icon, color }) {
-  return (
-    <div className="card card-hover stagger-in flex items-center gap-4">
-      <div className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: `${color}15` }}>
-        <Icon size={24} style={{ color }} />
-      </div>
-      <div>
-        <p className="text-2xl font-extrabold text-ink-primary">{value}</p>
-        <p className="text-sm font-semibold text-ink-secondary">{label}</p>
-      </div>
-    </div>
+    </motion.div>
   );
 }

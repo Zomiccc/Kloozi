@@ -2,8 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import API from '../../lib/api';
 import toast from 'react-hot-toast';
-import { ArrowLeft, MessageSquare, ToggleRight, Users } from 'lucide-react';
-import BrandLogo from '../../components/BrandLogo';
+import { ArrowLeft } from 'lucide-react';
 
 export default function WhatsAppChats() {
   const navigate = useNavigate();
@@ -47,53 +46,75 @@ export default function WhatsAppChats() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
-      <button onClick={() => navigate('/app/automations')} className="flex items-center gap-2 text-sm text-ink-secondary hover:text-ink-primary"><ArrowLeft size={16} /> Back to Automations</button>
+    <div className="max-w-2xl mx-auto space-y-8">
+      <button onClick={() => navigate('/app/automations')} className="btn-ghost text-sm font-medium flex items-center gap-1.5">
+        <ArrowLeft size={14} /> Automations
+      </button>
 
-      <div className="flex items-center gap-3">
-        <div className="w-12 h-12 bg-surface-page rounded-xl flex items-center justify-center"><BrandLogo brand="whatsapp" /></div>
-        <div><h2 className="text-xl font-bold text-ink-primary">WhatsApp Chats</h2><p className="text-sm text-ink-secondary">Auto-create leads from WhatsApp conversations</p></div>
+      <div>
+        <h1 style={{ fontSize: '32px', fontWeight: 650, letterSpacing: '-0.01em' }}>WhatsApp Chats</h1>
+        <p className="text-ink-secondary mt-1" style={{ fontSize: '15px' }}>
+          Turn every unknown WhatsApp number into a lead automatically — no copy-pasting.
+        </p>
       </div>
 
-      {loading ? <div className="flex justify-center py-8"><div className="animate-spin w-8 h-8 border-4 border-surface-border border-t-accent-blue rounded-full" /></div> : (
-        <div className="card space-y-6">
-          <div className="bg-surface-page border border-surface-border rounded-lg p-4 flex items-start gap-3">
-            <MessageSquare size={20} className="text-ink-secondary flex-shrink-0" />
-            <div><p className="text-sm font-medium text-ink-secondary">How it works:</p><p className="text-xs text-ink-tertiary mt-1">When enabled, any new WhatsApp number that messages your connected number will automatically create a lead record. This works in real-time via the webhook.</p></div>
-          </div>
+      {loading ? (
+        <div className="space-y-2">{[1, 2, 3].map((i) => <div key={i} className="skeleton h-14" />)}</div>
+      ) : (
+        <div className="space-y-7">
+          {/* The switch — the page's single decision */}
+          <label className="hairline-b pb-6 flex items-start justify-between gap-4 cursor-pointer select-none group">
+            <span>
+              <span className="font-semibold block" style={{ fontSize: '16px' }}>Auto-create leads</span>
+              <span className="text-ink-secondary block mt-1" style={{ fontSize: '14px' }}>
+                When a brand-new number messages you, a lead appears with the conversation attached — in real time via webhook.
+              </span>
+            </span>
+            <input
+              type="checkbox"
+              className="sr-only"
+              checked={!!config.is_enabled}
+              onChange={(e) => setConfig((prev) => ({ ...prev, is_enabled: e.target.checked }))}
+            />
+            <span
+              aria-hidden
+              className={`relative inline-block w-10 h-[22px] flex-shrink-0 mt-1 transition-colors duration-150 ${config.is_enabled ? '' : 'bg-[#E7E5E4]'}`}
+              style={config.is_enabled ? { background: '#EDE9FF' } : {}}
+            >
+              <span
+                className="absolute top-[3px] w-4 h-4 bg-white transition-all duration-150"
+                style={{ left: config.is_enabled ? '22px' : '3px', borderRadius: '8px' }}
+              />
+            </span>
+          </label>
 
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="font-semibold text-ink-primary">Enable Auto-Create</h3>
-              <p className="text-sm text-ink-secondary">Automatically create leads from new WhatsApp numbers</p>
-            </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input type="checkbox" className="sr-only peer" checked={config.is_enabled} onChange={e => setConfig(prev => ({ ...prev, is_enabled: e.target.checked }))} />
-              <div className="w-11 h-6 bg-surface-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent-blue"></div>
-            </label>
-          </div>
-
-          <div>
-            <label className="text-sm font-medium text-ink-secondary">Auto-Assign To Agent</label>
-            <select className="input mt-1" value={config.auto_assign_to || ''} onChange={e => setConfig(prev => ({ ...prev, auto_assign_to: e.target.value || null }))}>
-              <option value="">Round Robin (default)</option>
-              {agents.map(agent => (
+          <div className={`transition-opacity ${config.is_enabled ? '' : 'opacity-40 pointer-events-none'}`}>
+            <p className="meta-label mb-1">Auto-assign to agent</p>
+            <select
+              className="input"
+              value={config.auto_assign_to || ''}
+              onChange={(e) => setConfig((prev) => ({ ...prev, auto_assign_to: e.target.value || null }))}
+            >
+              <option value="">Round robin (default)</option>
+              {agents.map((agent) => (
                 <option key={agent.id} value={agent.id}>{agent.first_name} {agent.last_name}</option>
               ))}
             </select>
-          </div>
 
-          <div>
-            <label className="text-sm font-medium text-ink-secondary">Default Stage</label>
-            <select className="input mt-1" value={config.default_stage} onChange={e => setConfig(prev => ({ ...prev, default_stage: e.target.value }))}>
-              {stages.map(stage => (
+            <p className="meta-label mb-1 mt-6">Default stage for new chat leads</p>
+            <select
+              className="input"
+              value={config.default_stage || 'new'}
+              onChange={(e) => setConfig((prev) => ({ ...prev, default_stage: e.target.value }))}
+            >
+              {stages.map((stage) => (
                 <option key={stage.id} value={stage.name}>{stage.name}</option>
               ))}
             </select>
           </div>
 
-          <button onClick={handleSave} disabled={saving} className="w-full px-4 py-2.5 rounded-lg btn btn-primary flex items-center justify-center gap-2 transition-colors disabled:opacity-50">
-            <ToggleRight size={16} /> {saving ? 'Saving...' : 'Save Settings'}
+          <button onClick={handleSave} disabled={saving} className="btn btn-primary w-full sm:w-auto">
+            {saving ? 'Saving…' : 'Save settings'}
           </button>
         </div>
       )}

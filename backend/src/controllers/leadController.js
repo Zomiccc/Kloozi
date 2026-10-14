@@ -6,104 +6,29 @@ const { cacheGet, cacheSet, cacheDel, cacheDelPattern } = require('../config/red
 const { parse } = require('csv-parse');
 const { stringify } = require('csv-stringify');
 const crypto = require('crypto');
+const { createLead: createLeadInPipeline, onLeadUpdated, normalizeTags } = require('../services/leadPipeline');
 
 exports.createLead = async (req, res, next) => {
   try {
     const wsId = req.workspaceId;
-    const { first_name, last_name, phone, email, city, budget, lead_source, notes, custom_fields, tags, assigned_to } = req.body;
+    const result = await createLeadInPipeline(wsId, req.body, {
+      actorId: req.user.id,
+      source: req.body.lead_source || 'manual',
+      duplicateMode: req.body.auto_merge === true ? 'merge' : (req.body.allow_duplicate === true ? 'allow' : 'reject'),
+      activityText: `Lead created: ${req.body.first_name || req.body.name || ''} ${req.body.last_name || ''}`.trim(),
+    });
 
-    const autoMerge = req.body.auto_merge === true;
-
-    if (phone || email) {
-      let dupQuery = 'SELECT id, first_name, last_name, phone, email FROM leads WHERE workspace_id = $1 AND (';
-      let dupParams = [wsId];
-      let conditions = [];
-      if (phone) {
-        conditions.push(`phone = $${dupParams.length + 1}`);
-        dupParams.push(phone);
-      }
-      if (email) {
-        conditions.push(`email = $${dupParams.length + 1}`);
-        dupParams.push(email);
-      }
-      dupQuery += conditions.join(' OR ') + ')';
-      const dupResult = await db.query(dupQuery, dupParams);
-      if (dupResult.rows.length > 0) {
-        if (autoMerge) {
-          const existing = dupResult.rows[0];
-          const updateFields = [];
-          const updateParams = [];
-          let idx = 1;
-          if (first_name && !existing.first_name) { updateFields.push(`first_name = $${idx++}`); updateParams.push(first_name); }
-          if (last_name && !existing.last_name) { updateFields.push(`last_name = $${idx++}`); updateParams.push(last_name); }
-          if (email && !existing.email) { updateFields.push(`email = $${idx++}`); updateParams.push(email); }
-          if (city && !existing.city) { updateFields.push(`city = $${idx++}`); updateParams.push(city); }
-          if (budget && !existing.budget) { updateFields.push(`budget = $${idx++}`); updateParams.push(budget); }
-          if (notes) { updateFields.push(`notes = COALESCE(notes || ' | ', '') || $${idx++}`); updateParams.push(notes); }
-          if (tags && tags.length > 0) { updateFields.push(`tags = ARRAY(SELECT DISTINCT unnest(tags || $${idx++}::text[]))`); updateParams.push(tags); }
-          if (custom_fields && custom_fields.length > 0) {
-            updateFields.push(`custom_fields = $${idx++}`);
-            updateParams.push(JSON.stringify(custom_fields));
-          }
-          if (updateFields.length > 0) {
-            updateFields.push(`updated_at = NOW()`);
-            updateParams.push(existing.id, wsId);
-            await db.query(`UPDATE leads SET ${updateFields.join(', ')} WHERE id = $${idx++} AND workspace_id = $${idx++}`, updateParams);
-          }
-          await logActivity(wsId, existing.id, req.user.id, 'lead_merged', `Lead auto-merged from new submission (source: ${lead_source || 'manual'})`, { merged_source: lead_source });
-          await updateLeadScore(existing.id);
-          await cacheDelPattern(`leads:${wsId}:*`);
-          const mergedResult = await db.query('SELECT * FROM leads WHERE id = $1 AND workspace_id = $2', [existing.id, wsId]);
-          return res.json({ message: 'Lead auto-merged with existing duplicate', lead: mergedResult.rows[0], merged: true });
-        }
-        return res.status(409).json({
-          error: 'Potential duplicate lead found',
-          duplicate: dupResult.rows[0],
-        });
-      }
-    }
-
-    let assignedTo = assigned_to;
-    if (!assignedTo) {
-      const agentsResult = await db.query(
-        `SELECT u.id FROM users u WHERE u.workspace_id = $1 AND u.role = $2 AND u.status = $3
-         ORDER BY (SELECT COUNT(*) FROM leads WHERE assigned_to = u.id) ASC LIMIT 1`,
-        [wsId, 'sales_agent', 'active']
-      );
-      if (agentsResult.rows.length > 0) {
-        assignedTo = agentsResult.rows[0].id;
-      } else {
-        assignedTo = req.user.id;
-      }
-    }
-
-    const stageResult = await db.query(
-      'SELECT id FROM lead_stages WHERE workspace_id = $1 AND is_default = true LIMIT 1',
-      [wsId]
-    );
-    const stageId = stageResult.rows.length > 0 ? stageResult.rows[0].id : null;
-
-    const result = await db.query(
-      `INSERT INTO leads (workspace_id, first_name, last_name, phone, email, city, budget, lead_source, notes, custom_fields, tags, stage, stage_id, assigned_to, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
-       RETURNING *`,
-      [wsId, first_name, last_name, phone, email, city, budget, lead_source || 'manual',
-       notes, JSON.stringify(custom_fields || []), tags || [], 'new', stageId, assignedTo, req.user.id]
-    );
-
-    const lead = result.rows[0];
-    await logActivity(wsId, lead.id, req.user.id, 'lead_created', `Lead created: ${first_name} ${last_name || ''}`);
-    await updateLeadScore(lead.id);
-
-    await cacheDelPattern(`leads:${wsId}:*`);
-
-    if (assignedTo && assignedTo !== req.user.id) {
-      await sendPushNotification(assignedTo, 'New Lead Assigned', `You have a new lead: ${first_name} ${last_name || ''}`, {
-        type: 'new_lead', leadId: lead.id
+    if (result.status === 'duplicate') {
+      const d = result.duplicate;
+      return res.status(409).json({
+        error: 'Potential duplicate lead found',
+        duplicate: { id: d.id, first_name: d.first_name, last_name: d.last_name, phone: d.phone, email: d.email },
       });
     }
-
-    res.status(201).json({ message: 'Lead created successfully', lead });
+    if (result.status === 'merged') {
+      return res.json({ message: 'Lead auto-merged with existing duplicate', lead: result.lead, merged: true });
+    }
+    res.status(201).json({ message: 'Lead created successfully', lead: result.lead });
   } catch (err) {
     next(err);
   }
@@ -146,7 +71,7 @@ exports.getLeads = async (req, res, next) => {
       params.push(agent);
     }
     if (tag) {
-      conditions.push(`$${paramIdx++} = ANY(l.tags)`);
+      conditions.push(`l.tags ? $${paramIdx++}`);
       params.push(tag);
     }
     if (city) {
@@ -169,8 +94,19 @@ exports.getLeads = async (req, res, next) => {
       conditions.push(`l.created_at <= $${paramIdx++}`);
       params.push(date_to);
     }
+    // "Follow-ups" tab: an open follow-up that is due now or earlier
+    if (req.query.follow_up_due === 'true') {
+      conditions.push(`EXISTS (SELECT 1 FROM follow_ups f WHERE f.lead_id = l.id AND f.status = 'pending' AND f.due_date <= NOW())`);
+    }
+    // "Engaged" tab: opened a document, visited the website or replied in the last 7 days
+    if (req.query.recently_viewed === 'true') {
+      conditions.push(`(EXISTS (SELECT 1 FROM engagement_sessions s WHERE s.lead_id = l.id AND s.last_seen_at > NOW() - INTERVAL '7 days')
+        OR EXISTS (SELECT 1 FROM whatsapp_messages m WHERE m.lead_id = l.id AND m.direction = 'inbound' AND m.created_at > NOW() - INTERVAL '7 days'))`);
+    }
 
     let orderBy = 'l.created_at DESC';
+    if (req.query.follow_up_due === 'true') orderBy = 'l.follow_up_date ASC NULLS LAST';
+    if (req.query.recently_viewed === 'true') orderBy = 'l.score DESC, l.last_activity_at DESC';
     switch (sort) {
       case 'oldest': orderBy = 'l.created_at ASC'; break;
       case 'last_activity': orderBy = 'l.last_activity_at DESC'; break;
@@ -187,7 +123,8 @@ exports.getLeads = async (req, res, next) => {
 
     const query = `
       SELECT l.*, u.first_name as agent_first_name, u.last_name as agent_last_name,
-             s.name as stage_name, s.color as stage_color
+             s.name as stage_name, s.color as stage_color,
+             EXISTS (SELECT 1 FROM update_requests ur WHERE ur.lead_id = l.id AND ur.resolved_at IS NULL) AS update_requested
       FROM leads l
       LEFT JOIN users u ON l.assigned_to = u.id
       LEFT JOIN lead_stages s ON l.stage_id = s.id
@@ -301,7 +238,9 @@ exports.updateLead = async (req, res, next) => {
         if (field === 'custom_fields') {
           params.push(JSON.stringify(updates[field]));
         } else if (field === 'tags') {
-          params.push(updates[field]);
+          params.push(JSON.stringify(normalizeTags(updates[field])));
+        } else if (field === 'stage') {
+          params.push(String(updates[field]).toLowerCase());
         } else {
           params.push(updates[field]);
         }
@@ -310,6 +249,22 @@ exports.updateLead = async (req, res, next) => {
 
     if (setClauses.length === 0) {
       return res.status(400).json({ error: 'No valid fields to update' });
+    }
+
+    if (updates.stage !== undefined) {
+      const stageRow = await db.query(
+        'SELECT id FROM lead_stages WHERE workspace_id = $1 AND LOWER(name) = LOWER($2) LIMIT 1',
+        [wsId, String(updates.stage)]
+      );
+      if (stageRow.rows[0]) {
+        setClauses.push(`stage_id = $${paramIdx++}`);
+        params.push(stageRow.rows[0].id);
+      }
+    }
+
+    const before = await db.query('SELECT * FROM leads WHERE workspace_id = $1 AND id = $2', [wsId, id]);
+    if (before.rows.length === 0) {
+      return res.status(404).json({ error: 'Lead not found' });
     }
 
     setClauses.push(`updated_at = NOW()`);
@@ -324,19 +279,37 @@ exports.updateLead = async (req, res, next) => {
       return res.status(404).json({ error: 'Lead not found' });
     }
 
-    if (updates.stage) {
-      await logActivity(wsId, id, req.user.id, 'stage_change', `Stage changed to ${updates.stage}`, { new_stage: updates.stage });
-      if (updates.stage === 'won') {
+    const stageChanged = updates.stage !== undefined
+      && String(before.rows[0].stage || '').toLowerCase() !== String(updates.stage).toLowerCase();
+    if (stageChanged) {
+      const newStage = String(updates.stage).toLowerCase();
+      await logActivity(wsId, id, req.user.id, 'stage_change', `Stage changed to ${newStage}`, { old_stage: before.rows[0].stage, new_stage: newStage });
+      if (newStage === 'won') {
         await notifyManagers(wsId, 'lead_won', 'Deal Won!', `A lead has been moved to Won`, { type: 'lead_won', leadId: id });
-      } else if (updates.stage === 'lost') {
+      } else if (newStage === 'lost') {
         await notifyManagers(wsId, 'lead_lost', 'Deal Lost', `A lead has been moved to Lost`, { type: 'lead_lost', leadId: id });
       }
     } else {
       await logActivity(wsId, id, req.user.id, 'lead_updated', 'Lead details updated');
     }
 
+    // A follow-up date set straight on the lead becomes a real follow-up (with a reminder).
+    if (updates.follow_up_date && String(updates.follow_up_date) !== String(before.rows[0].follow_up_date || '')) {
+      const due = new Date(updates.follow_up_date);
+      if (!Number.isNaN(due.getTime())) {
+        const exists = await db.query("SELECT 1 FROM follow_ups WHERE lead_id = $1 AND status = 'pending' AND due_date = $2", [id, due]);
+        if (!exists.rows.length) {
+          await db.query(
+            `INSERT INTO follow_ups (workspace_id, lead_id, user_id, type, notes, due_date, status) VALUES ($1,$2,$3,$4,$5,$6,'pending')`,
+            [wsId, id, result.rows[0].assigned_to || req.user.id, updates.follow_up_type || 'call', updates.follow_up_notes || null, due]
+          );
+        }
+      }
+    }
+
     await updateLeadScore(id);
     await cacheDelPattern(`leads:${wsId}:*`);
+    await onLeadUpdated(wsId, before.rows[0], result.rows[0], { actorId: req.user.id });
 
     res.json({ message: 'Lead updated successfully', lead: result.rows[0] });
   } catch (err) {
@@ -381,9 +354,6 @@ exports.importLeads = async (req, res, next) => {
       records.push(record);
     }
 
-    const stageResult = await db.query('SELECT id FROM lead_stages WHERE workspace_id = $1 AND is_default = true LIMIT 1', [wsId]);
-    const stageId = stageResult.rows[0]?.id;
-
     let successCount = 0;
     let failedRows = [];
 
@@ -402,20 +372,14 @@ exports.importLeads = async (req, res, next) => {
           continue;
         }
 
-        const agentsResult = await db.query(
-          `SELECT u.id FROM users u WHERE u.workspace_id = $1 AND u.role = $2 AND u.status = $3
-           ORDER BY (SELECT COUNT(*) FROM leads WHERE assigned_to = u.id) ASC LIMIT 1`,
-          [wsId, 'sales_agent', 'active']
-        );
-
-        await db.query(
-          `INSERT INTO leads (workspace_id, first_name, last_name, phone, email, city, budget, lead_source, notes, stage, stage_id, assigned_to, created_by)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
-          [wsId, leadData.first_name, leadData.last_name, leadData.phone, leadData.email,
-           leadData.city, leadData.budget ? parseFloat(leadData.budget) : null,
-           leadData.lead_source || 'import', leadData.notes, 'new', stageId,
-           agentsResult.rows[0]?.id || req.user.id, req.user.id]
-        );
+        const created = await createLeadInPipeline(wsId, { ...leadData, lead_source: leadData.lead_source || 'import' }, {
+          actorId: req.user.id, source: 'import', duplicateMode: 'workspace', notify: false,
+          activityText: 'Lead imported from CSV',
+        });
+        if (created.status === 'skipped') {
+          failedRows.push({ row: i + 2, reason: 'Duplicate lead (skipped by duplicate settings)', data: row });
+          continue;
+        }
         successCount++;
       } catch (err) {
         failedRows.push({ row: i + 2, reason: err.message, data: records[i] });
@@ -505,28 +469,58 @@ exports.bulkAction = async (req, res, next) => {
         message = 'Leads assigned successfully';
         break;
       case 'change_stage':
-        query = `UPDATE leads SET stage = $${lead_ids.length + 2}, updated_at = NOW() WHERE workspace_id = $1 AND id IN (${placeholders})`;
+        query = `UPDATE leads SET stage = LOWER($${lead_ids.length + 2}),
+                   stage_id = COALESCE((SELECT id FROM lead_stages WHERE workspace_id = $1 AND LOWER(name) = LOWER($${lead_ids.length + 2}) LIMIT 1), stage_id),
+                   updated_at = NOW()
+                 WHERE workspace_id = $1 AND id IN (${placeholders})`;
         params.push(value);
         message = 'Leads stage updated successfully';
         break;
       case 'add_tag':
-        query = `UPDATE leads SET tags = tags || ARRAY[$${lead_ids.length + 2}], updated_at = NOW() WHERE workspace_id = $1 AND id IN (${placeholders})`;
-        params.push(value);
+        query = `UPDATE leads SET tags = (
+                   SELECT COALESCE(jsonb_agg(DISTINCT t), '[]'::jsonb)
+                   FROM jsonb_array_elements_text(COALESCE(tags, '[]'::jsonb) || jsonb_build_array($${lead_ids.length + 2}::text)) AS t
+                 ), updated_at = NOW() WHERE workspace_id = $1 AND id IN (${placeholders})`;
+        params.push(String(value || '').trim());
         message = 'Tag added to leads successfully';
         break;
       case 'delete':
         query = `DELETE FROM leads WHERE workspace_id = $1 AND id IN (${placeholders})`;
         message = 'Leads deleted successfully';
         break;
+      case 'start_sequence': {
+        const { startSequence } = require('./whatsappSequenceController');
+        let started = 0;
+        const reasons = {};
+        for (const leadId of lead_ids) {
+          const r = await startSequence(wsId, value, leadId, req.user.id);
+          if (r.started) started++; else reasons[r.reason] = (reasons[r.reason] || 0) + 1;
+        }
+        const skipped = Object.entries(reasons).map(([r, n]) => `${n} skipped: ${r}`).join('; ');
+        return res.json({ message: `Sequence started for ${started} lead${started === 1 ? '' : 's'}${skipped ? ` (${skipped})` : ''}`, count: started });
+      }
       default:
         return res.status(400).json({ error: 'Invalid bulk action' });
     }
 
+    const before = action === 'delete' ? { rows: [] } : await db.query(
+      `SELECT * FROM leads WHERE workspace_id = $1 AND id IN (${placeholders})`, [wsId, ...lead_ids]
+    );
     await db.query(query, params);
     await cacheDelPattern(`leads:${wsId}:*`);
 
-    for (const leadId of lead_ids) {
-      await logActivity(wsId, leadId, req.user.id, 'bulk_action', `Bulk action: ${action}`);
+    if (action !== 'delete') {
+      const after = await db.query(`SELECT * FROM leads WHERE workspace_id = $1 AND id IN (${placeholders})`, [wsId, ...lead_ids]);
+      const beforeById = Object.fromEntries(before.rows.map((l) => [l.id, l]));
+      for (const lead of after.rows) {
+        const prev = beforeById[lead.id];
+        if (action === 'change_stage' && prev && String(prev.stage || '') !== String(lead.stage || '')) {
+          await logActivity(wsId, lead.id, req.user.id, 'stage_change', `Stage changed to ${lead.stage}`, { old_stage: prev.stage, new_stage: lead.stage });
+        } else {
+          await logActivity(wsId, lead.id, req.user.id, 'bulk_action', `Bulk action: ${action}`);
+        }
+        await onLeadUpdated(wsId, prev, lead, { actorId: req.user.id });
+      }
     }
 
     res.json({ message, count: lead_ids.length });
@@ -663,9 +657,6 @@ exports.importPhonebook = async (req, res, next) => {
       return res.status(400).json({ error: 'Contacts array required' });
     }
 
-    const stageResult = await db.query('SELECT id FROM lead_stages WHERE workspace_id = $1 AND is_default = true LIMIT 1', [wsId]);
-    const stageId = stageResult.rows[0]?.id;
-
     let successCount = 0;
     let duplicateCount = 0;
     let failedCount = 0;
@@ -681,29 +672,17 @@ exports.importPhonebook = async (req, res, next) => {
         const firstName = contact.first_name || nameParts[0] || 'Unknown';
         const lastName = contact.last_name || nameParts.slice(1).join(' ') || '';
 
-        const dupCheck = await db.query(
-          'SELECT id FROM leads WHERE workspace_id = $1 AND phone = $2',
-          [wsId, contact.phone]
-        );
-
-        if (dupCheck.rows.length > 0) {
+        const created = await createLeadInPipeline(wsId, {
+          first_name: firstName, last_name: lastName, phone: contact.phone, email: contact.email,
+          city: contact.city, notes: contact.notes, lead_source: 'phonebook',
+        }, {
+          actorId: req.user.id, source: 'phonebook', duplicateMode: 'skip', notify: false,
+          activityText: 'Lead imported from phonebook',
+        });
+        if (created.status !== 'created') {
           duplicateCount++;
           continue;
         }
-
-        const agentsResult = await db.query(
-          `SELECT u.id FROM users u WHERE u.workspace_id = $1 AND u.role = $2 AND u.status = $3
-           ORDER BY (SELECT COUNT(*) FROM leads WHERE assigned_to = u.id) ASC LIMIT 1`,
-          [wsId, 'sales_agent', 'active']
-        );
-
-        await db.query(
-          `INSERT INTO leads (workspace_id, first_name, last_name, phone, email, city, lead_source, notes, stage, stage_id, assigned_to, created_by)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
-          [wsId, firstName, lastName, contact.phone, contact.email || null,
-           contact.city || null, 'phonebook', contact.notes || null, 'new', stageId,
-           agentsResult.rows[0]?.id || req.user.id, req.user.id]
-        );
         successCount++;
       } catch (err) {
         failedCount++;
@@ -750,7 +729,7 @@ exports.mergeLeads = async (req, res, next) => {
     const primaryTags = Array.isArray(primary.tags) ? primary.tags : (typeof primary.tags === 'string' ? JSON.parse(primary.tags || '[]') : []);
     const secondaryTags = Array.isArray(secondary.tags) ? secondary.tags : (typeof secondary.tags === 'string' ? JSON.parse(secondary.tags || '[]') : []);
     const mergedTags = [...new Set([...primaryTags, ...secondaryTags])];
-    if (mergedTags.length > 0) { updateFields.push(`tags = $${idx++}`); updateParams.push(mergedTags); }
+    if (mergedTags.length > 0) { updateFields.push(`tags = $${idx++}`); updateParams.push(JSON.stringify(mergedTags)); }
 
     const primaryCustomFields = Array.isArray(primary.custom_fields) ? primary.custom_fields : (typeof primary.custom_fields === 'string' ? JSON.parse(primary.custom_fields || '[]') : []);
     const secondaryCustomFields = Array.isArray(secondary.custom_fields) ? secondary.custom_fields : (typeof secondary.custom_fields === 'string' ? JSON.parse(secondary.custom_fields || '[]') : []);

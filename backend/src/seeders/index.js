@@ -77,16 +77,6 @@ async function seed() {
     }
 
     db.query(
-      `INSERT INTO email_templates (id, workspace_id, name, subject, body, category, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [uuidv4(), workspaceId, 'Welcome Email', 'Welcome to Demo Company, {{First_Name}}!', '<h2>Hello {{First_Name}}!</h2><p>Thank you for your interest. {{Agent_Name}} will be in touch with you shortly.</p><p>Best regards,<br>{{Company_Name}}</p>', 'intro', adminId]
-    );
-
-    db.query(
-      `INSERT INTO email_templates (id, workspace_id, name, subject, body, category, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [uuidv4(), workspaceId, 'Follow Up Email', 'Following up on your inquiry, {{First_Name}}', '<p>Hi {{First_Name}},</p><p>I wanted to follow up on your recent inquiry. Do you have any questions I can answer?</p><p>Best,<br>{{Agent_Name}}</p>', 'follow_up', adminId]
-    );
-
-    db.query(
       `INSERT INTO whatsapp_templates (id, workspace_id, name, category, content) VALUES (?, ?, ?, ?, ?)`,
       [uuidv4(), workspaceId, 'Welcome WhatsApp', 'intro', 'Hi {{First_Name}}! Thank you for your interest. This is {{Agent_Name}} from {{Company_Name}}. How can I help you today?']
     );

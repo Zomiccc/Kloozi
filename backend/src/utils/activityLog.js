@@ -42,52 +42,13 @@ async function addTimelineEntry(workspaceId, leadId, userId, type, description, 
   }
 }
 
+/** Lead score = interest score (behaviour-based, see services/interestService.js). */
 async function updateLeadScore(leadId) {
   try {
-    const leadResult = await db.query(
-      `SELECT l.id, l.created_at, l.stage, l.last_activity_at,
-              (SELECT COUNT(*) FROM lead_activities WHERE lead_id = l.id AND type = 'call') as call_count,
-              (SELECT COUNT(*) FROM lead_activities WHERE lead_id = l.id AND type = 'whatsapp_sent') as whatsapp_count,
-              (SELECT COUNT(*) FROM lead_activities WHERE lead_id = l.id AND type = 'email_sent') as email_count,
-              (SELECT COUNT(*) FROM lead_activities WHERE lead_id = l.id AND type IN ('whatsapp_received', 'sms_received', 'email_replied')) as response_count,
-              (SELECT COUNT(*) FROM lead_activities WHERE lead_id = l.id) as total_activities
-       FROM leads l WHERE l.id = $1`,
-      [leadId]
-    );
-
-    if (leadResult.rows.length === 0) return;
-
-    const lead = leadResult.rows[0];
-    let score = 0;
-
-    const daysSinceCreation = (Date.now() - new Date(lead.created_at).getTime()) / (1000 * 60 * 60 * 24);
-    if (daysSinceCreation < 1) score += 20;
-    else if (daysSinceCreation < 7) score += 15;
-    else if (daysSinceCreation < 30) score += 10;
-    else score += 5;
-
-    const stageScores = { new: 10, contacted: 20, interested: 40, negotiating: 60, won: 100, lost: 0 };
-    score += stageScores[lead.stage] || 0;
-
-    const totalMessages = parseInt(lead.call_count) + parseInt(lead.whatsapp_count) + parseInt(lead.email_count);
-    if (totalMessages > 0) {
-      const responseRate = parseInt(lead.response_count) / totalMessages;
-      score += Math.round(responseRate * 20);
-    }
-
-    if (lead.last_activity_at) {
-      const daysSinceActivity = (Date.now() - new Date(lead.last_activity_at).getTime()) / (1000 * 60 * 60 * 24);
-      if (daysSinceActivity < 1) score += 15;
-      else if (daysSinceActivity < 3) score += 10;
-      else if (daysSinceActivity < 7) score += 5;
-    }
-
-    score = Math.min(100, Math.max(0, score));
-
-    await db.query('UPDATE leads SET score = $1 WHERE id = $2', [score, leadId]);
-    return score;
+    const { refreshLeadInterest } = require('../services/interestService');
+    await refreshLeadInterest(leadId);
   } catch (err) {
-    logger.error('Score update error:', err.message);
+    logger.error('Lead score update error:', err.message);
   }
 }
 

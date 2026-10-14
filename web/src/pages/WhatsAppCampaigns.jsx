@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
 import API from '../lib/api';
 import toast from 'react-hot-toast';
-import { Plus, Send, BarChart3, MessageSquare, X, Users, FileText, Clock, CheckCircle2, AlertCircle, Image } from 'lucide-react';
+import { pillStyle } from '../components/ui';
+
+const statusDots = { draft: '#57534E', scheduled: '#EDE9FF', sending: '#2F6FDB', completed: '#0E8A5F' };
 
 export default function WhatsAppCampaigns() {
   const [campaigns, setCampaigns] = useState([]);
@@ -27,62 +30,59 @@ export default function WhatsAppCampaigns() {
     catch { toast.error('Failed'); }
   };
 
-  const statusColors = { draft: 'bg-white/10 text-slate-400', scheduled: 'bg-amber-500/15 text-amber-400', sending: 'bg-blue-500/15 text-blue-400', completed: 'bg-emerald-500/15 text-emerald-400' };
-
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-white">WhatsApp Campaigns</h1>
-        <button onClick={() => setShowBuilder(true)} className="px-4 py-2 rounded-lg text-sm bg-[#25D366] text-white hover:bg-[#1da851] flex items-center gap-2 transition-colors"><Plus size={16} /> New Campaign</button>
+        <h1 className="text-ink-primary" style={{ fontSize: '28px', fontWeight: 650, letterSpacing: '-0.01em' }}>WhatsApp Campaigns</h1>
+        <button onClick={() => setShowBuilder(true)} className="btn btn-primary">New campaign</button>
       </div>
 
-      {/* Sandbox Mode Banner */}
-      <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4 flex items-start gap-3">
-        <div className="text-yellow-400 mt-0.5">⚠️</div>
-        <div>
-          <p className="text-sm font-medium text-yellow-400">Running in Sandbox Mode</p>
-          <p className="text-xs text-yellow-500/80 mt-1">Contacts must join sandbox before receiving messages. Go live after Meta business verification.</p>
+      {/* Sandbox notice */}
+      <div className="hairline pt-4">
+        <div className="flex items-center gap-2">
+          <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#EDE9FF' }} />
+          <p className="text-ink-secondary" style={{ fontSize: '13px' }}>Running in sandbox mode — contacts must join sandbox before receiving messages. Go live after Meta business verification.</p>
         </div>
       </div>
 
-      <div className="bg-[#25D366]/10 border border-[#25D366]/20 rounded-lg p-4 flex items-start gap-3">
-        <MessageSquare size={20} className="text-[#25D366] flex-shrink-0" />
-        <div>
-          <p className="text-sm font-medium text-[#25D366]">Send bulk WhatsApp messages from your own number</p>
-          <p className="text-xs text-slate-400 mt-1">Messages are sent one by one with random delays to avoid blocking. Each message is personalized with lead data.</p>
-        </div>
+      {/* Info */}
+      <div className="hairline pt-4">
+        <p className="text-ink-secondary" style={{ fontSize: '14px' }}>Send bulk WhatsApp messages from your own number. Messages are sent one by one with random delays to avoid blocking. Each message is personalized with lead data.</p>
       </div>
 
-      {loading ? <div className="flex justify-center py-8"><div className="animate-spin w-8 h-8 border-4 border-[#25D366] border-t-transparent rounded-full" /></div> :
+      {loading ? <div className="flex justify-center py-8"><div className="animate-spin w-6 h-6 border-2 border-ink-tertiary border-t-transparent rounded-full" /></div> :
         campaigns.length === 0 ? (
-          <div className="card text-center py-12">
-            <MessageSquare size={48} className="text-slate-600 mx-auto mb-3" />
-            <p className="text-lg font-medium text-slate-300">No WhatsApp campaigns yet</p>
-            <p className="text-sm text-slate-500 mt-1">Create your first campaign to start messaging leads in bulk</p>
+          <div className="hairline pt-8 text-center">
+            <p className="text-ink-secondary" style={{ fontSize: '16px', fontWeight: 500 }}>No WhatsApp campaigns yet</p>
+            <p className="text-ink-tertiary mt-1" style={{ fontSize: '13px' }}>Create your first campaign to start messaging leads in bulk</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="hairline pt-2">
             {campaigns.map((c, idx) => (
-              <div key={c.id || idx} className="card">
-                <div className="flex items-start justify-between mb-2"><h3 className="font-semibold text-white">{c.name}</h3><span className={`badge ${statusColors[c.status]}`}>{c.status}</span></div>
-                <div className="grid grid-cols-2 gap-2 text-sm mt-3">
-                  <div><p className="text-slate-500">Recipients</p><p className="font-medium text-white">{c.recipients_count}</p></div>
-                  <div><p className="text-slate-500">Sent</p><p className="font-medium text-white">{c.sent_count}</p></div>
-                  <div><p className="text-slate-500">Delivered</p><p className="font-medium text-white">{c.delivered_count}</p></div>
-                  <div><p className="text-slate-500">Failed</p><p className="font-medium text-white">{c.failed_count}</p></div>
+              <motion.div key={c.id || idx} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(idx * 0.04, 0.3), duration: 0.2 }} className="py-4 hairline-row space-y-3">
+                <div className="flex items-start justify-between gap-4">
+                  <h3 className="text-ink-primary" style={{ fontSize: '16px', fontWeight: 600 }}>{c.name}</h3>
+                  <span className=" flex-shrink-0" style={pillStyle(statusDots[c.status] || '#57534E')}> {c.status}
+                  </span>
+                </div>
+                <div className="grid grid-cols-4 gap-4">
+                  <div><p className="meta-label">Recipients</p><p className="text-ink-primary mono" style={{ fontSize: '15px', fontWeight: 500 }}>{c.recipients_count}</p></div>
+                  <div><p className="meta-label">Sent</p><p className="text-ink-primary mono" style={{ fontSize: '15px', fontWeight: 500 }}>{c.sent_count}</p></div>
+                  <div><p className="meta-label">Delivered</p><p className="text-ink-primary mono" style={{ fontSize: '15px', fontWeight: 500 }}>{c.delivered_count}</p></div>
+                  <div><p className="meta-label">Failed</p><p className="text-ink-primary mono" style={{ fontSize: '15px', fontWeight: 500 }}>{c.failed_count}</p></div>
                 </div>
                 {stats && stats.id === c.id && (
-                  <div className="mt-3 pt-3 border-t border-white/10 grid grid-cols-3 gap-2 text-center text-xs">
-                    <div><p className="font-bold text-white">{stats.delivery_rate || 0}%</p><p className="text-slate-500">Delivery</p></div>
-                    <div><p className="font-bold text-white">{stats.read_count || 0}</p><p className="text-slate-500">Read</p></div>
-                    <div><p className="font-bold text-white">{stats.reply_count || 0}</p><p className="text-slate-500">Replies</p></div>
+                  <div className="grid grid-cols-3 gap-4 hairline pt-3">
+                    <div><p className="meta-label">Delivery rate</p><p className="text-ink-primary mono" style={{ fontSize: '15px', fontWeight: 500 }}>{stats.delivery_rate || 0}%</p></div>
+                    <div><p className="meta-label">Read</p><p className="text-ink-primary mono" style={{ fontSize: '15px', fontWeight: 500 }}>{stats.read_count || 0}</p></div>
+                    <div><p className="meta-label">Replies</p><p className="text-ink-primary mono" style={{ fontSize: '15px', fontWeight: 500 }}>{stats.reply_count || 0}</p></div>
                   </div>
                 )}
-                <div className="flex gap-2 mt-4">
-                  {c.status === 'draft' && <button onClick={() => handleSend(c.id)} className="px-3 py-1.5 rounded-lg text-sm bg-[#25D366] text-white hover:bg-[#1da851] transition-colors flex-1 flex items-center justify-center gap-1"><Send size={14} /> Send</button>}
-                  <button onClick={() => loadStats(c.id)} className="px-3 py-1.5 rounded-lg text-sm bg-white/5 text-slate-300 border border-white/10 hover:bg-white/10 transition-colors flex-1 flex items-center justify-center gap-1"><BarChart3 size={14} /> Stats</button>
+                <div className="flex gap-4">
+                  {c.status === 'draft' && <button onClick={() => handleSend(c.id)} className="text-ink-primary hover:text-accent-deep underline underline-offset-4 transition-colors" style={{ fontSize: '14px' }}>Send</button>}
+                  <button onClick={() => loadStats(c.id)} className="text-ink-primary hover:text-accent-deep underline underline-offset-4 transition-colors" style={{ fontSize: '14px' }}>Stats</button>
                 </div>
-              </div>
+              </motion.div>
             ))}
           </div>
         )
@@ -112,13 +112,12 @@ function CampaignBuilder({ onClose, onCreated }) {
     try { const res = await API.get('/content'); setFiles(res.data.files || []); } catch {}
   };
 
+  const recipientFilterPayload = () => ({ type: recipientFilter, stages: selectedStages, tags: selectedTags });
+
   const checkRecipients = async () => {
     try {
-      const params = {};
-      if (recipientFilter === 'stage' && selectedStages.length) params.stages = selectedStages.join(',');
-      if (recipientFilter === 'tag' && selectedTags.length) params.tags = selectedTags.join(',');
-      const res = await API.get('/leads', { params: { ...params, limit: 1 } });
-      setRecipientCount(res.data.pagination?.total || 0);
+      const res = await API.post('/campaigns/preview-audience', { channel: 'whatsapp', recipient_filter: recipientFilterPayload() });
+      setRecipientCount(res.data.count || 0);
     } catch {}
   };
 
@@ -126,16 +125,22 @@ function CampaignBuilder({ onClose, onCreated }) {
 
   const handleCreate = async () => {
     if (!name || !message) return toast.error('Name and message required');
+    if (schedule === 'later' && !scheduleDate) return toast.error('Pick a date and time');
     try {
-      await API.post('/campaigns', {
+      const res = await API.post('/campaigns', {
         name, channel: 'whatsapp', message,
-        recipient_filter: { type: recipientFilter, stages: selectedStages, tags: selectedTags },
+        recipient_filter: recipientFilterPayload(),
         file_id: attachFile,
-        schedule: schedule === 'later' ? scheduleDate : null,
+        schedule: schedule === 'later' ? new Date(scheduleDate).toISOString() : null,
       });
-      toast.success('Campaign created');
+      if (schedule === 'now') {
+        await API.post(`/campaigns/${res.data.campaign.id}/send`);
+        toast.success(`Sending to ${res.data.campaign.recipients_count} leads`);
+      } else {
+        toast.success('Campaign scheduled');
+      }
       onCreated();
-    } catch { toast.error('Create failed'); }
+    } catch (err) { toast.error(err.response?.data?.error || 'Create failed'); }
   };
 
   const insertVariable = (varName) => {
@@ -145,123 +150,121 @@ function CampaignBuilder({ onClose, onCreated }) {
   const variables = ['first_name', 'last_name', 'phone', 'email', 'city', 'budget'];
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-slate-800 border border-white/10 rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold text-white">WhatsApp Campaign Builder</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors"><X size={20} /></button>
+    <div className="fixed inset-0 bg-[rgba(28,25,23,0.25)] flex items-center justify-center z-50 p-4">
+      <div className="card-raised w-full max-w-2xl max-h-[90vh] overflow-y-auto" style={{ borderRadius: '10px' }}>
+        <div className="flex items-center justify-between p-6 hairline-bottom">
+          <h2 className="text-ink-primary" style={{ fontSize: '20px', fontWeight: 650 }}>New WhatsApp Campaign</h2>
+          <button onClick={onClose} className="text-ink-tertiary hover:text-ink-primary transition-colors" style={{ fontSize: '14px' }}>Close</button>
         </div>
 
-        {/* Steps indicator */}
-        <div className="flex items-center gap-2 mb-6">
-          {['Message', 'Recipients', 'Schedule'].map((s, i) => (
-            <div key={s} className="flex items-center gap-2">
-              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium ${step > i + 1 ? 'bg-emerald-500 text-white' : step === i + 1 ? 'bg-[#25D366] text-white' : 'bg-white/10 text-slate-500'}`}>
-                {step > i + 1 ? <CheckCircle2 size={14} /> : i + 1}
+        <div className="p-6 space-y-6">
+          {/* Steps indicator */}
+          <div className="flex items-center gap-3">
+            {['Message', 'Recipients', 'Schedule'].map((s, i) => (
+              <div key={s} className="flex items-center gap-3">
+                <span className={`mono ${step === i + 1 ? 'text-accent-deep' : step > i + 1 ? 'text-ink-primary' : 'text-ink-tertiary'}`} style={{ fontSize: '13px', fontWeight: 500 }}>{step > i + 1 ? '✓' : i + 1}</span>
+                <span className={`${step >= i + 1 ? 'text-ink-primary' : 'text-ink-tertiary'}`} style={{ fontSize: '14px', fontWeight: step === i + 1 ? 500 : 400 }}>{s}</span>
+                {i < 2 && <span className="text-ink-tertiary">·</span>}
               </div>
-              <span className={`text-sm ${step >= i + 1 ? 'text-white font-medium' : 'text-slate-500'}`}>{s}</span>
-              {i < 2 && <div className={`w-8 h-0.5 ${step > i + 1 ? 'bg-emerald-500' : 'bg-white/10'}`} />}
-            </div>
-          ))}
-        </div>
-
-        {/* Step 1: Message */}
-        {step === 1 && (
-          <div className="space-y-4">
-            <div><label className="text-sm font-medium text-slate-300">Campaign Name *</label><input className="input mt-1" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. New Property Launch" /></div>
-            <div>
-              <label className="text-sm font-medium text-slate-300">Message *</label>
-              <div className="flex gap-1 mt-1 mb-2 flex-wrap">
-                {variables.map(v => <button key={v} onClick={() => insertVariable(v)} className="text-xs bg-[#25D366]/15 text-[#25D366] px-2 py-1 rounded hover:bg-[#25D366]/25 transition-colors">{`{{${v}}}`}</button>)}
-              </div>
-              <textarea className="input" rows={5} value={message} onChange={e => setMessage(e.target.value)} placeholder="Hi {{first_name}}, we have a new property in {{city}}..." />
-              <p className="text-xs text-slate-500 mt-1">Variables will be replaced with lead data when sending</p>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-slate-300">Attach File (optional)</label>
-              <select className="input mt-1" value={attachFile || ''} onChange={e => setAttachFile(e.target.value || null)}>
-                <option value="">No attachment</option>
-                {files.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
-              </select>
-            </div>
-            {/* Preview */}
-            {message && (
-              <div className="bg-[#25D366]/10 border border-[#25D366]/20 rounded-lg p-4">
-                <p className="text-xs text-slate-500 mb-2">Preview:</p>
-                <p className="text-sm text-slate-200 whitespace-pre-wrap">{message.replace(/\{\{(\w+)\}\}/g, '[$1]')}</p>
-              </div>
-            )}
-            <button onClick={() => setStep(2)} disabled={!name || !message} className="w-full px-4 py-2.5 rounded-lg bg-[#25D366] text-white hover:bg-[#1da851] disabled:opacity-50 transition-colors">Next: Select Recipients</button>
+            ))}
           </div>
-        )}
 
-        {/* Step 2: Recipients */}
-        {step === 2 && (
-          <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium text-slate-300">Recipient Filter</label>
-              <div className="space-y-2 mt-2">
-                <label className="flex items-center gap-3 p-3 border border-white/10 rounded-lg cursor-pointer hover:bg-white/5 transition-colors">
-                  <input type="radio" checked={recipientFilter === 'all'} onChange={() => setRecipientFilter('all')} className="accent-[#25D366]" />
-                  <div><p className="text-sm font-medium text-white">All Leads</p><p className="text-xs text-slate-500">Send to all leads with phone numbers</p></div>
-                </label>
-                <label className="flex items-center gap-3 p-3 border border-white/10 rounded-lg cursor-pointer hover:bg-white/5 transition-colors">
-                  <input type="radio" checked={recipientFilter === 'stage'} onChange={() => setRecipientFilter('stage')} className="accent-[#25D366]" />
-                  <div><p className="text-sm font-medium text-white">By Stage</p><p className="text-xs text-slate-500">Select specific lead stages</p></div>
-                </label>
-                <label className="flex items-center gap-3 p-3 border border-white/10 rounded-lg cursor-pointer hover:bg-white/5 transition-colors">
-                  <input type="radio" checked={recipientFilter === 'tag'} onChange={() => setRecipientFilter('tag')} className="accent-[#25D366]" />
-                  <div><p className="text-sm font-medium text-white">By Tag</p><p className="text-xs text-slate-500">Select leads with specific tags</p></div>
-                </label>
+          {/* Step 1: Message */}
+          {step === 1 && (
+            <div className="space-y-4">
+              <div><p className="meta-label mb-1">Campaign name</p><input className="input" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. New Property Launch" /></div>
+              <div>
+                <p className="meta-label mb-1">Message</p>
+                <div className="flex gap-1 mb-2 flex-wrap">
+                  {variables.map(v => <button key={v} onClick={() => insertVariable(v)} className="text-ink-secondary hover:text-ink-primary transition-colors mono" style={{ fontSize: '12px' }}>{`{{${v}}}`}</button>)}
+                </div>
+                <textarea className="input" rows={5} value={message} onChange={e => setMessage(e.target.value)} placeholder="Hi {{first_name}}, we have a new property in {{city}}..." />
+                <p className="text-ink-tertiary mt-1" style={{ fontSize: '12px' }}>Variables will be replaced with lead data when sending</p>
               </div>
+              <div>
+                <p className="meta-label mb-1">Attach file (optional)</p>
+                <select className="input" value={attachFile || ''} onChange={e => setAttachFile(e.target.value || null)}>
+                  <option value="">No attachment</option>
+                  {files.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+                </select>
+              </div>
+              {message && (
+                <div className="hairline pt-3 space-y-1">
+                  <p className="meta-label">Preview</p>
+                  <p className="text-ink-secondary whitespace-pre-wrap" style={{ fontSize: '14px' }}>{message.replace(/\{\{(\w+)\}\}/g, '[$1]')}</p>
+                </div>
+              )}
+              <button onClick={() => setStep(2)} disabled={!name || !message} className="btn btn-primary w-full disabled:opacity-50 transition-opacity">Next: Select recipients</button>
             </div>
-            {recipientFilter === 'stage' && (
-              <div className="flex gap-2 flex-wrap">
-                {['new', 'contacted', 'interested', 'negotiating', 'won', 'lost'].map(s => (
-                  <label key={s} className="flex items-center gap-1 text-sm text-slate-300"><input type="checkbox" checked={selectedStages.includes(s)} onChange={e => setSelectedStages(e.target.checked ? [...selectedStages, s] : selectedStages.filter(x => x !== s))} className="accent-[#25D366]" /> {s}</label>
+          )}
+
+          {/* Step 2: Recipients */}
+          {step === 2 && (
+            <div className="space-y-4">
+              <p className="meta-label">Recipient filter</p>
+              <div className="space-y-2">
+                {[
+                  { value: 'all', label: 'All leads', desc: 'Send to all leads with phone numbers' },
+                  { value: 'stage', label: 'By stage', desc: 'Select specific lead stages' },
+                  { value: 'tag', label: 'By tag', desc: 'Select leads with specific tags' },
+                ].map(opt => (
+                  <label key={opt.value} className="flex items-center gap-3 py-2.5 hairline-row cursor-pointer">
+                    <input type="radio" checked={recipientFilter === opt.value} onChange={() => setRecipientFilter(opt.value)} className="accent-accent-orange" />
+                    <div><p className="text-ink-primary" style={{ fontSize: '14px', fontWeight: 500 }}>{opt.label}</p><p className="text-ink-tertiary" style={{ fontSize: '12px' }}>{opt.desc}</p></div>
+                  </label>
                 ))}
               </div>
-            )}
-            <div className="bg-[#25D366]/10 border border-[#25D366]/20 rounded-lg p-4 flex items-center gap-3">
-              <Users size={20} className="text-[#25D366]" />
-              <div><p className="text-sm font-medium text-white">{recipientCount} recipients</p><p className="text-xs text-slate-400">Only leads with phone numbers will receive the message</p></div>
-            </div>
-            <div className="flex gap-2">
-              <button onClick={() => setStep(1)} className="flex-1 px-4 py-2.5 rounded-lg bg-white/5 text-slate-300 border border-white/10 hover:bg-white/10 transition-colors">Back</button>
-              <button onClick={() => setStep(3)} className="flex-1 px-4 py-2.5 rounded-lg bg-[#25D366] text-white hover:bg-[#1da851] transition-colors">Next: Schedule</button>
-            </div>
-          </div>
-        )}
-
-        {/* Step 3: Schedule */}
-        {step === 3 && (
-          <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium text-slate-300">When to send?</label>
-              <div className="space-y-2 mt-2">
-                <label className="flex items-center gap-3 p-3 border border-white/10 rounded-lg cursor-pointer hover:bg-white/5 transition-colors">
-                  <input type="radio" checked={schedule === 'now'} onChange={() => setSchedule('now')} className="accent-[#25D366]" />
-                  <div><p className="text-sm font-medium text-white">Send Now</p><p className="text-xs text-slate-500">Start sending immediately</p></div>
-                </label>
-                <label className="flex items-center gap-3 p-3 border border-white/10 rounded-lg cursor-pointer hover:bg-white/5 transition-colors">
-                  <input type="radio" checked={schedule === 'later'} onChange={() => setSchedule('later')} className="accent-[#25D366]" />
-                  <div><p className="text-sm font-medium text-white">Schedule for Later</p><p className="text-xs text-slate-500">Pick a date and time</p></div>
-                </label>
+              {recipientFilter === 'stage' && (
+                <div className="flex gap-3 flex-wrap">
+                  {['new', 'contacted', 'interested', 'negotiating', 'won', 'lost'].map(s => (
+                    <label key={s} className="flex items-center gap-1.5 text-ink-secondary cursor-pointer" style={{ fontSize: '13px' }}><input type="checkbox" checked={selectedStages.includes(s)} onChange={e => setSelectedStages(e.target.checked ? [...selectedStages, s] : selectedStages.filter(x => x !== s))} className="accent-accent-orange" /> {s}</label>
+                  ))}
+                </div>
+              )}
+              {recipientFilter === 'tag' && (
+                <div>
+                  <p className="meta-label mb-1">Tags (comma separated)</p>
+                  <input className="input" placeholder="e.g. hot, vip" value={selectedTags.join(', ')}
+                    onChange={e => setSelectedTags(e.target.value.split(',').map(t => t.trim()).filter(Boolean))} />
+                </div>
+              )}
+              <div className="hairline pt-3">
+                <p className="text-ink-primary mono" style={{ fontSize: '16px', fontWeight: 500 }}>{recipientCount} recipients</p>
+                <p className="text-ink-tertiary" style={{ fontSize: '12px' }}>Only leads with phone numbers will receive the message</p>
+              </div>
+              <div className="flex gap-3">
+                <button onClick={() => setStep(1)} className="text-ink-secondary hover:text-ink-primary transition-colors" style={{ fontSize: '14px' }}>Back</button>
+                <button onClick={() => setStep(3)} className="btn btn-primary flex-1">Next: Schedule</button>
               </div>
             </div>
-            {schedule === 'later' && (
-              <div><label className="text-sm font-medium text-slate-300">Date & Time</label><input type="datetime-local" className="input mt-1" value={scheduleDate} onChange={e => setScheduleDate(e.target.value)} /></div>
-            )}
-            <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3 flex items-start gap-2">
-              <AlertCircle size={16} className="text-amber-400 flex-shrink-0 mt-0.5" />
-              <p className="text-xs text-amber-400">Messages are sent with random 5-15 second delays between each to prevent blocking. Do not close the browser tab while sending is in progress.</p>
+          )}
+
+          {/* Step 3: Schedule */}
+          {step === 3 && (
+            <div className="space-y-4">
+              <p className="meta-label">When to send?</p>
+              <div className="space-y-2">
+                {[
+                  { value: 'now', label: 'Send now', desc: 'Start sending immediately' },
+                  { value: 'later', label: 'Schedule for later', desc: 'Pick a date and time' },
+                ].map(opt => (
+                  <label key={opt.value} className="flex items-center gap-3 py-2.5 hairline-row cursor-pointer">
+                    <input type="radio" checked={schedule === opt.value} onChange={() => setSchedule(opt.value)} className="accent-accent-orange" />
+                    <div><p className="text-ink-primary" style={{ fontSize: '14px', fontWeight: 500 }}>{opt.label}</p><p className="text-ink-tertiary" style={{ fontSize: '12px' }}>{opt.desc}</p></div>
+                  </label>
+                ))}
+              </div>
+              {schedule === 'later' && (
+                <div><p className="meta-label mb-1">Date & time</p><input type="datetime-local" className="input" value={scheduleDate} onChange={e => setScheduleDate(e.target.value)} /></div>
+              )}
+              <p className="text-ink-tertiary" style={{ fontSize: '12px' }}>Messages are sent with random 5-15 second delays between each to prevent blocking. Do not close the browser tab while sending is in progress.</p>
+              <div className="flex gap-3">
+                <button onClick={() => setStep(2)} className="text-ink-secondary hover:text-ink-primary transition-colors" style={{ fontSize: '14px' }}>Back</button>
+                <button onClick={handleCreate} className="btn btn-primary flex-1">{schedule === 'now' ? 'Create & send' : 'Create campaign'}</button>
+              </div>
             </div>
-            <div className="flex gap-2">
-              <button onClick={() => setStep(2)} className="flex-1 px-4 py-2.5 rounded-lg bg-white/5 text-slate-300 border border-white/10 hover:bg-white/10 transition-colors">Back</button>
-              <button onClick={handleCreate} className="flex-1 px-4 py-2.5 rounded-lg bg-[#25D366] text-white hover:bg-[#1da851] transition-colors">{schedule === 'now' ? 'Create & Send' : 'Create Campaign'}</button>
-            </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );

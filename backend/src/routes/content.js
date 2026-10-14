@@ -4,7 +4,9 @@ const { authenticate } = require('../middleware/auth');
 const { upload } = require('../middleware/upload');
 const contentController = require('../controllers/contentController');
 
-router.get('/track/:trackingId', contentController.trackFile);
+const tracking = require('../controllers/trackingController');
+router.get('/track/:trackingId', tracking.viewer);
+router.get('/track/:trackingId/file', tracking.file);
 
 router.use(authenticate);
 

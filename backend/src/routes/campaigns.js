@@ -8,6 +8,7 @@ router.use(authenticate);
 router.get('/', campaignController.getCampaigns);
 router.get('/:id', campaignController.getCampaign);
 router.post('/', campaignController.createCampaign);
+router.post('/preview-audience', campaignController.previewAudience);
 router.post('/:id/send', campaignController.sendCampaign);
 router.post('/:id/schedule', campaignController.scheduleCampaign);
 router.post('/:id/cancel', campaignController.cancelCampaign);

@@ -23,7 +23,7 @@ export default function LoginScreen({ navigation }) {
       <View style={styles.content}>
         <View style={styles.logoContainer}>
           <View style={styles.logo}><Text style={styles.logoText}>C</Text></View>
-          <Text style={styles.title}>CRM Final</Text>
+          <Text style={styles.title}>Flazyn</Text>
         </View>
         <Text style={styles.subtitle}>Sign in to your account</Text>
         <TextInput style={styles.input} placeholder="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />

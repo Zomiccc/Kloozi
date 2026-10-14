@@ -9,8 +9,17 @@ if (config.twilio.accountSid && config.twilio.authToken) {
   client = twilio(config.twilio.accountSid, config.twilio.authToken);
 }
 
-async function sendSMS({ to, body }) {
+
+// MESSAGING_DRY_RUN=true: everything is processed and recorded exactly as normal, but
+// nothing leaves the server (used for automated tests and staging).
+const DRY_RUN = () => process.env.MESSAGING_DRY_RUN === 'true';
+
+async function sendSMS({ to, body, workspaceId }) {
   try {
+    if (DRY_RUN() || await require('../utils/demo').isDemoWorkspace(workspaceId)) {
+      logger.info(`[dry-run] SMS to ${to}: ${String(body || '').slice(0, 80)}`);
+      return { success: true, messageId: `dryrun-sms-${Date.now()}`, status: 'sent' };
+    }
     if (!client) {
       logger.warn('Twilio not configured, skipping SMS');
       return { success: false, error: 'SMS not configured' };
@@ -45,22 +54,15 @@ async function sendSMSToLead({ workspaceId, leadId, userId, message, templateId 
 
     if (templateId) {
       const tplResult = await db.query('SELECT * FROM sms_templates WHERE id = $1 AND workspace_id = $2', [templateId, workspaceId]);
-      if (tplResult.rows.length > 0) {
-        const { replaceVariables } = require('../utils/variables');
-        const leadData = {
-          first_name: lead.first_name,
-          last_name: lead.last_name,
-          phone: lead.phone,
-          email: lead.email,
-          city: lead.city,
-          budget: lead.budget,
-          lead_source: lead.lead_source,
-        };
-        messageText = replaceVariables(tplResult.rows[0].content, leadData);
-      }
+      if (tplResult.rows.length > 0) messageText = tplResult.rows[0].content;
+    }
+    if (messageText) {
+      const { replaceVariables } = require('../utils/variables');
+      const { loadLeadVariables } = require('../utils/leadVariables');
+      messageText = replaceVariables(messageText, (await loadLeadVariables(workspaceId, leadId)) || {});
     }
 
-    const result = await sendSMS({ to: lead.phone, body: messageText });
+    const result = await sendSMS({ to: lead.phone, body: messageText, workspaceId });
 
     const msgInsert = await db.query(
       `INSERT INTO sms_messages (workspace_id, lead_id, user_id, direction, message_text, status, twilio_message_id, sent_at)
@@ -86,38 +88,52 @@ async function sendSMSToLead({ workspaceId, leadId, userId, message, templateId 
 
 async function handleSMSWebhook(payload) {
   try {
-    const fromPhone = payload.From;
-    const text = payload.Body;
+    const fromDigits = String(payload.From || '').replace(/\D/g, '');
+    const text = String(payload.Body || '');
+    if (!fromDigits) return { success: true, ignored: true };
 
-    const leadResult = await db.query(
-      `SELECT l.id, l.workspace_id FROM leads l WHERE REPLACE(REPLACE(l.phone, '+', ''), ' ', '') LIKE $1`,
-      [`%${fromPhone}%`]
-    );
-
-    if (leadResult.rows.length > 0) {
-      const lead = leadResult.rows[0];
-      await db.query(
-        `INSERT INTO sms_messages (workspace_id, lead_id, direction, message_text, status, sent_at)
-         VALUES ($1, $2, $3, $4, $5, NOW())`,
-        [lead.workspace_id, lead.id, 'inbound', text, 'delivered']
-      );
-
-      await db.query(
-        `INSERT INTO lead_activities (workspace_id, lead_id, type, description, metadata)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [lead.workspace_id, lead.id, 'sms_received', `SMS received: ${text}`, JSON.stringify({ from: fromPhone })]
-      );
-
-      const { sendPushNotification } = require('../utils/notifications');
-      const assigneeResult = await db.query('SELECT assigned_to FROM leads WHERE id = $1', [lead.id]);
-      if (assigneeResult.rows[0]?.assigned_to) {
-        await sendPushNotification(assigneeResult.rows[0].assigned_to, 'SMS Reply', `New SMS from a lead`, {
-          type: 'sms_reply', leadId: lead.id
-        });
-      }
+    // Twilio retries on timeouts: never log the same message twice.
+    if (payload.MessageSid) {
+      const seen = await db.query('SELECT 1 FROM sms_messages WHERE twilio_message_id = $1 LIMIT 1', [payload.MessageSid]);
+      if (seen.rows.length) return { success: true, duplicate: true };
     }
 
-    return { success: true };
+    // Match on the last 10 digits so +61 412…, 0412… and 61412… are the same person.
+    // If several workspaces know the number, the one that last messaged it wins.
+    const leadResult = await db.query(
+      `SELECT l.id, l.workspace_id, l.assigned_to, l.first_name, l.last_name FROM leads l
+       WHERE RIGHT(REGEXP_REPLACE(COALESCE(l.phone, ''), '\\D', '', 'g'), 10) = RIGHT($1, 10)
+       ORDER BY (SELECT MAX(m.created_at) FROM sms_messages m WHERE m.lead_id = l.id AND m.direction = 'outbound') DESC NULLS LAST,
+                l.created_at DESC
+       LIMIT 1`,
+      [fromDigits]
+    );
+    const lead = leadResult.rows[0];
+    if (!lead) {
+      logger.warn(`Inbound SMS from +${fromDigits} matched no lead`);
+      return { success: true, unmatched: true };
+    }
+
+    await db.query(
+      `INSERT INTO sms_messages (workspace_id, lead_id, direction, message_text, status, twilio_message_id, sent_at)
+       VALUES ($1, $2, 'inbound', $3, 'delivered', $4, NOW())`,
+      [lead.workspace_id, lead.id, text, payload.MessageSid || null]
+    );
+    await db.query(
+      `INSERT INTO lead_activities (workspace_id, lead_id, type, description, metadata)
+       VALUES ($1, $2, 'sms_received', $3, $4)`,
+      [lead.workspace_id, lead.id, `SMS received: ${text}`, JSON.stringify({ from: `+${fromDigits}` })]
+    );
+    await db.query('UPDATE leads SET last_activity_at = NOW() WHERE id = $1', [lead.id]);
+
+    if (lead.assigned_to) {
+      const { sendPushNotification } = require('../utils/notifications');
+      const name = [lead.first_name, lead.last_name].filter(Boolean).join(' ') || `+${fromDigits}`;
+      await sendPushNotification(lead.assigned_to, 'SMS reply', `${name}: ${text.slice(0, 80)}`, { type: 'sms_reply', leadId: lead.id });
+    }
+    const { updateLeadScore } = require('../utils/activityLog');
+    await updateLeadScore(lead.id).catch(() => {});
+    return { success: true, leadId: lead.id };
   } catch (err) {
     logger.error('SMS webhook error:', err.message);
     return { success: false, error: err.message };

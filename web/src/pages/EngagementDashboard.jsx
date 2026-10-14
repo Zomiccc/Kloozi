@@ -1,145 +1,150 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import toast from 'react-hot-toast';
+import { Activity, Copy, FileText, Globe, Sparkles } from 'lucide-react';
 import API from '../lib/api';
-import { BarChart3, TrendingUp, Mail, FileText, Target, Users, Clock, Eye, Activity } from 'lucide-react';
-import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { Avatar, TOKENS, formatWait, useNow, EmptyState } from '../components/ui';
+import { fmtSecs, InterestChip } from '../components/InterestPanel';
 
-const COLORS = ['#0066FF', '#34C759', '#FF9500', '#FF3B5C', '#AF52DE', '#8E8E93'];
+/* ═══════════════════════════════════════════════════════════════
+   INTEREST BOARD — who is engaged right now, who is hottest, and
+   what they have been reading. Refreshes live.
+   ═══════════════════════════════════════════════════════════════ */
 
 export default function EngagementDashboard() {
+  const navigate = useNavigate();
   const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [range, setRange] = useState('30d');
+  const now = useNow(15000);
 
-  useEffect(() => { loadAnalytics(); }, [range]);
-
-  const loadAnalytics = async () => {
-    setLoading(true);
-    try {
-      const res = await API.get('/analytics/engagement', { params: { range } });
-      setData(res.data);
-    } catch { }
-    finally { setLoading(false); }
+  const load = async () => {
+    try { const res = await API.get('/analytics/interest-board'); setData(res.data); } catch { toast.error('Could not load interest'); }
   };
+  useEffect(() => { load(); const t = setInterval(load, 15000); return () => clearInterval(t); }, []);
 
-  const ranges = [
-    { key: 'today', label: 'Today' },
-    { key: '7d', label: '7 Days' },
-    { key: '30d', label: '30 Days' },
-    { key: '90d', label: '90 Days' },
-  ];
+  if (!data) return <div className="flex flex-col" style={{ gap: 12 }}>{[0, 1, 2].map((i) => <div key={i} className="skeleton" style={{ height: i ? 160 : 90 }} />)}</div>;
+  const ago = (d) => (d ? `${formatWait((now - new Date(d).getTime()) / 60000)} ago` : '—');
+  const totals = data.totals || {};
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <h1 className="text-3xl font-extrabold text-ink-primary tracking-tight">Engagement Analytics</h1>
-        <div className="flex gap-1 bg-white border border-surface-border rounded-full p-1">
-          {ranges.map(r => (
-            <button key={r.key} onClick={() => setRange(r.key)}
-              className={`tab-pill ${range === r.key ? 'tab-pill-active bg-accent-blue' : 'text-ink-secondary hover:text-ink-primary'}`}>
-              {r.label}
-            </button>
+    <div className="flex flex-col" style={{ gap: 22 }}>
+      <div className="flex items-end justify-between flex-wrap" style={{ gap: 16 }}>
+        <div>
+          <p className="meta-label" style={{ marginBottom: 6 }}>Last 7 days</p>
+          <h1 className="t-display" style={{ fontSize: 'clamp(34px, 5vw, 50px)' }}>
+            {data.live.length > 0 ? <><span style={{ color: TOKENS.ember }}>{data.live.length}</span> {data.live.length === 1 ? 'lead is' : 'leads are'} <em>looking right now.</em></> : <>Who's <em>actually interested.</em></>}
+          </h1>
+        </div>
+        <div className="flex" style={{ background: TOKENS.surface, border: `1px solid ${TOKENS.hairline}`, borderRadius: 12 }}>
+          {[['Engaged leads', totals.engaged_leads || 0], ['Site visits', totals.web_sessions || 0], ['Doc reading', fmtSecs(totals.doc_seconds || 0)]].map(([l, v], i) => (
+            <div key={l} style={{ padding: '12px 18px', borderLeft: i ? `1px solid ${TOKENS.hairline}` : 'none' }}>
+              <p className="meta-label">{l}</p>
+              <p className="serif" style={{ fontSize: 28, lineHeight: 1.05, marginTop: 4 }}>{v}</p>
+            </div>
           ))}
         </div>
       </div>
 
-      {loading ? <div className="flex justify-center py-8"><div className="animate-spin w-8 h-8 border-4 border-accent-blue border-t-transparent rounded-full" /></div> :
-        data && (
-          <div className="space-y-6">
-            {/* Section: Email Engagement */}
-            <div>
-              <h2 className="text-lg font-bold text-ink-primary mb-3 flex items-center gap-2"><Mail size={18} style={{ color: '#FF9500' }} /> Email Engagement</h2>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <StatBox label="Emails Sent" value={data.email?.sent || 0} icon={Mail} color="#0066FF" />
-                <StatBox label="Emails Opened" value={data.email?.opened || 0} icon={Eye} color="#34C759" />
-                <StatBox label="Emails Clicked" value={data.email?.clicked || 0} icon={Target} color="#AF52DE" />
-                <StatBox label="Emails Replied" value={data.email?.replied || 0} icon={Activity} color="#FF9500" />
-              </div>
-            </div>
+      {!data.tracking_installed && <InstallCard snippet={data.snippet} />}
 
-            {/* Section: Content Engagement */}
-            <div>
-              <h2 className="text-lg font-bold text-ink-primary mb-3 flex items-center gap-2"><FileText size={18} style={{ color: '#0066FF' }} /> Content Engagement</h2>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <StatBox label="Files Sent" value={data.content?.totalSent || 0} icon={FileText} color="#0066FF" />
-                <StatBox label="Files Opened" value={data.content?.totalOpened || 0} icon={Eye} color="#34C759" />
-                <StatBox label="Total Views" value={data.content?.totalViews || 0} icon={BarChart3} color="#AF52DE" />
-                <StatBox label="Time Spent" value={`${Math.floor((data.content?.totalTimeSpent || 0) / 60)}m`} icon={Clock} color="#FF9500" />
-              </div>
-            </div>
-
-            {/* Section: Lead Activity */}
-            <div>
-              <h2 className="text-lg font-bold text-ink-primary mb-3 flex items-center gap-2"><Users size={18} style={{ color: '#AF52DE' }} /> Lead Activity</h2>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <StatBox label="Total Leads" value={data.leadActivity?.total || 0} icon={Users} color="#0066FF" />
-                <StatBox label="New Today" value={data.leadActivity?.newToday || 0} icon={TrendingUp} color="#34C759" />
-                <StatBox label="Active This Week" value={data.leadActivity?.activeThisWeek || 0} icon={Activity} color="#FF9500" />
-                <StatBox label="Stuck (14+ days)" value={data.leadActivity?.stuck || 0} icon={Clock} color="#FF3B5C" />
-              </div>
-            </div>
-
-            {/* Section: Conversion */}
-            <div>
-              <h2 className="text-lg font-bold text-ink-primary mb-3 flex items-center gap-2"><Target size={18} style={{ color: '#34C759' }} /> Conversion</h2>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <StatBox label="Won" value={data.conversion?.won || 0} icon={TrendingUp} color="#34C759" />
-                <StatBox label="Lost" value={data.conversion?.lost || 0} icon={Target} color="#FF3B5C" />
-                <StatBox label="Conversion Rate" value={`${data.conversion?.conversionRate || 0}%`} icon={BarChart3} color="#0066FF" />
-                <StatBox label="Avg Signal Score" value={data.conversion?.avgSignalScore || 0} icon={Activity} color="#AF52DE" />
-              </div>
-            </div>
-
-            {/* Top Engaged Leads */}
-            <div className="card stagger-in" style={{ padding: 0 }}>
-              <div className="p-5 border-b border-surface-border">
-                <h2 className="text-lg font-bold text-ink-primary flex items-center gap-2"><TrendingUp size={18} style={{ color: '#0066FF' }} /> Top Engaged Leads</h2>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-surface-page border-b border-surface-border">
-                    <tr>
-                      <th className="p-3 text-left text-xs font-bold text-ink-tertiary uppercase">Lead</th>
-                      <th className="p-3 text-left text-xs font-bold text-ink-tertiary uppercase">Stage</th>
-                      <th className="p-3 text-left text-xs font-bold text-ink-tertiary uppercase">Score</th>
-                      <th className="p-3 text-left text-xs font-bold text-ink-tertiary uppercase">Emails</th>
-                      <th className="p-3 text-left text-xs font-bold text-ink-tertiary uppercase">Doc Views</th>
-                      <th className="p-3 text-left text-xs font-bold text-ink-tertiary uppercase">Total Opens</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-surface-border">
-                    {data.topLeads && data.topLeads.length > 0 ? data.topLeads.map((lead, idx) => (
-                      <tr key={lead.id || idx} className="hover:bg-surface-page transition-colors">
-                        <td className="p-3 font-bold text-ink-primary">{lead.first_name} {lead.last_name}</td>
-                        <td className="p-3"><span className="badge capitalize" style={{ background: '#0066FF10', color: '#0066FF' }}>{lead.stage}</span></td>
-                        <td className="p-3 font-bold" style={{ color: (lead.score || 0) >= 70 ? '#34C759' : (lead.score || 0) >= 40 ? '#FF9500' : '#FF3B5C' }}>{lead.score || 0}</td>
-                        <td className="p-3 font-semibold text-ink-secondary">{parseInt(lead.email_count) || 0}</td>
-                        <td className="p-3 font-semibold text-ink-secondary">{parseInt(lead.doc_views) || 0}</td>
-                        <td className="p-3 font-bold text-ink-primary">{parseInt(lead.total_opens) || 0}</td>
-                      </tr>
-                    )) : (
-                      <tr><td colSpan={6} className="p-6 text-center text-ink-tertiary text-sm">No engaged leads yet</td></tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+      {/* Live now */}
+      <section>
+        <p className="meta-label flex items-center" style={{ gap: 8, marginBottom: 10 }}>
+          <span className={`heat-dot ${data.live.length ? 'heat-live' : ''}`} style={{ background: data.live.length ? TOKENS.ember : TOKENS.hairlineStrong }} /> Right now
+        </p>
+        {data.live.length === 0 ? (
+          <p className="t-body-sm" style={{ color: TOKENS.ink2, padding: '14px 16px', background: TOKENS.surface, border: `1px dashed ${TOKENS.hairlineStrong}`, borderRadius: 12 }}>
+            Nobody is on your site or reading a document this minute. You'll get a notification the moment someone starts.
+          </p>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {data.live.map((l) => (
+              <motion.button
+                key={l.lead_id}
+                initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+                onClick={() => navigate(`/app/leads/${l.lead_id}`)}
+                className="text-left"
+                style={{ background: 'linear-gradient(135deg, #7C5CFF 0%, #5B3DF5 100%)', color: '#FAFAF9', borderRadius: 12, padding: '14px 16px', border: '1px solid rgba(245,158,11,0.35)' }}
+              >
+                <div className="flex items-center" style={{ gap: 10 }}>
+                  <Avatar first={l.first_name} last={l.last_name} size={32} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate" style={{ fontWeight: 600 }}>{l.first_name} {l.last_name}</span>
+                    <span className="block mono" style={{ fontSize: 11, color: '#A8A29E' }}>{fmtSecs(l.total_seconds)} this session</span>
+                  </span>
+                  <span className="heat-dot heat-live" style={{ background: TOKENS.ember }} />
+                </div>
+                <p className="flex items-center t-body-sm" style={{ gap: 6, marginTop: 10, color: '#D6D3D1' }}>
+                  {l.channel === 'document' ? <FileText size={13} /> : <Globe size={13} />}
+                  <span className="truncate">{l.channel === 'document' ? `Reading ${l.looking_at || 'a document'}${l.page ? ` · page ${l.page}` : ''}` : l.looking_at || 'Browsing your site'}</span>
+                </p>
+              </motion.button>
+            ))}
           </div>
-        )
-      }
+        )}
+      </section>
+
+      <div className="grid gap-5 lg:grid-cols-[1.25fr_1fr]">
+        {/* Hottest */}
+        <section>
+          <p className="meta-label" style={{ marginBottom: 10 }}>Hottest open leads</p>
+          {data.hottest.length === 0 ? (
+            <div className="row-list"><EmptyState icon={<Activity size={22} />} title="No signals yet." body="Share a tracked document or install the website script — interest builds from what people actually do." /></div>
+          ) : (
+            <div className="row-list">
+              {data.hottest.map((l, i) => (
+                <button key={l.id} onClick={() => navigate(`/app/leads/${l.id}`)} className="row-card text-left">
+                  <span className="mono" style={{ width: 18, color: TOKENS.ink3, fontSize: 12 }}>{i + 1}</span>
+                  <Avatar first={l.first_name} last={l.last_name} size={32} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate" style={{ fontWeight: 600, fontSize: 14 }}>{l.first_name} {l.last_name}</span>
+                    {l.next_action
+                      ? <span className="flex items-center t-body-sm truncate" style={{ gap: 5, color: TOKENS.ink2 }}><Sparkles size={11} style={{ color: TOKENS.accentDeep, flexShrink: 0 }} /> <span className="truncate">{l.next_action}</span></span>
+                      : <span className="block t-body-sm" style={{ color: TOKENS.ink3 }}>last active {ago(l.last_engaged_at)}</span>}
+                  </span>
+                  <InterestChip score={l.score} temperature={l.temperature} />
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* Recent */}
+        <section>
+          <p className="meta-label" style={{ marginBottom: 10 }}>Recent reading & visits</p>
+          <div className="row-list">
+            {data.recent.length === 0 && <p className="t-body-sm" style={{ color: TOKENS.ink2, padding: 16 }}>Nothing recorded yet.</p>}
+            {data.recent.map((s) => (
+              <button key={s.id} onClick={() => s.lead_id && navigate(`/app/leads/${s.lead_id}`)} className="row-card text-left" style={{ minHeight: 52 }}>
+                <span className="flex items-center justify-center" style={{ width: 28, height: 28, borderRadius: 7, background: s.channel === 'document' ? '#FFE8D2' : TOKENS.sky, color: s.channel === 'document' ? TOKENS.peachDeep : TOKENS.skyDeep, flexShrink: 0 }}>
+                  {s.channel === 'document' ? <FileText size={14} /> : <Globe size={14} />}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate" style={{ fontSize: 13.5, fontWeight: 600 }}>{s.lead_id ? `${s.first_name || ''} ${s.last_name || ''}`.trim() : 'Anonymous visitor'}</span>
+                  <span className="block t-body-sm truncate" style={{ color: TOKENS.ink2 }}>{s.top_view || (s.channel === 'document' ? 'Document' : 'Website')}</span>
+                </span>
+                <span className="text-right">
+                  <span className="block mono" style={{ fontSize: 12.5 }}>{fmtSecs(s.total_seconds)}</span>
+                  <span className="block mono" style={{ fontSize: 11, color: TOKENS.ink3 }}>{ago(s.last_seen_at)}</span>
+                </span>
+              </button>
+            ))}
+          </div>
+        </section>
+      </div>
     </div>
   );
 }
 
-function StatBox({ label, value, icon: Icon, color }) {
+function InstallCard({ snippet }) {
   return (
-    <div className="card card-hover stagger-in flex items-center gap-3" style={{ padding: '16px' }}>
-      <div className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: `${color}15` }}>
-        <Icon size={24} style={{ color }} />
+    <div className="flex flex-col md:flex-row md:items-center" style={{ gap: 16, background: TOKENS.surface, border: `1px solid ${TOKENS.hairline}`, borderRadius: 12, padding: '16px 18px' }}>
+      <div className="flex-1 min-w-0">
+        <p style={{ fontWeight: 600 }}>Add one line to your website to see visits and time on page</p>
+        <p className="t-body-sm" style={{ color: TOKENS.ink2, marginTop: 2 }}>Paste it before <span className="mono">&lt;/body&gt;</span> (WordPress: Appearance → Theme File Editor, or any "header & footer scripts" plugin). Leads are recognised when they fill a form or open a tracked link.</p>
+        <code className="mono block truncate" style={{ marginTop: 10, background: TOKENS.canvas, border: `1px solid ${TOKENS.hairline}`, borderRadius: 8, padding: '8px 10px', fontSize: 12 }}>{snippet}</code>
       </div>
-      <div>
-        <p className="text-2xl font-extrabold text-ink-primary">{value}</p>
-        <p className="text-sm font-semibold text-ink-secondary">{label}</p>
-      </div>
+      <button onClick={() => { navigator.clipboard.writeText(snippet); toast.success('Snippet copied'); }} className="btn btn-primary flex-shrink-0"><Copy size={14} /> Copy snippet</button>
     </div>
   );
 }

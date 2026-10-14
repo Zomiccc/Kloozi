@@ -1,93 +1,83 @@
 const axios = require('axios');
-const config = require('../config');
 const logger = require('../utils/logger');
 
+// WhatsApp AI agent: pulls lead details out of a message and (optionally) drafts a reply.
+// Without OPENAI_API_KEY both helpers return null and the agent simply does nothing.
+
+const MODEL = () => process.env.OPENAI_MODEL || 'gpt-4o-mini';
+
+async function chat(messages, extra = {}) {
+  const response = await axios.post(
+    'https://api.openai.com/v1/chat/completions',
+    { model: MODEL(), messages, ...extra },
+    {
+      headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+      timeout: 20000,
+    }
+  );
+  return response.data.choices?.[0]?.message?.content || null;
+}
+
+function parseFields(extractFields) {
+  let fields = extractFields;
+  if (typeof fields === 'string') {
+    try { fields = JSON.parse(fields); } catch { fields = fields.split(','); }
+  }
+  fields = (Array.isArray(fields) ? fields : []).map((f) => String(f).trim().toLowerCase()).filter(Boolean);
+  return fields.length ? fields : ['name', 'budget', 'interest', 'city', 'email'];
+}
+
+/**
+ * Extract lead fields from a message. The workspace's own prompt (persona/business
+ * context) is passed as background only, so extraction always returns clean JSON.
+ */
 async function extractLeadInfoFromMessage(messageText, extractFields, systemPrompt) {
   try {
-    if (!process.env.OPENAI_API_KEY) {
-      logger.warn('OpenAI API key not configured');
-      return null;
-    }
-
-    const fields = extractFields || ['name', 'budget', 'interest', 'product'];
-    
-    const prompt = systemPrompt || `You are a lead extraction assistant for a CRM system. Extract the following information from the WhatsApp message: ${fields.join(', ')}. Return ONLY a JSON object with these fields. If a field is not found, set it to null. Do not include any other text.`;
-
-    const response = await axios.post(
-      'https://api.openai.com/v1/chat/completions',
+    if (!process.env.OPENAI_API_KEY || !String(messageText || '').trim()) return null;
+    const fields = parseFields(extractFields);
+    const content = await chat([
       {
-        model: 'gpt-3.5-turbo',
-        messages: [
-          { role: 'system', content: prompt },
-          { role: 'user', content: messageText }
-        ],
-        response_format: { type: 'json_object' },
-        temperature: 0.3
+        role: 'system',
+        content: `You extract lead details for a CRM from a customer's WhatsApp message. Return ONLY a JSON object with exactly these keys: ${fields.join(', ')}. `
+          + 'Use null for anything the customer did not clearly state. "budget" must be a plain number (e.g. 750000) with no currency or words. Never guess.'
+          + (systemPrompt ? `\n\nBusiness context (for understanding only): ${systemPrompt}` : ''),
       },
-      {
-        headers: {
-          'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
-
-    const content = response.data.choices[0]?.message?.content;
+      { role: 'user', content: String(messageText) },
+    ], { response_format: { type: 'json_object' }, temperature: 0 });
     if (!content) return null;
-
     const extracted = JSON.parse(content);
-    
-    // Normalize the extracted data
     const result = {};
-    for (const field of fields) {
-      result[field] = extracted[field] || null;
-    }
-
+    for (const field of fields) result[field] = extracted[field] ?? null;
     return result;
   } catch (err) {
-    logger.error('OpenAI extraction error:', err.message);
+    logger.error('OpenAI extraction error:', err.response?.data?.error?.message || err.message);
     return null;
   }
 }
 
-async function generateAIReply(messageText, extractedInfo, systemPrompt) {
+/**
+ * Draft a short WhatsApp reply. `history` is the recent conversation, oldest first:
+ * [{ direction: 'inbound'|'outbound', text }].
+ */
+async function generateAIReply(messageText, extractedInfo, systemPrompt, history = []) {
   try {
-    if (!process.env.OPENAI_API_KEY) {
-      logger.warn('OpenAI API key not configured');
-      return null;
-    }
-
-    const prompt = systemPrompt || `You are a helpful sales assistant for a real estate CRM. Generate a friendly, professional WhatsApp reply to the customer's message. Keep it under 160 characters. If the customer hasn't provided their name or budget, ask for it politely. Otherwise, acknowledge their message and offer to help.`;
-
-    const context = extractedInfo ? `Extracted info: ${JSON.stringify(extractedInfo)}` : '';
-
-    const response = await axios.post(
-      'https://api.openai.com/v1/chat/completions',
-      {
-        model: 'gpt-3.5-turbo',
-        messages: [
-          { role: 'system', content: prompt },
-          { role: 'user', content: `${context}\n\nCustomer message: ${messageText}` }
-        ],
-        max_tokens: 100,
-        temperature: 0.7
-      },
-      {
-        headers: {
-          'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
-
-    return response.data.choices[0]?.message?.content || null;
+    if (!process.env.OPENAI_API_KEY) return null;
+    const persona = systemPrompt
+      || 'You are a friendly, professional sales assistant replying on WhatsApp. If the customer has not shared their name or budget, ask politely. Otherwise acknowledge their message and offer to help.';
+    const known = extractedInfo && Object.values(extractedInfo).some((v) => v)
+      ? `\nKnown about this customer: ${JSON.stringify(extractedInfo)}`
+      : '';
+    const messages = [
+      { role: 'system', content: `${persona}\nKeep replies under 300 characters, plain text, no markdown. Never invent prices, availability or promises.${known}` },
+      ...history.slice(-10).map((m) => ({ role: m.direction === 'inbound' ? 'user' : 'assistant', content: String(m.text || '') })).filter((m) => m.content),
+    ];
+    if (!history.length || history[history.length - 1].text !== messageText) messages.push({ role: 'user', content: String(messageText) });
+    const reply = await chat(messages, { max_tokens: 160, temperature: 0.6 });
+    return reply ? reply.trim() : null;
   } catch (err) {
-    logger.error('OpenAI reply generation error:', err.message);
+    logger.error('OpenAI reply generation error:', err.response?.data?.error?.message || err.message);
     return null;
   }
 }
 
-module.exports = {
-  extractLeadInfoFromMessage,
-  generateAIReply
-};
+module.exports = { extractLeadInfoFromMessage, generateAIReply };

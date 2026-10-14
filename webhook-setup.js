@@ -1,5 +1,5 @@
 /**
- * Zomic CRM - Webhook Setup Script
+ * Flazyn - Webhook Setup Script
  * 
  * This script:
  * 1. Starts an ngrok tunnel to expose localhost:5000
@@ -19,14 +19,14 @@ const BASE_URL = `http://localhost:${BACKEND_PORT}`;
 // ─── Configuration ───
 const WEBHOOKS = {
   whatsapp: {
-    verifyToken: 'zomic_wa_verify_2026',
+    verifyToken: 'flazyn_wa_verify_2026',
     verifyEndpoint: '/api/whatsapp/webhook',
     webhookEndpoint: '/api/whatsapp/webhook',
     subscribeField: 'messages',
     description: 'WhatsApp Business Cloud API',
   },
   facebook: {
-    verifyToken: 'zomic_verify_2026',
+    verifyToken: 'flazyn_verify_2026',
     verifyEndpoint: '/api/integrations/webhook/facebook',
     webhookEndpoint: '/api/integrations/webhook/facebook',
     subscribeField: 'leadgen',
@@ -73,7 +73,7 @@ async function testWhatsAppWebhookVerify() {
   console.log('\n📱 Testing WhatsApp Webhook Verification...');
   
   // Test with correct token
-  const correctUrl = `/api/whatsapp/webhook?hub.mode=subscribe&hub.verify_token=zomic_wa_verify_2026&hub.challenge=test_challenge_123`;
+  const correctUrl = `/api/whatsapp/webhook?hub.mode=subscribe&hub.verify_token=flazyn_wa_verify_2026&hub.challenge=test_challenge_123`;
   const correctRes = await request('GET', correctUrl);
   
   if (correctRes.status === 200 && correctRes.body === 'test_challenge_123') {
@@ -100,7 +100,7 @@ async function testFacebookWebhookVerify() {
   console.log('\n📘 Testing Facebook Webhook Verification...');
   
   // Test with correct token
-  const correctUrl = `/api/integrations/webhook/facebook?hub.mode=subscribe&hub.verify_token=zomic_verify_2026&hub.challenge=fb_challenge_456`;
+  const correctUrl = `/api/integrations/webhook/facebook?hub.mode=subscribe&hub.verify_token=flazyn_verify_2026&hub.challenge=fb_challenge_456`;
   const correctRes = await request('GET', correctUrl);
   
   if (correctRes.status === 200 && correctRes.body === 'fb_challenge_456') {
@@ -238,11 +238,11 @@ function printMetaConfigGuide(ngrokUrl) {
   console.log(`   2. Add your phone number as a test recipient in the "To" field`);
   console.log(`   3. Configure Webhook:`);
   console.log(`      - Callback URL: ${baseUrl}/api/whatsapp/webhook`);
-  console.log(`      - Verify Token: zomic_wa_verify_2026`);
+  console.log(`      - Verify Token: flazyn_wa_verify_2026`);
   console.log(`      - Subscribe to: messages`);
   console.log(`   4. Test: Send a message to the WhatsApp test number`);
   console.log('');
-  console.log(`   ✅ Webhook verification endpoint: GET ${baseUrl}/api/whatsapp/webhook?hub.mode=subscribe&hub.verify_token=zomic_wa_verify_2026&hub.challenge=test`);
+  console.log(`   ✅ Webhook verification endpoint: GET ${baseUrl}/api/whatsapp/webhook?hub.mode=subscribe&hub.verify_token=flazyn_wa_verify_2026&hub.challenge=test`);
   
   console.log('\n📘 Facebook Lead Ads Setup');
   console.log('─'.repeat(50));
@@ -251,10 +251,10 @@ function printMetaConfigGuide(ngrokUrl) {
   console.log(`      - Add OAuth redirect: ${baseUrl}/api/integrations/oauth/facebook/callback`);
   console.log(`   3. Go to Webhooks → Page → Subscribe`);
   console.log(`      - Callback URL: ${baseUrl}/api/integrations/webhook/facebook`);
-  console.log(`      - Verify Token: zomic_verify_2026`);
+  console.log(`      - Verify Token: flazyn_verify_2026`);
   console.log(`      - Subscribe to: leadgen`);
   console.log('');
-  console.log(`   ✅ Webhook verification endpoint: GET ${baseUrl}/api/integrations/webhook/facebook?hub.mode=subscribe&hub.verify_token=zomic_verify_2026&hub.challenge=test`);
+  console.log(`   ✅ Webhook verification endpoint: GET ${baseUrl}/api/integrations/webhook/facebook?hub.mode=subscribe&hub.verify_token=flazyn_verify_2026&hub.challenge=test`);
   
   console.log('\n📊 Meta Conversions API Setup');
   console.log('─'.repeat(50));
@@ -278,13 +278,13 @@ function printTestCommands(ngrokUrl) {
   console.log('='.repeat(70));
   
   console.log('\n📱 Test WhatsApp Webhook Verification:');
-  console.log(`   curl -G "${baseUrl}/api/whatsapp/webhook" --data-urlencode "hub.mode=subscribe" --data-urlencode "hub.verify_token=zomic_wa_verify_2026" --data-urlencode "hub.challenge=test123"`);
+  console.log(`   curl -G "${baseUrl}/api/whatsapp/webhook" --data-urlencode "hub.mode=subscribe" --data-urlencode "hub.verify_token=flazyn_wa_verify_2026" --data-urlencode "hub.challenge=test123"`);
   
   console.log('\n📱 Test WhatsApp Incoming Message:');
   console.log(`   curl -X POST "${baseUrl}/api/whatsapp/webhook" -H "Content-Type: application/json" -d '{"object":"whatsapp_business_account","entry":[{"id":"4313679592232288","changes":[{"value":{"messaging_product":"whatsapp","metadata":{"phone_number_id":"1145886271951817","display_phone_number":"15551234567"},"contacts":[{"profile":{"name":"Test User"},"wa_id":"919876543210"}],"messages":[{"from":"919876543210","id":"wamid.test123","timestamp":"${Math.floor(Date.now()/1000)}","text":{"body":"Hello test"},"type":"text"}]}}]}]}'`);
   
   console.log('\n📘 Test Facebook Webhook Verification:');
-  console.log(`   curl -G "${baseUrl}/api/integrations/webhook/facebook" --data-urlencode "hub.mode=subscribe" --data-urlencode "hub.verify_token=zomic_verify_2026" --data-urlencode "hub.challenge=test456"`);
+  console.log(`   curl -G "${baseUrl}/api/integrations/webhook/facebook" --data-urlencode "hub.mode=subscribe" --data-urlencode "hub.verify_token=flazyn_verify_2026" --data-urlencode "hub.challenge=test456"`);
   
   console.log('\n📘 Test Facebook Leadgen Webhook:');
   console.log(`   curl -X POST "${baseUrl}/api/integrations/webhook/facebook" -H "Content-Type: application/json" -d '{"object":"page","entry":[{"id":"test_page_id","changes":[{"field":"leadgen","value":{"leadgen_id":"test_leadgen_123","page_id":"test_page_id","form_id":"test_form_id"}}]}]}'`);
@@ -296,7 +296,7 @@ function printTestCommands(ngrokUrl) {
 // ─── Main ───
 async function main() {
   console.log('╔══════════════════════════════════════════════════════════════╗');
-  console.log('║           ZOMIC CRM - Webhook Setup Utility                ║');
+  console.log('║           FLAZYN CRM - Webhook Setup Utility                ║');
   console.log('╚══════════════════════════════════════════════════════════════╝');
   console.log(`   Backend URL: ${BASE_URL}`);
   console.log(`   Time: ${new Date().toLocaleString()}`);

@@ -49,6 +49,7 @@ exports.inviteMember = async (req, res, next) => {
     const inviteUrl = `${config.webUrl}/accept-invitation?token=${token}`;
     try {
       await sendEmail({
+        workspaceId: req.workspaceId,
         to: email,
         subject: `You're invited to join ${config.appName}`,
         text: `You've been invited to join the team. Click here: ${inviteUrl}`,
@@ -257,18 +258,50 @@ exports.registerDeviceToken = async (req, res, next) => {
 
 exports.deleteAccount = async (req, res, next) => {
   try {
-    const { password } = req.body;
-    const userResult = await db.query('SELECT password_hash FROM users WHERE id = $1', [req.user.id]);
-    if (!userResult.rows[0].password_hash) {
-      return res.status(400).json({ error: 'Cannot delete account' });
+    const { password, confirm } = req.body || {};
+    const userResult = await db.query('SELECT password_hash, google_id FROM users WHERE id = $1', [req.user.id]);
+    const account = userResult.rows[0];
+    if (account.password_hash) {
+      const isMatch = await bcrypt.compare(password || '', account.password_hash);
+      if (!isMatch) return res.status(401).json({ error: 'Invalid password' });
+    } else if (confirm !== 'DELETE') {
+      return res.status(400).json({ error: 'Type DELETE to confirm' });
     }
-    const isMatch = await bcrypt.compare(password, userResult.rows[0].password_hash);
-    if (!isMatch) {
-      return res.status(401).json({ error: 'Invalid password' });
-    }
-    await db.query('UPDATE users SET status = $1 WHERE id = $2', ['deleted', req.user.id]);
-    res.json({ message: 'Account deletion requested. Your data will be removed within 30 days.' });
+    await db.query("UPDATE users SET status = 'deleted', updated_at = NOW() WHERE id = $1", [req.user.id]);
+    await db.query('DELETE FROM refresh_tokens WHERE user_id = $1', [req.user.id]).catch(() => {});
+    await db.query('UPDATE device_tokens SET active = false WHERE user_id = $1', [req.user.id]).catch(() => {});
+    res.json({ message: 'Account deleted. Remaining data is permanently removed within 30 days.' });
   } catch (err) { next(err); }
+};
+
+/**
+ * Scheduled purge for accounts deleted more than 30 days ago:
+ * the last member of a workspace takes the whole workspace with them (cascades
+ * to leads, messages, files…); otherwise the user's personal data is anonymised
+ * and their leads stay with the team.
+ */
+exports.purgeDeletedAccounts = async () => {
+  const due = await db.query(
+    "SELECT id, workspace_id FROM users WHERE status = 'deleted' AND updated_at < NOW() - INTERVAL '30 days'"
+  );
+  for (const u of due.rows) {
+    const others = await db.query(
+      "SELECT 1 FROM users WHERE workspace_id = $1 AND id <> $2 AND status NOT IN ('deleted', 'purged') LIMIT 1",
+      [u.workspace_id, u.id]
+    );
+    if (others.rows.length === 0) {
+      await db.query('DELETE FROM workspaces WHERE id = $1', [u.workspace_id]);
+    } else {
+      await db.query('UPDATE leads SET assigned_to = NULL WHERE assigned_to = $1', [u.id]);
+      await db.query(
+        `UPDATE users SET status = 'purged', email = 'deleted-' || id || '@deleted.invalid', first_name = NULL, last_name = NULL,
+           phone = NULL, profile_image = NULL, password_hash = NULL, google_id = NULL, two_factor_secret = NULL, updated_at = NOW()
+         WHERE id = $1`,
+        [u.id]
+      );
+    }
+  }
+  return due.rows.length;
 };
 
 exports.getSubteams = async (req, res, next) => {

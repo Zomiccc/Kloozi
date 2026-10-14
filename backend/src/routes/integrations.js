@@ -20,7 +20,9 @@ router.get('/oauth/linkedin/callback', oauthService.linkedinCallback);
 router.get('/oauth/config', (req, res) => {
   const config = require('../config');
   res.json({
-    facebook: { appId: config.facebook.appId },
+    facebook: { appId: config.facebook.appId, graphVersion: config.facebook.graphVersion, scopes: oauthService.FACEBOOK_SCOPES, configId: config.facebook.loginConfigId },
+    linkedin: { clientId: config.linkedin.clientId, scopes: oauthService.LINKEDIN_SCOPES },
+    tiktok: { appId: config.tiktok.appId },
     apiUrl: config.apiUrl,
   });
 });
@@ -29,10 +31,22 @@ router.get('/oauth/config', (req, res) => {
 router.get('/webhook/facebook', oauthService.facebookWebhookVerify);
 router.post('/webhook/facebook', oauthService.facebookWebhook);
 router.post('/webhook/tiktok', oauthService.tiktokWebhook);
+router.get('/webhook/linkedin', oauthService.linkedinWebhookVerify);
 router.post('/webhook/linkedin', oauthService.linkedinWebhook);
+const googleAds = require('../services/googleAdsService');
+router.post('/google-ads/:webhookId([a-f0-9]{24})', googleAds.webhook);
+const connectors = require('../services/connectorService');
+router.get('/connect/:token/ping', connectors.ping);
+router.post('/connect/:token/:source', connectors.receive);
 
 router.use(authenticate);
 
+router.get('/google-ads/setup', requireAdminOrAbove, googleAds.getSetup);
+router.post('/google-ads/rotate-key', requireAdminOrAbove, googleAds.rotateKey);
+router.get('/connectors/:source', connectors.setup);
+router.post('/connectors/:source/test', connectors.sendTest);
+
+router.get('/oauth/state', requireAdminOrAbove, oauthService.getOAuthState);
 router.get('/', integrationController.getIntegrations);
 router.post('/connect', requireAdminOrAbove, integrationController.connectIntegration);
 router.delete('/:id/disconnect', requireAdminOrAbove, integrationController.disconnectIntegration);

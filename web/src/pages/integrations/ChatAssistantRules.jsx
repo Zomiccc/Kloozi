@@ -1,16 +1,36 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import API from '../../lib/api';
 import toast from 'react-hot-toast';
-import { ArrowLeft, Bot, Plus, Trash2, Zap, Save } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2 } from 'lucide-react';
+import useCreateRegistry from '../../stores/createStore';
+import { useAutomationOptions, ActionValueField } from '../../lib/automationOptions';
 
 export default function ChatAssistantRules() {
   const navigate = useNavigate();
   const [rules, setRules] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
+  const options = useAutomationOptions();
+  const register = useCreateRegistry((s) => s.register);
+  const clearRegistry = useCreateRegistry((s) => s.clear);
+
+  useEffect(() => {
+    register([{ label: 'New assistant rule', icon: <Plus size={14} />, run: () => setShowCreate(true) }]);
+    return () => clearRegistry();
+  }, [register, clearRegistry]);
 
   useEffect(() => { loadRules(); }, []);
-  const loadRules = async () => { try { const res = await API.get('/automations/chat-assistant'); setRules(res.data.rules || []); } catch {} };
+  const loadRules = async () => {
+    try { const res = await API.get('/automations/chat-assistant'); setRules(res.data.rules || []); }
+    catch {}
+    finally { setLoading(false); }
+  };
+
+  const handleToggle = async (id) => {
+    try { await API.put(`/automations/chat-assistant/${id}/toggle`); loadRules(); } catch { toast.error('Failed'); }
+  };
 
   const handleDelete = async (id) => {
     if (!confirm('Delete this rule?')) return;
@@ -23,68 +43,139 @@ export default function ChatAssistantRules() {
     { value: 'no_reply_5min', label: 'No reply from agent in 5 minutes' },
   ];
   const actionTypes = [
-    { value: 'send_template', label: 'Send Template' },
-    { value: 'send_file', label: 'Send File' },
-    { value: 'create_lead', label: 'Create Lead' },
-    { value: 'assign_agent', label: 'Assign to Agent' },
-    { value: 'add_tag', label: 'Add Tag' },
-    { value: 'change_stage', label: 'Change Stage' },
+    { value: 'send_template', label: 'Send reply message', kind: 'message' },
+    { value: 'send_file', label: 'Send file from Content', kind: 'file' },
+    { value: 'create_lead', label: 'Create lead (if not one yet)', kind: null },
+    { value: 'assign_agent', label: 'Assign to agent', kind: 'agent' },
+    { value: 'add_tag', label: 'Add tag', kind: 'text' },
+    { value: 'change_stage', label: 'Change stage', kind: 'stage' },
   ];
+  const triggerLabel = (v) => triggerConditions.find((t) => t.value === v)?.label || v;
+  const actionLabel = (v) => actionTypes.find((a) => a.value === v)?.label || v;
+  const actionValueLabel = (r) => {
+    if (!r.action_value) return null;
+    if (r.action_type === 'send_file') return options.files.find((f) => f.id === r.action_value)?.name || 'file';
+    if (r.action_type === 'send_template') return `"${String(r.action_value).slice(0, 40)}${String(r.action_value).length > 40 ? '…' : ''}"`;
+    return r.action_value;
+  };
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
-      <button onClick={() => navigate('/app/automations')} className="flex items-center gap-2 text-sm text-ink-secondary hover:text-ink-primary"><ArrowLeft size={16} /> Back to Automations</button>
+    <div className="max-w-3xl mx-auto space-y-8">
+      <button onClick={() => navigate('/app/automations')} className="btn-ghost text-sm font-medium flex items-center gap-1.5">
+        <ArrowLeft size={14} /> Automations
+      </button>
 
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 bg-surface-page rounded-xl flex items-center justify-center"><Bot size={24} className="text-ink-secondary" /></div>
-          <div><h2 className="text-xl font-bold text-ink-primary">WhatsApp Chat Assistant</h2><p className="text-sm text-ink-secondary">Configure automated response rules for incoming WhatsApp messages</p></div>
+      <div>
+        <h1 style={{ fontSize: '32px', fontWeight: 650, letterSpacing: '-0.01em' }}>Chat Assistant</h1>
+        <p className="text-ink-secondary mt-1" style={{ fontSize: '15px' }}>
+          Rules that answer WhatsApp messages while you sleep — every message checked against every active rule.
+        </p>
+      </div>
+
+      {loading ? (
+        <div className="space-y-2">{[1, 2, 3].map((i) => <div key={i} className="skeleton h-16" />)}</div>
+      ) : rules.length === 0 ? (
+        <div className="pt-16 max-w-[560px]">
+          <p style={{ fontSize: '22px', fontWeight: 600 }}>No rules yet.</p>
+          <p className="text-ink-secondary mt-2" style={{ fontSize: '15px' }}>
+            One rule = one trigger + one action. They run 24/7, even when you're offline.
+          </p>
         </div>
-        <button onClick={() => setShowCreate(true)} className="px-4 py-2 rounded-lg btn btn-primary flex items-center gap-2 transition-colors"><Plus size={16} /> New Rule</button>
-      </div>
-
-      <div className="bg-surface-page border border-surface-border rounded-lg p-4">
-        <p className="text-sm text-ink-secondary">Rules run 24/7 even when agent is offline. Each rule has a trigger condition and action.</p>
-      </div>
-
-      {rules.length === 0 ? (
-        <div className="card text-center py-12"><Bot size={48} className="text-ink-tertiary mx-auto mb-3" /><p className="text-ink-secondary">No rules configured yet</p></div>
       ) : (
-        <div className="space-y-3">
-          {rules.map(r => (
-            <div key={r.id} className="card flex items-center justify-between">
-              <div className="flex-1">
-                <div className="flex items-center gap-2"><span className="font-medium text-ink-primary">{r.name}</span><span className={`badge ${r.is_active ? 'bg-surface-page text-ink-secondary' : 'bg-surface-hover text-ink-secondary'}`}>{r.is_active ? 'Active' : 'Inactive'}</span></div>
-                <p className="text-xs text-ink-tertiary mt-1">IF {r.trigger_condition} "{r.trigger_value}" → {r.action_type}: {r.action_value}</p>
+        <div>
+          {rules.map((r, idx) => (
+            <motion.div
+              key={r.id}
+              initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: Math.min(idx * 0.04, 0.3), duration: 0.2 }}
+              className="group hairline-b py-4 flex items-start justify-between gap-4 hover-accent-left"
+            >
+              <div className="min-w-0">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <h3 className="font-semibold" style={{ fontSize: '15px' }}>{r.name}</h3>
+                  <span className={`badge ${r.is_active ? 'badge-success' : 'badge-neutral'}`}>{r.is_active ? 'Active' : 'Paused'}</span>
+                </div>
+                <p className="text-ink-secondary mt-1 truncate" style={{ fontSize: '13px' }}>
+                  IF {triggerLabel(r.trigger_condition)}{r.trigger_value ? <> · <span className="mono">"{r.trigger_value}"</span></> : null}
+                  {' '}→ THEN {actionLabel(r.action_type)}{actionValueLabel(r) ? <> · <span className="mono">{actionValueLabel(r)}</span></> : null}
+                </p>
               </div>
-              <button onClick={() => handleDelete(r.id)} className="text-ink-secondary p-2 hover:text-red-300 transition-colors"><Trash2 size={16} /></button>
-            </div>
+              <div className="flex items-center gap-3 flex-shrink-0 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                <button onClick={() => handleToggle(r.id)} className="text-ink-primary hover:text-accent-deep text-sm">{r.is_active ? 'Pause' : 'Resume'}</button>
+                <button onClick={() => handleDelete(r.id)} className="btn-danger text-sm font-medium">
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            </motion.div>
           ))}
         </div>
       )}
 
-      {showCreate && <CreateRuleModal triggerConditions={triggerConditions} actionTypes={actionTypes} onClose={() => setShowCreate(false)} onCreated={() => { setShowCreate(false); loadRules(); }} />}
+      {showCreate && (
+        <CreateRuleModal triggerConditions={triggerConditions} actionTypes={actionTypes} options={options} onClose={() => setShowCreate(false)} onCreated={() => { setShowCreate(false); loadRules(); }} />
+      )}
     </div>
   );
 
-  function CreateRuleModal({ triggerConditions, actionTypes, onClose, onCreated }) {
+  function CreateRuleModal({ triggerConditions, actionTypes, options, onClose, onCreated }) {
     const [form, setForm] = useState({ name: '', trigger_condition: 'contains', trigger_value: '', action_type: 'send_template', action_value: '', is_active: true });
     const handleCreate = async () => {
-      if (!form.name || !form.action_value) return toast.error('Fill all fields');
-      try { await API.post('/automations/chat-assistant', form); toast.success('Rule created'); onCreated(); } catch { toast.error('Failed'); }
+      const kind = actionTypes.find((a) => a.value === form.action_type)?.kind;
+      if (!form.name) return toast.error('Give the rule a name');
+      if (form.trigger_condition === 'contains' && !form.trigger_value.trim()) return toast.error('Enter at least one keyword');
+      if (kind && !String(form.action_value).trim()) return toast.error('Fill in the action');
+      try { await API.post('/automations/chat-assistant', form); toast.success('Rule created'); onCreated(); }
+      catch (err) { toast.error(err.response?.data?.error || 'Failed'); }
     };
     return (
-      <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-        <div className="bg-white border border-surface-border rounded-2xl p-6 w-full max-w-md shadow-modal">
-          <div className="flex items-center justify-between mb-4"><h2 className="text-xl font-bold text-ink-primary">New Chat Assistant Rule</h2><button onClick={onClose}>✕</button></div>
-          <div className="space-y-3">
-            <input className="input" placeholder="Rule name" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
-            <select className="input" value={form.trigger_condition} onChange={e => setForm({ ...form, trigger_condition: e.target.value })}>{triggerConditions.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}</select>
-            <input className="input" placeholder='Trigger value (e.g. "price")' value={form.trigger_value} onChange={e => setForm({ ...form, trigger_value: e.target.value })} />
-            <select className="input" value={form.action_type} onChange={e => setForm({ ...form, action_type: e.target.value })}>{actionTypes.map(a => <option key={a.value} value={a.value}>{a.label}</option>)}</select>
-            <input className="input" placeholder="Action value (template name, file name, agent name, tag, stage)" value={form.action_value} onChange={e => setForm({ ...form, action_value: e.target.value })} />
-            <label className="flex items-center gap-2"><input type="checkbox" checked={form.is_active} onChange={e => setForm({ ...form, is_active: e.target.checked })} /> <span className="text-sm text-ink-secondary">Active</span></label>
-            <button onClick={handleCreate} className="w-full px-4 py-2.5 rounded-lg btn btn-primary transition-colors">Create Rule</button>
+      <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-0 sm:p-6 overflow-y-auto" style={{ background: 'rgba(28,25,23,0.25)' }} onClick={onClose}>
+        <div className="card-raised w-full max-w-md my-auto" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center justify-between mb-5">
+            <h2 style={{ fontSize: '18px', fontWeight: 600 }}>New chat assistant rule</h2>
+            <button onClick={onClose} className="text-ink-tertiary hover:text-ink-primary transition-colors">✕</button>
+          </div>
+          <div className="space-y-4">
+            <div>
+              <p className="meta-label mb-1">Rule name</p>
+              <input className="input" placeholder="e.g. Price enquiry auto-reply" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            </div>
+            <div>
+              <p className="meta-label mb-1">When this happens</p>
+              <select className="input" value={form.trigger_condition} onChange={(e) => setForm({ ...form, trigger_condition: e.target.value })}>
+                {triggerConditions.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+              </select>
+            </div>
+            {form.trigger_condition === 'contains' && (
+              <div>
+                <p className="meta-label mb-1">Keywords (comma-separated)</p>
+                <input className="input" placeholder='e.g. price, rate, cost' value={form.trigger_value} onChange={(e) => setForm({ ...form, trigger_value: e.target.value })} />
+              </div>
+            )}
+            <div>
+              <p className="meta-label mb-1">Then do this</p>
+              <select className="input" value={form.action_type} onChange={(e) => setForm({ ...form, action_type: e.target.value, action_value: '' })}>
+                {actionTypes.map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}
+              </select>
+            </div>
+            {actionTypes.find((a) => a.value === form.action_type)?.kind && (
+              <div>
+                <p className="meta-label mb-1">{form.action_type === 'send_template' ? 'Reply text (supports {{First_Name}})' : 'Action target'}</p>
+                <div className="flex">
+                  <ActionValueField
+                    kind={actionTypes.find((a) => a.value === form.action_type)?.kind}
+                    value={form.action_value}
+                    placeholder="Tag name"
+                    options={options}
+                    onChange={(action_value) => setForm({ ...form, action_value })}
+                  />
+                </div>
+              </div>
+            )}
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input type="checkbox" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} />
+              <span className="text-sm text-ink-secondary">Rule is active</span>
+            </label>
+            <button onClick={handleCreate} className="btn btn-primary w-full">Create rule</button>
           </div>
         </div>
       </div>

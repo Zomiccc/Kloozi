@@ -124,6 +124,10 @@ exports.login = async (req, res, next) => {
 
     const user = userResult.rows[0];
 
+    if (user.status === 'deleted' || user.status === 'purged') {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
     if (user.status === 'suspended') {
       return res.status(403).json({ error: 'Your account has been suspended. Please contact your administrator.' });
     }
@@ -323,6 +327,9 @@ exports.googleCallback = async (req, res, next) => {
     }
 
     const user = userResult.rows[0];
+    if (user.status !== 'active') {
+      return res.redirect(`${config.webUrl}/login?error=${user.status === 'suspended' ? 'suspended' : 'no_account'}`);
+    }
     const tokens = await generateAndStoreRefreshToken(user.id);
     const accessToken = jwt.sign({ userId: user.id, workspaceId: user.workspace_id, role: user.role }, config.jwt.secret, {
       expiresIn: config.jwt.expiresIn,

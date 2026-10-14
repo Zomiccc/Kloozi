@@ -1,360 +1,364 @@
+const crypto = require('crypto');
 const axios = require('axios');
+const jwt = require('jsonwebtoken');
 const db = require('../config/database');
 const config = require('../config');
 const logger = require('../utils/logger');
-const { logActivity } = require('../utils/activityLog');
-const { sendPushNotification } = require('../utils/notifications');
-const { updateLeadScore } = require('../utils/activityLog');
-const { cacheDelPattern } = require('../config/redis');
+const { createLead, fireOutgoingWebhooks } = require('./leadPipeline');
+
+const GRAPH = () => `https://graph.facebook.com/${config.facebook.graphVersion}`;
+
+// ─── OAuth state ───
+// The state parameter is a short-lived signed token, not a bare workspace id,
+// so nobody can attach their ad account to someone else's workspace.
+
+function signOAuthState(workspaceId, provider) {
+  return jwt.sign({ ws: workspaceId, p: provider }, config.jwt.secret, { expiresIn: '20m' });
+}
+
+function readOAuthState(state, provider) {
+  try {
+    const decoded = jwt.verify(String(state || ''), config.jwt.secret);
+    return decoded.p === provider ? decoded.ws : null;
+  } catch {
+    return null;
+  }
+}
+
+function hmacHex(secret, data) {
+  return crypto.createHmac('sha256', secret).update(data).digest('hex');
+}
+
+function safeEqual(a, b) {
+  const x = Buffer.from(String(a || ''));
+  const y = Buffer.from(String(b || ''));
+  return x.length === y.length && crypto.timingSafeEqual(x, y);
+}
+
+/** Split platform form answers into known lead fields + custom fields. */
+function mapFormAnswers(pairs) {
+  const lead = { custom_fields: [] };
+  for (const { name: rawName, value } of pairs) {
+    if (value === undefined || value === null || value === '') continue;
+    const name = String(rawName || '').toLowerCase().replace(/\s+/g, '_');
+    const v = String(value);
+    if (/(^|_)first_?name$/.test(name)) lead.first_name = v;
+    else if (/(^|_)last_?name$/.test(name)) lead.last_name = v;
+    else if (/^(full_?name|name)$/.test(name)) lead.name = v;
+    else if (/phone|mobile|whatsapp/.test(name)) lead.phone = v;
+    else if (/e-?mail/.test(name)) lead.email = v;
+    else if (/^city$|_city$|^location$/.test(name)) lead.city = v;
+    else if (/budget/.test(name) && !isNaN(parseFloat(v.replace(/[^\d.]/g, '')))) {
+      lead.budget = parseFloat(v.replace(/[^\d.]/g, ''));
+      lead.custom_fields.push({ name: rawName, value: v });
+    } else lead.custom_fields.push({ name: rawName, value: v });
+  }
+  return lead;
+}
+
+async function saveIntegration(workspaceId, type, credentials, cfg = {}) {
+  await db.query(
+    `INSERT INTO integrations (workspace_id, type, is_connected, credentials, config)
+     VALUES ($1, $2, true, $3, $4)
+     ON CONFLICT (workspace_id, type) DO UPDATE SET is_connected = true, credentials = $3, config = $4, updated_at = NOW()`,
+    [workspaceId, type, JSON.stringify(credentials), JSON.stringify(cfg)]
+  );
+}
+
+exports.getOAuthState = (req, res) => {
+  const provider = String(req.query.provider || '');
+  if (!['facebook', 'tiktok', 'linkedin'].includes(provider)) return res.status(400).json({ error: 'Unknown provider' });
+  res.json({ state: signOAuthState(req.workspaceId, provider) });
+};
 
 // ─── Facebook Lead Ads ───
 
-exports.facebookCallback = async (req, res, next) => {
+exports.FACEBOOK_SCOPES = [
+  'pages_show_list', 'pages_read_engagement', 'pages_manage_metadata', 'pages_manage_ads', 'leads_retrieval', 'ads_management',
+];
+
+exports.facebookCallback = async (req, res) => {
+  const back = `${config.webUrl}/app/automations/facebook`;
   try {
     const { code, state } = req.query;
-    const workspaceId = state;
-    if (!code || !workspaceId) return res.status(400).send('Missing code or state');
+    const workspaceId = readOAuthState(state, 'facebook');
+    if (!code || !workspaceId) return res.redirect(`${back}?error=invalid_state`);
+    const redirectUri = `${config.apiUrl}/api/integrations/oauth/facebook/callback`;
 
-    // Exchange code for access token
-    const tokenResp = await axios.get('https://graph.facebook.com/v18.0/oauth/access_token', {
+    const shortLived = await axios.get(`${GRAPH()}/oauth/access_token`, {
+      params: { client_id: config.facebook.appId, client_secret: config.facebook.appSecret, redirect_uri: redirectUri, code },
+    });
+    // Page tokens fetched with a long-lived user token never expire; with the
+    // short-lived one they die after ~1 hour and lead fetching stops silently.
+    const longLived = await axios.get(`${GRAPH()}/oauth/access_token`, {
       params: {
-        client_id: config.facebook.appId,
-        client_secret: config.facebook.appSecret,
-        redirect_uri: `${config.apiUrl}/api/integrations/oauth/facebook/callback`,
-        code,
+        grant_type: 'fb_exchange_token', client_id: config.facebook.appId,
+        client_secret: config.facebook.appSecret, fb_exchange_token: shortLived.data.access_token,
       },
     });
+    const userToken = longLived.data.access_token || shortLived.data.access_token;
 
-    const accessToken = tokenResp.data.access_token;
-    if (!accessToken) return res.status(400).send('Failed to get access token');
-
-    // Get user pages
-    const pagesResp = await axios.get('https://graph.facebook.com/v18.0/me/accounts', {
-      params: { access_token: accessToken, fields: 'id,name,access_token,category' },
+    const pagesResp = await axios.get(`${GRAPH()}/me/accounts`, {
+      params: { access_token: userToken, fields: 'id,name,access_token,category,tasks', limit: 100 },
     });
-
     const pages = pagesResp.data.data || [];
 
-    // Store integration
-    await db.query(
-      `INSERT INTO integrations (workspace_id, type, is_connected, credentials, config)
-       VALUES ($1, 'facebook', true, $2, $3)
-       ON CONFLICT (workspace_id, type) DO UPDATE SET is_connected = true, credentials = $2, config = $3, updated_at = NOW()`,
-      [workspaceId, JSON.stringify({ accessToken, pages: pages.map(p => ({ id: p.id, name: p.name, accessToken: p.access_token })) }), JSON.stringify({})]
-    );
-
-    // Subscribe pages for leadgen webhook
+    const subscribed = [];
     for (const page of pages) {
       try {
-        await axios.post(`https://graph.facebook.com/v18.0/${page.id}/subscribed_apps`, {
-          subscribed_fields: 'leadgen',
-        }, { params: { access_token: page.access_token } });
-      } catch (e) {
-        logger.error(`FB subscribe page ${page.id}: ${e.message}`);
-      }
-    }
-
-    res.redirect(`${config.webUrl}/app/automations/facebook?connected=true`);
-  } catch (err) {
-    logger.error('Facebook OAuth callback error:', err.message);
-    if (err.response?.data) logger.error('FB OAuth error details:', JSON.stringify(err.response.data));
-    res.redirect(`${config.webUrl}/app/automations/facebook?error=oauth_failed&reason=${encodeURIComponent(err.message)}`);
-  }
-};
-
-exports.facebookWebhook = async (req, res, next) => {
-  try {
-    const { object, entry } = req.body;
-    if (object !== 'page') return res.sendStatus(404);
-
-    for (const pageEntry of entry || []) {
-      const pageId = pageEntry.id;
-      for (const change of pageEntry.changes || []) {
-        if (change.field !== 'leadgen') continue;
-        const leadgenId = change.value.leadgen_id;
-        if (!leadgenId) continue;
-
-        // Find workspace by page ID
-        const intRes = await db.query(
-          `SELECT * FROM integrations WHERE type = 'facebook' AND is_connected = true`
-        );
-        let workspaceId = null;
-        let pageAccessToken = null;
-        for (const integ of intRes.rows) {
-          const creds = integ.credentials || {};
-          const pages = creds.pages || [];
-          const match = pages.find(p => p.id === pageId);
-          if (match) {
-            workspaceId = integ.workspace_id;
-            pageAccessToken = match.accessToken;
-            break;
-          }
-        }
-        if (!workspaceId) continue;
-
-        // Fetch lead data
-        const leadResp = await axios.get(`https://graph.facebook.com/v18.0/${leadgenId}`, {
-          params: { access_token: pageAccessToken },
+        await axios.post(`${GRAPH()}/${page.id}/subscribed_apps`, null, {
+          params: { subscribed_fields: 'leadgen', access_token: page.access_token },
         });
-        const leadData = leadResp.data;
-        const fieldData = leadData.field_data || [];
-
-        const parsed = {};
-        for (const f of fieldData) {
-          const name = f.name.toLowerCase();
-          const val = (f.values || [])[0] || '';
-          if (name.includes('first_name') || name === 'first name') parsed.first_name = val;
-          else if (name.includes('last_name') || name === 'last name') parsed.last_name = val;
-          else if (name.includes('full_name') || name === 'full name' || name === 'name') parsed.name = val;
-          else if (name.includes('phone') || name.includes('mobile')) parsed.phone = val;
-          else if (name.includes('email')) parsed.email = val;
-          else if (name.includes('city')) parsed.city = val;
-          else if (name.includes('zip') || name.includes('postal')) parsed.city = parsed.city || val;
-          else parsed[name] = val;
-        }
-        if (!parsed.first_name && parsed.name) {
-          const parts = parsed.name.trim().split(/\s+/);
-          parsed.first_name = parts[0];
-          parsed.last_name = parts.slice(1).join(' ');
-        }
-
-        await createLeadFromIntegration(workspaceId, parsed, 'facebook');
+        subscribed.push(page.id);
+      } catch (e) {
+        logger.error(`FB subscribe page ${page.id}: ${e.response?.data?.error?.message || e.message}`);
       }
     }
 
-    res.sendStatus(200);
+    await saveIntegration(workspaceId, 'facebook', {
+      accessToken: userToken,
+      pages: pages.map((p) => ({ id: p.id, name: p.name, accessToken: p.access_token, subscribed: subscribed.includes(p.id) })),
+    });
+    res.redirect(`${back}?connected=true`);
   } catch (err) {
-    logger.error('Facebook webhook error:', err.message);
-    res.sendStatus(200);
+    logger.error('Facebook OAuth callback error:', err.response?.data?.error?.message || err.message);
+    res.redirect(`${back}?error=oauth_failed`);
   }
 };
 
 exports.facebookWebhookVerify = (req, res) => {
   const { 'hub.mode': mode, 'hub.verify_token': token, 'hub.challenge': challenge } = req.query;
-  if (mode === 'subscribe' && token === config.facebook.verifyToken) {
-    res.send(challenge);
-  } else {
-    res.sendStatus(403);
-  }
+  if (mode === 'subscribe' && token === config.facebook.verifyToken) return res.send(challenge);
+  res.sendStatus(403);
 };
 
-// ─── TikTok Lead Gen ───
-
-exports.tiktokCallback = async (req, res, next) => {
-  try {
-    const { code, state } = req.query;
-    const workspaceId = state;
-    if (!code || !workspaceId) return res.status(400).send('Missing code or state');
-
-    const tokenResp = await axios.post('https://business-api.tiktok.com/open_api/v1.3/oauth2/access_token/', {
-      client_key: config.tiktok.appId,
-      client_secret: config.tiktok.appSecret,
-      grant_type: 'authorization_code',
-      auth_code: code,
-    });
-
-    const accessToken = tokenResp.data?.data?.access_token;
-    if (!accessToken) return res.status(400).send('Failed to get TikTok access token');
-
-    await db.query(
-      `INSERT INTO integrations (workspace_id, type, is_connected, credentials, config)
-       VALUES ($1, 'tiktok', true, $2, $3)
-       ON CONFLICT (workspace_id, type) DO UPDATE SET is_connected = true, credentials = $2, config = $3, updated_at = NOW()`,
-      [workspaceId, JSON.stringify({ accessToken }), JSON.stringify({})]
-    );
-
-    res.redirect(`${config.webUrl}/app/automations/tiktok?connected=true`);
-  } catch (err) {
-    logger.error('TikTok OAuth callback error:', err.message);
-    res.redirect(`${config.webUrl}/app/automations/tiktok?error=oauth_failed`);
+exports.facebookWebhook = async (req, res) => {
+  if (config.facebook.appSecret) {
+    const expected = `sha256=${hmacHex(config.facebook.appSecret, req.rawBody || Buffer.from(''))}`;
+    if (!safeEqual(req.get('x-hub-signature-256'), expected)) {
+      logger.warn('Facebook webhook rejected: bad signature');
+      return res.sendStatus(403);
+    }
   }
-};
+  res.sendStatus(200); // acknowledge fast; Meta retries slow endpoints
 
-exports.tiktokWebhook = async (req, res, next) => {
   try {
-    const { event, lead_data } = req.body;
-    if (event !== 'lead') return res.sendStatus(200);
-
-    // Find workspace by TikTok integration
-    const intRes = await db.query(`SELECT workspace_id, credentials FROM integrations WHERE type = 'tiktok' AND is_connected = true`);
-    if (intRes.rows.length === 0) return res.sendStatus(200);
-
-    for (const integ of intRes.rows) {
-      const parsed = {
-        first_name: lead_data?.first_name || lead_data?.name || '',
-        last_name: lead_data?.last_name || '',
-        phone: lead_data?.phone_number || lead_data?.phone || '',
-        email: lead_data?.email || '',
-        city: lead_data?.city || '',
-      };
-      if (parsed.first_name || parsed.phone || parsed.email) {
-        await createLeadFromIntegration(integ.workspace_id, parsed, 'tiktok');
+    const { object, entry } = req.body || {};
+    if (object !== 'page') return;
+    for (const pageEntry of entry || []) {
+      for (const change of pageEntry.changes || []) {
+        if (change.field !== 'leadgen' || !change.value?.leadgen_id) continue;
+        const pageId = String(change.value.page_id || pageEntry.id);
+        const integ = await db.query(
+          `SELECT workspace_id, credentials FROM integrations
+           WHERE type = 'facebook' AND is_connected = true AND credentials->'pages' @> $1::jsonb`,
+          [JSON.stringify([{ id: pageId }])]
+        );
+        if (integ.rows.length === 0) {
+          logger.warn(`Facebook lead for unconnected page ${pageId} ignored`);
+          continue;
+        }
+        for (const row of integ.rows) {
+          const page = (row.credentials.pages || []).find((p) => p.id === pageId);
+          try {
+            const leadResp = await axios.get(`${GRAPH()}/${change.value.leadgen_id}`, {
+              params: { access_token: page.accessToken, fields: 'field_data,created_time,ad_id,adgroup_id,form_id,campaign_id,platform,is_organic' },
+            });
+            const l = leadResp.data;
+            const mapped = mapFormAnswers((l.field_data || []).map((f) => ({ name: f.name, value: (f.values || []).join(', ') })));
+            mapped.custom_fields.push(
+              ...[['Facebook lead ID', l.id || change.value.leadgen_id], ['Facebook form', l.form_id], ['Facebook ad', l.ad_id], ['Facebook campaign', l.campaign_id], ['Platform', l.platform]]
+                .filter(([, v]) => v).map(([name, value]) => ({ name, value: String(value) }))
+            );
+            await createLeadFromIntegration(row.workspace_id, mapped, 'facebook');
+          } catch (e) {
+            logger.error(`Facebook lead fetch ${change.value.leadgen_id} failed: ${e.response?.data?.error?.message || e.message}`);
+          }
+        }
       }
     }
-    res.sendStatus(200);
+  } catch (err) {
+    logger.error('Facebook webhook error:', err.message);
+  }
+};
+
+// ─── TikTok Lead Generation ───
+
+exports.tiktokCallback = async (req, res) => {
+  const back = `${config.webUrl}/app/automations/tiktok`;
+  try {
+    const { auth_code, code, state } = req.query;
+    const workspaceId = readOAuthState(state, 'tiktok');
+    if (!(auth_code || code) || !workspaceId) return res.redirect(`${back}?error=invalid_state`);
+
+    const tokenResp = await axios.post('https://business-api.tiktok.com/open_api/v1.3/oauth2/access_token/', {
+      app_id: config.tiktok.appId, secret: config.tiktok.appSecret, auth_code: auth_code || code,
+    });
+    const data = tokenResp.data?.data || {};
+    if (!data.access_token) {
+      logger.error('TikTok token exchange failed:', JSON.stringify(tokenResp.data));
+      return res.redirect(`${back}?error=oauth_failed`);
+    }
+    await saveIntegration(workspaceId, 'tiktok', {
+      accessToken: data.access_token, advertiserIds: (data.advertiser_ids || []).map(String),
+    });
+    res.redirect(`${back}?connected=true`);
+  } catch (err) {
+    logger.error('TikTok OAuth callback error:', err.response?.data?.message || err.message);
+    res.redirect(`${back}?error=oauth_failed`);
+  }
+};
+
+exports.tiktokWebhook = async (req, res) => {
+  res.sendStatus(200);
+  try {
+    const body = req.body || {};
+    const leadData = body.lead_data || body.data || body.content || {};
+    const advertiserId = String(body.advertiser_id || leadData.advertiser_id || '');
+    if (!advertiserId) {
+      logger.warn('TikTok webhook without advertiser_id ignored');
+      return;
+    }
+    // Route only to the workspace that authorised this advertiser — never broadcast.
+    const integ = await db.query(
+      `SELECT workspace_id FROM integrations
+       WHERE type = 'tiktok' AND is_connected = true AND credentials->'advertiserIds' @> $1::jsonb`,
+      [JSON.stringify([advertiserId])]
+    );
+    if (integ.rows.length === 0) {
+      logger.warn(`TikTok lead for unknown advertiser ${advertiserId} ignored`);
+      return;
+    }
+    const pairs = Array.isArray(leadData.fields)
+      ? leadData.fields.map((f) => ({ name: f.name || f.field_name, value: f.value }))
+      : Object.entries(leadData).filter(([, v]) => typeof v !== 'object').map(([name, value]) => ({ name, value }));
+    const mapped = mapFormAnswers(pairs);
+    if (!mapped.first_name && !mapped.name && !mapped.phone && !mapped.email) return;
+    await createLeadFromIntegration(integ.rows[0].workspace_id, mapped, 'tiktok');
   } catch (err) {
     logger.error('TikTok webhook error:', err.message);
-    res.sendStatus(200);
   }
 };
 
-// ─── LinkedIn Lead Gen ───
+// ─── LinkedIn Lead Sync ───
 
-exports.linkedinCallback = async (req, res, next) => {
+exports.LINKEDIN_SCOPES = ['r_marketing_leadgen_automation', 'r_ads', 'r_organization_admin'];
+
+function linkedinHeaders(token) {
+  return {
+    Authorization: `Bearer ${token}`,
+    'LinkedIn-Version': config.linkedin.apiVersion,
+    'X-Restli-Protocol-Version': '2.0.0',
+  };
+}
+
+exports.linkedinCallback = async (req, res) => {
+  const back = `${config.webUrl}/app/automations/linkedin`;
   try {
     const { code, state } = req.query;
-    const workspaceId = state;
-    if (!code || !workspaceId) return res.status(400).send('Missing code or state');
+    const workspaceId = readOAuthState(state, 'linkedin');
+    if (!code || !workspaceId) return res.redirect(`${back}?error=invalid_state`);
 
     const tokenResp = await axios.post('https://www.linkedin.com/oauth/v2/accessToken', new URLSearchParams({
-      grant_type: 'authorization_code',
-      code,
+      grant_type: 'authorization_code', code,
       redirect_uri: `${config.apiUrl}/api/integrations/oauth/linkedin/callback`,
-      client_id: config.linkedin.clientId,
-      client_secret: config.linkedin.clientSecret,
+      client_id: config.linkedin.clientId, client_secret: config.linkedin.clientSecret,
     }), { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
+    const token = tokenResp.data.access_token;
+    if (!token) return res.redirect(`${back}?error=oauth_failed`);
 
-    const accessToken = tokenResp.data.access_token;
-    if (!accessToken) return res.status(400).send('Failed to get LinkedIn access token');
+    // Ad accounts this member can read leads from; each gets a lead notification subscription.
+    const accounts = await axios.get('https://api.linkedin.com/rest/adAccountUsers?q=authenticatedUser', { headers: linkedinHeaders(token) })
+      .then((r) => (r.data.elements || []).map((e) => e.account).filter(Boolean))
+      .catch((e) => { logger.error('LinkedIn ad accounts:', e.response?.data?.message || e.message); return []; });
 
-    await db.query(
-      `INSERT INTO integrations (workspace_id, type, is_connected, credentials, config)
-       VALUES ($1, 'linkedin', true, $2, $3)
-       ON CONFLICT (workspace_id, type) DO UPDATE SET is_connected = true, credentials = $2, config = $3, updated_at = NOW()`,
-      [workspaceId, JSON.stringify({ accessToken }), JSON.stringify({})]
-    );
+    const webhook = `${config.apiUrl}/api/integrations/webhook/linkedin`;
+    for (const account of accounts) {
+      await axios.post('https://api.linkedin.com/rest/leadNotifications',
+        { webhook, owner: { sponsoredAccount: account }, leadType: 'SPONSORED' },
+        { headers: { ...linkedinHeaders(token), 'Content-Type': 'application/json' } })
+        .catch((e) => logger.error(`LinkedIn subscribe ${account}:`, e.response?.data?.message || e.message));
+    }
 
-    res.redirect(`${config.webUrl}/app/automations/linkedin?connected=true`);
+    await saveIntegration(workspaceId, 'linkedin', {
+      accessToken: token, refreshToken: tokenResp.data.refresh_token || null,
+      expiresAt: Date.now() + (tokenResp.data.expires_in || 0) * 1000, accounts,
+    });
+    res.redirect(`${back}?connected=true`);
   } catch (err) {
-    logger.error('LinkedIn OAuth callback error:', err.message);
-    res.redirect(`${config.webUrl}/app/automations/linkedin?error=oauth_failed`);
+    logger.error('LinkedIn OAuth callback error:', err.response?.data?.message || err.message);
+    res.redirect(`${back}?error=oauth_failed`);
   }
 };
 
-exports.linkedinWebhook = async (req, res, next) => {
-  try {
-    const { leadData } = req.body;
-    const intRes = await db.query(`SELECT workspace_id FROM integrations WHERE type = 'linkedin' AND is_connected = true`);
-    if (intRes.rows.length === 0) return res.sendStatus(200);
+/** LinkedIn webhook validation: GET ?challengeCode=… → HMAC-SHA256(challengeCode, clientSecret). */
+exports.linkedinWebhookVerify = (req, res) => {
+  const challengeCode = req.query.challengeCode;
+  if (!challengeCode || !config.linkedin.clientSecret) return res.sendStatus(400);
+  res.json({ challengeCode, challengeResponse: hmacHex(config.linkedin.clientSecret, challengeCode) });
+};
 
-    const parsed = {
-      first_name: leadData?.firstName || leadData?.first_name || '',
-      last_name: leadData?.lastName || leadData?.last_name || '',
-      phone: leadData?.phone || '',
-      email: leadData?.email || '',
-      city: leadData?.city || '',
-      company: leadData?.company || '',
-    };
-    if (parsed.first_name || parsed.phone || parsed.email) {
-      await createLeadFromIntegration(intRes.rows[0].workspace_id, parsed, 'linkedin');
+exports.linkedinWebhook = async (req, res) => {
+  if (config.linkedin.clientSecret) {
+    const expected = `hmacsha256=${hmacHex(config.linkedin.clientSecret, req.rawBody || Buffer.from(''))}`;
+    if (!safeEqual(req.get('x-li-signature'), expected)) {
+      logger.warn('LinkedIn webhook rejected: bad signature');
+      return res.sendStatus(403);
     }
-    res.sendStatus(200);
+  }
+  res.sendStatus(200);
+
+  try {
+    const body = req.body || {};
+    const owner = body.owner?.sponsoredAccount || body.owner?.organization;
+    const responseUrn = body.leadGenFormResponse || body.leadFormResponse;
+    if (!owner || !responseUrn) return;
+    const integ = await db.query(
+      `SELECT workspace_id, credentials FROM integrations
+       WHERE type = 'linkedin' AND is_connected = true AND credentials->'accounts' @> $1::jsonb`,
+      [JSON.stringify([owner])]
+    );
+    if (integ.rows.length === 0) {
+      logger.warn(`LinkedIn lead for unconnected owner ${owner} ignored`);
+      return;
+    }
+    const { workspace_id: workspaceId, credentials } = integ.rows[0];
+    const headers = linkedinHeaders(credentials.accessToken);
+    const responseId = String(responseUrn).split(':').pop();
+    const lead = (await axios.get(`https://api.linkedin.com/rest/leadFormResponses/${encodeURIComponent(responseId)}`, { headers })).data;
+
+    // Question ids → field names come from the (versioned) form definition.
+    const formUrn = lead.versionedLeadGenFormUrn || '';
+    const formId = (formUrn.match(/leadGenForm:(\d+)/) || [])[1];
+    const questions = {};
+    if (formId) {
+      const form = await axios.get(`https://api.linkedin.com/rest/leadForms/${formId}`, { headers }).then((r) => r.data).catch(() => null);
+      for (const q of form?.content?.questions || []) {
+        questions[q.questionId] = q.predefinedField || q.name || q.question?.localized?.en_US || `Question ${q.questionId}`;
+      }
+    }
+    const pairs = (lead.formResponse?.answers || []).map((a) => ({
+      name: (questions[a.questionId] || `Question ${a.questionId}`).replace(/^PHONE_NUMBER$/, 'phone').replace(/^EMAIL$/, 'email')
+        .replace(/^FIRST_NAME$/, 'first_name').replace(/^LAST_NAME$/, 'last_name').replace(/^CITY$/, 'city'),
+      value: a.answerDetails?.textQuestionAnswer?.answer ?? (a.answerDetails?.multipleChoiceAnswer?.options || []).join(', '),
+    }));
+    const mapped = mapFormAnswers(pairs);
+    const campaign = lead.leadMetadataInfo?.sponsoredLeadMetadataInfo?.campaign?.name;
+    if (campaign) mapped.custom_fields.push({ name: 'LinkedIn campaign', value: campaign });
+    await createLeadFromIntegration(workspaceId, mapped, 'linkedin');
   } catch (err) {
-    logger.error('LinkedIn webhook error:', err.message);
-    res.sendStatus(200);
+    logger.error('LinkedIn webhook error:', err.response?.data?.message || err.message);
   }
 };
 
 // ─── Shared helper ───
 
 async function createLeadFromIntegration(workspaceId, parsed, source) {
-  // Check workspace duplicate lead settings
-  let dupMode = 'allow';
-  let matchPhone = true;
-  let matchEmail = true;
-  try {
-    const wsRes = await db.query('SELECT settings FROM workspaces WHERE id = $1', [workspaceId]);
-    const wsSettings = wsRes.rows[0]?.settings || {};
-    dupMode = wsSettings.duplicate_mode || 'allow';
-    matchPhone = wsSettings.duplicate_match_phone !== false;
-    matchEmail = wsSettings.duplicate_match_email !== false;
-  } catch {}
-
-  // Check for duplicates if mode is not 'allow'
-  if (dupMode !== 'allow' && (parsed.phone || parsed.email)) {
-    let dupQuery = 'SELECT id FROM leads WHERE workspace_id = $1 AND (';
-    let dupParams = [workspaceId];
-    let conditions = [];
-    let idx = 2;
-    if (matchPhone && parsed.phone) { conditions.push(`phone = $${idx++}`); dupParams.push(parsed.phone); }
-    if (matchEmail && parsed.email) { conditions.push(`email = $${idx++}`); dupParams.push(parsed.email); }
-    dupQuery += conditions.join(' OR ') + ') LIMIT 1';
-    const dupResult = await db.query(dupQuery, dupParams);
-    if (dupResult.rows.length > 0) {
-      const existingId = dupResult.rows[0].id;
-      if (dupMode === 'auto_merge') {
-        // Update existing lead with new info
-        const updateFields = [];
-        const updateParams = [];
-        let pIdx = 1;
-        if (parsed.first_name) { updateFields.push(`first_name = $${pIdx++}`); updateParams.push(parsed.first_name); }
-        if (parsed.last_name) { updateFields.push(`last_name = $${pIdx++}`); updateParams.push(parsed.last_name); }
-        if (parsed.city) { updateFields.push(`city = $${pIdx++}`); updateParams.push(parsed.city); }
-        if (updateFields.length > 0) {
-          updateFields.push(`updated_at = NOW()`);
-          updateParams.push(existingId, workspaceId);
-          await db.query(`UPDATE leads SET ${updateFields.join(', ')} WHERE id = $${pIdx++} AND workspace_id = $${pIdx++}`, updateParams);
-        }
-        await logActivity(workspaceId, existingId, null, 'lead_merged', `Lead auto-merged from ${source} (duplicate detected)`, { merged_source: source });
-        await updateLeadScore(existingId);
-        await cacheDelPattern(`leads:${workspaceId}:*`);
-        return existingId;
-      }
-      // dupMode === 'warn' — log and skip creating new lead
-      logger.info(`Duplicate lead skipped from ${source} for workspace ${workspaceId}`);
-      return null;
-    }
-  }
-
-  const stageResult = await db.query('SELECT id FROM lead_stages WHERE workspace_id = $1 AND is_default = true LIMIT 1', [workspaceId]);
-  const agentsResult = await db.query(
-    `SELECT u.id FROM users u WHERE u.workspace_id = $1 AND u.role = $2 AND u.status = $3
-     ORDER BY (SELECT COUNT(*) FROM leads WHERE assigned_to = u.id) ASC LIMIT 1`,
-    [workspaceId, 'sales_agent', 'active']
-  );
-
-  const leadResult = await db.query(
-    `INSERT INTO leads (workspace_id, first_name, last_name, phone, email, city, lead_source, stage, stage_id, assigned_to)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
-    [workspaceId, parsed.first_name || 'Unknown', parsed.last_name || null, parsed.phone || null,
-     parsed.email || null, parsed.city || null, source, 'new', stageResult.rows[0]?.id, agentsResult.rows[0]?.id || null]
-  );
-
-  const leadId = leadResult.rows[0].id;
-  await logActivity(workspaceId, leadId, null, 'lead_created', `Lead captured from ${source}`);
-  await updateLeadScore(leadId);
-
-  if (agentsResult.rows[0]?.id) {
-    await sendPushNotification(agentsResult.rows[0].id, `New ${source} Lead`, `New lead: ${parsed.first_name || 'Unknown'}`, { type: 'new_lead', leadId, source });
-  }
-
-  // Fire outgoing webhooks
-  await fireOutgoingWebhooks(workspaceId, 'lead.created', { leadId, ...parsed });
-
-  return leadId;
-}
-
-// ─── Outgoing Webhooks ───
-
-async function fireOutgoingWebhooks(workspaceId, event, data) {
-  try {
-    const whRes = await db.query('SELECT * FROM outgoing_webhooks WHERE workspace_id = $1 AND is_active = true', [workspaceId]);
-    for (const wh of whRes.rows) {
-      const events = wh.events || [];
-      if (events.length > 0 && !events.includes(event) && !events.includes('*')) continue;
-      const payload = { event, timestamp: new Date().toISOString(), data };
-      try {
-        const response = await axios.post(wh.url, payload, { timeout: 10000 });
-        await db.query('INSERT INTO outgoing_webhook_logs (webhook_id, event, payload, response_code, status) VALUES ($1,$2,$3,$4,$5)',
-          [wh.id, event, JSON.stringify(payload), response.status, 'success']);
-      } catch (err) {
-        await db.query('INSERT INTO outgoing_webhook_logs (webhook_id, event, payload, response_code, status, error_message) VALUES ($1,$2,$3,$4,$5,$6)',
-          [wh.id, event, JSON.stringify(payload), err.response?.status || 0, 'failed', err.message]);
-      }
-    }
-  } catch (err) {
-    logger.error('Fire outgoing webhooks error:', err.message);
-  }
+  const result = await createLead(workspaceId, { ...parsed, lead_source: source }, {
+    source, duplicateMode: 'workspace', activityText: `Lead captured from ${source}`,
+  });
+  if (result.status === 'skipped') return null;
+  return result.lead.id;
 }
 
 exports.fireOutgoingWebhooks = fireOutgoingWebhooks;

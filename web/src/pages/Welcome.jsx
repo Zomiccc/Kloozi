@@ -1,172 +1,184 @@
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import API from '../lib/api';
+import { CountUp } from '../lib/motion';
 import useAuthStore from '../stores/authStore';
-import {
-  Plug, MessageSquare, Send, Users, Repeat, Zap, Settings, ArrowRight,
-  Smartphone, Bell, Phone, BarChart3, UserPlus, GitBranch, Crown, CheckCircle2
-} from 'lucide-react';
+import { ArrowRight, ArrowUpRight, Clock, Users, Mail, Phone, Flame, TrendingUp } from 'lucide-react';
+import { avatarTone, initialsOf } from '../lib/avatar';
+import { pillStyle } from '../components/ui';
+
+const stageColors = {
+  new: '#2F6FDB', contacted: '#B45309', interested: '#2F6FDB',
+  negotiating: '#B45309', won: '#0E8A5F', lost: '#A8A29E',
+};
 
 export default function Welcome() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const firstName = user?.firstName || user?.first_name || 'there';
+  const [stats, setStats] = useState(null);
+  const [recentLeads, setRecentLeads] = useState([]);
 
-  const sections = [
-    {
-      title: 'New Lead Automations',
-      subtitle: 'Instantly receive, contact, and follow up with new leads. Automatically receive leads from your lead sources, and engage them with automated sequences across WhatsApp, text message, phone calls, and more.',
-      cards: [
-        { icon: Plug, title: 'Connect Your Lead Sources', desc: 'Receive new leads from your website, Google, & other sources', route: '/app/automations', color: '#0066FF' },
-        { icon: MessageSquare, title: 'WhatsApp Auto-Responder', desc: 'Automatically message new leads on WhatsApp, from your number', route: '/app/automations/whatsapp-auto-responder', color: '#34C759' },
-      ],
-    },
-    {
-      title: 'Bulk Lead Engagement',
-      subtitle: 'Re-engage existing leads at scale. Bulk call or message thousands of leads at a time with auto-personalisation, multi-step sequences, view tracking, and one-click WhatsApp campaigns.',
-      cards: [
-        { icon: Repeat, title: 'Set your Default Sequence', desc: 'Configure a multi-step intro sequence to engage new leads', route: '/app/email-sequences', color: '#FF9500' },
-        { icon: Send, title: 'Send a WhatsApp Campaign', desc: 'Instantly message thousands of leads via WhatsApp in one click', route: '/app/whatsapp-campaigns', color: '#34C759' },
-      ],
-    },
-    {
-      title: 'Easy Lead Management',
-      subtitle: 'Track every lead & sales activity. View and manage your leads, playbooks, and sales pipeline right from your phone. Track your team\'s performance with high-level dashboards and detailed activity timelines.',
-      cards: [
-        { icon: Settings, title: 'Create Custom Client Fields', desc: 'Customise client fields to capture key details about every lead', route: '/app/settings', color: '#AF52DE' },
-        { icon: BarChart3, title: 'View Analytics Dashboard', desc: 'Track your pipeline, conversion rates, and team performance', route: '/app/analytics', color: '#0066FF' },
-      ],
-    },
-    {
-      title: 'Official WhatsApp Automations',
-      subtitle: 'Use your existing WhatsApp Business number to instantly message new leads, automatically follow up, bulk message thousands, import new contacts to the CRM, and much more.',
-      cards: [
-        { icon: MessageSquare, title: 'WhatsApp Auto-Responder', desc: 'Automatically message new leads on WhatsApp, from your number', route: '/app/automations/whatsapp-auto-responder', color: '#34C759' },
-        { icon: Send, title: 'Send a WhatsApp Campaign', desc: 'Instantly message thousands of leads via WhatsApp in one click', route: '/app/whatsapp-campaigns', color: '#34C759' },
-      ],
-    },
-    {
-      title: 'Use Zomic as a Team',
-      subtitle: 'Gain full control and visibility over your sales team. Automatically assign leads and get real-time insights into the pipelines and progress of every team member.',
-      cards: [
-        { icon: UserPlus, title: 'Invite Your Team Members', desc: 'Add your team to coordinate on leads and track progress', route: '/app/team', color: '#0066FF' },
-        { icon: GitBranch, title: 'Set up Lead Assignment', desc: 'Create rules to automatically assign new leads to your team', route: '/app/automations/rules', color: '#FF9500' },
-      ],
-    },
-  ];
+  useEffect(() => {
+    API.get('/analytics/dashboard').then((r) => setStats(r.data)).catch(() => {});
+    API.get('/leads?limit=6').then((r) => setRecentLeads(r.data.leads || [])).catch(() => {});
+  }, []);
+
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+  const today = new Date().toLocaleDateString('en', { weekday: 'long', month: 'long', day: 'numeric' });
+
+  const s = stats || {};
+  const st = s.leadStats || {};
+  const followUpsLeft = (s.followUpsToday?.total || 0) - (s.followUpsToday?.completed || 0);
+  const loading = !stats;
 
   return (
-    <div className="space-y-8 pb-12">
-      {/* Hero Header */}
-      <div className="text-center py-10 px-4">
-        <div
-          className="w-16 h-16 rounded-2xl flex items-center justify-center text-white font-extrabold text-2xl mx-auto mb-5 shadow-card"
-          style={{ background: 'linear-gradient(135deg, #FF3B5C, #FF9500)' }}
-        >
-          Z
-        </div>
-        <h1 className="text-4xl font-extrabold text-ink-primary tracking-tight">
-          Welcome to Zomic
+    <div className="max-w-[1100px]">
+      {/* Greeting */}
+      <div className="pt-4">
+        <p className="meta-label mb-2">{today}</p>
+        <h1 className="text-ink-primary" style={{ fontSize: '40px', fontWeight: 650, letterSpacing: '-0.015em', lineHeight: 1.15 }}>
+          {greeting}, {firstName}.
         </h1>
-        <p className="text-lg text-ink-secondary mt-3 max-w-xl mx-auto">
-          Hi {firstName}, let's get you set up. Explore the features below to start capturing and converting leads.
+        <p className="text-ink-secondary mt-2" style={{ fontSize: '15px' }}>
+          {followUpsLeft > 0
+            ? <>You have <b className="text-ink-primary">{followUpsLeft} follow-up{followUpsLeft > 1 ? 's' : ''}</b> waiting — clear them before lunch.</>
+            : 'Nothing urgent today. Time to hunt.'}
         </p>
-        <button
-          onClick={() => navigate('/app/dashboard')}
-          className="btn btn-primary mt-6 px-8 py-3 text-base font-bold"
-          style={{ background: 'linear-gradient(135deg, #FF3B5C, #FF9500)', border: 'none' }}
-        >
-          Go to Dashboard <ArrowRight size={18} className="inline ml-1" />
-        </button>
       </div>
 
-      {/* Feature Sections */}
-      {sections.map((section, sIdx) => (
-        <div key={sIdx} className="space-y-4">
-          <div>
-            <h2 className="text-xl font-extrabold text-ink-primary">{section.title}</h2>
-            <p className="text-sm text-ink-secondary mt-1 max-w-2xl">{section.subtitle}</p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {section.cards.map((card, cIdx) => (
-              <button
-                key={cIdx}
-                onClick={() => navigate(card.route)}
-                className="card card-hover text-left flex items-start gap-4 group"
-              >
-                <div
-                  className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0"
-                  style={{ background: `${card.color}15` }}
-                >
-                  <card.icon size={24} style={{ color: card.color }} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-bold text-ink-primary group-hover:text-accent-red transition-colors">
-                    {card.title}
-                  </h3>
-                  <p className="text-sm text-ink-secondary mt-1">{card.desc}</p>
-                </div>
-                <ArrowRight size={18} className="text-ink-tertiary group-hover:text-accent-red group-hover:translate-x-1 transition-all flex-shrink-0 mt-1" />
-              </button>
-            ))}
-          </div>
-        </div>
-      ))}
-
-      {/* Mobile App Banner */}
-      <div
-        className="rounded-3xl p-6 flex flex-col sm:flex-row items-center gap-6 text-white"
-        style={{ background: 'linear-gradient(135deg, #FF3B5C, #FF9500)' }}
+      {/* The Display number + supporting metrics */}
+      <motion.div
+        initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.22 }}
+        className="hairline mt-10 pt-8 flex items-end justify-between gap-8 flex-wrap"
       >
-        <Smartphone size={48} className="flex-shrink-0" />
-        <div className="flex-1 text-center sm:text-left">
-          <h3 className="text-lg font-extrabold">Download the Zomic App</h3>
-          <p className="text-sm text-white/90 mt-1">
-            Get instant new lead alerts, one-touch calls / WhatsApp / SMS, phonebook integration, view tracking, and more
+        <div>
+          <p className="meta-label mb-1">Pipeline under management</p>
+          <p className="mono text-ink-primary" style={{ fontSize: '56px', fontWeight: 700, letterSpacing: '-0.02em', lineHeight: 1.05 }}>
+            <CountUp value={Number(st.totalLeads) || 0} />
           </p>
         </div>
-        <div className="flex gap-3 flex-shrink-0">
-          <div className="bg-white/20 backdrop-blur-sm rounded-xl px-4 py-2.5 text-center cursor-pointer hover:bg-white/30 transition-colors">
-            <p className="text-xs font-semibold">App Store</p>
-            <p className="text-[10px] text-white/80">Download on the</p>
-          </div>
-          <div className="bg-white/20 backdrop-blur-sm rounded-xl px-4 py-2.5 text-center cursor-pointer hover:bg-white/30 transition-colors">
-            <p className="text-xs font-semibold">Google Play</p>
-            <p className="text-[10px] text-white/80">Get it on</p>
-          </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-8 gap-y-4 pb-1">
+          {[
+            { label: 'New today', value: st.leadsToday || 0 },
+            { label: 'Won all-time', value: st.won || 0 },
+            { label: 'Conversion', value: `${s.conversionRate ?? 0}%`, mono: false },
+            { label: 'Follow-ups left', value: followUpsLeft, danger: followUpsLeft > 0 },
+          ].map((m) => (
+            <div key={m.label}>
+              <p className="meta-label mb-1">{m.label}</p>
+              <p className="mono" style={{ fontSize: '20px', fontWeight: 600, color: m.danger ? '#B45309' : '#1C1917' }}>
+                {m.mono === false ? (s.conversionRate ?? 0) + '%' : <CountUp value={Number(m.value) || 0} />}
+              </p>
+            </div>
+          ))}
         </div>
-      </div>
+      </motion.div>
 
-      {/* Unlock Full Access Banner */}
-      <div className="card text-center" style={{ padding: '40px 24px' }}>
-        <Crown size={32} style={{ color: '#FF9500' }} className="mx-auto mb-3" />
-        <h3 className="text-xl font-extrabold text-ink-primary">Unlock Full Access</h3>
-        <p className="text-sm text-ink-secondary mt-2 max-w-md mx-auto">
-          Please subscribe to unlock unlimited access to the full functionality of Zomic.
-        </p>
-        <button
-          onClick={() => navigate('/app/billing')}
-          className="btn btn-primary mt-5 px-8 py-3 font-bold"
-          style={{ background: 'linear-gradient(135deg, #FF3B5C, #FF9500)', border: 'none' }}
-        >
-          View Plans <ArrowRight size={16} className="inline ml-1" />
-        </button>
-      </div>
+      {/* Two-column brief */}
+      <div className="grid lg:grid-cols-[1fr_380px] gap-10 mt-12 items-start">
+        {/* Latest arrivals */}
+        <section>
+          <div className="flex items-center justify-between mb-4">
+            <p className="meta-label">Latest arrivals</p>
+            <button onClick={() => navigate('/app/leads')} className="text-sm font-medium text-ink-secondary hover:text-ink-primary transition-colors flex items-center gap-1">
+              All leads <ArrowRight size={13} />
+            </button>
+          </div>
+          {loading ? (
+            <div className="space-y-2">{[1, 2, 3, 4].map((i) => <div key={i} className="skeleton h-14" />)}</div>
+          ) : recentLeads.length === 0 ? (
+            <div className="pt-8 max-w-[420px]">
+              <p className="text-ink-primary" style={{ fontSize: '24px', fontWeight: 650 }}>No leads yet.</p>
+              <p className="text-ink-secondary mt-1" style={{ fontSize: '14px' }}>Connect a source in Automations or add your first lead.</p>
+              <button onClick={() => navigate('/app/automations')} className="btn btn-accent mt-5">Connect a source</button>
+            </div>
+          ) : (
+            <div>
+              {recentLeads.map((l, idx) => (
+                <motion.button
+                  key={l.id}
+                  initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: Math.min(idx * 0.05, 0.35), duration: 0.2 }}
+                  onClick={() => navigate(`/app/leads/${l.id}`)}
+                  className="group w-full hairline-b py-3 flex items-center gap-3 text-left hover-accent-left"
+                >
+                  <span
+                    className="flex items-center justify-center text-xs font-bold  flex-shrink-0"
+                    style={{ background: avatarTone(`${l.first_name || ''}${l.last_name || ''}`).bg, color: avatarTone(`${l.first_name || ''}${l.last_name || ''}`).fg, width: '32px', height: '32px', borderRadius: '10px' }}
+                  >
+                    {initialsOf(l.first_name, l.last_name)}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-semibold text-ink-primary truncate" style={{ fontSize: '14px' }}>{l.first_name} {l.last_name}</span>
+                    <span className="block mono text-ink-secondary truncate" style={{ fontSize: '12px' }}>{l.phone || l.email || l.city || ''}</span>
+                  </span>
+                  <span className="capitalize hidden sm:block text-ink-tertiary flex-shrink-0" style={{ fontSize: '12px' }}>{l.lead_source || ''}</span>
+                  <span className="capitalize flex-shrink-0" style={pillStyle(stageColors[l.stage] || stageColors.new)}>
+                    {l.stage}
+                  </span>
+                  <ArrowUpRight size={14} className="text-ink-tertiary opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                </motion.button>
+              ))}
+            </div>
+          )}
+        </section>
 
-      {/* Quick Links Footer */}
-      <div className="flex flex-wrap justify-center gap-3 pt-4">
-        {[
-          { label: 'Leads', route: '/app/leads', icon: Users },
-          { label: 'Automations', route: '/app/automations', icon: Zap },
-          { label: 'Analytics', route: '/app/analytics', icon: BarChart3 },
-          { label: 'Settings', route: '/app/settings', icon: Settings },
-        ].map((link, i) => (
-          <button
-            key={i}
-            onClick={() => navigate(link.route)}
-            className="flex items-center gap-2 px-4 py-2 rounded-full bg-surface-page border border-surface-border text-sm font-semibold text-ink-secondary hover:text-ink-primary hover:border-ink-tertiary transition-all"
-          >
-            <link.icon size={14} /> {link.label}
-          </button>
-        ))}
+        {/* Right rail — actions */}
+        <aside className="space-y-8">
+          <section>
+            <p className="meta-label mb-4">Act now</p>
+            <div className="space-y-2">
+              {[
+                { label: 'Clear follow-ups', sub: `${followUpsLeft} waiting`, route: '/app/leads?view=follow_ups', icon: Clock, hot: followUpsLeft > 0 },
+                { label: 'Call list', sub: 'Work your newest leads', route: '/app/leads', icon: Phone },
+                { label: 'Unread mail', sub: 'Internal team messages', route: '/app/mailbox', icon: Mail },
+                { label: "See what's working", sub: 'Analytics & engagement', route: '/app/analytics', icon: TrendingUp },
+              ].map((a, i) => (
+                <motion.button
+                  key={a.label}
+                  initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: Math.min(i * 0.05, 0.3), duration: 0.2 }}
+                  onClick={() => navigate(a.route)}
+                  className="group w-full flex items-center gap-3 p-4 bg-white text-left transition-all hover:elev-sm active:scale-[0.99]"
+                  style={{ border: '1px solid #E7E5E4', borderRadius: '10px' }}
+                >
+                  <span className={`flex-shrink-0 ${a.hot ? 'text-accent-deep' : 'text-ink-tertiary'}`}>
+                    {a.hot ? <Flame size={17} /> : <a.icon size={17} />}
+                  </span>
+                  <span className="flex-1 min-w-0">
+                    <span className="block font-semibold text-ink-primary" style={{ fontSize: '14px' }}>{a.label}</span>
+                    <span className="block text-ink-secondary" style={{ fontSize: '12px' }}>{a.sub}</span>
+                  </span>
+                  <ArrowRight size={14} className="text-ink-tertiary group-hover:translate-x-0.5 group-hover:text-ink-primary transition-all flex-shrink-0" />
+                </motion.button>
+              ))}
+            </div>
+          </section>
+
+          <section>
+            <p className="meta-label mb-4">Go deeper</p>
+            <div className="flex flex-wrap gap-2">
+              {[
+                { label: 'Build a flow', route: '/app/marketing/flows/new' },
+                { label: 'New campaign', route: '/app/marketing/campaigns' },
+                { label: 'Team performance', route: '/app/team' },
+                { label: 'Engagement report', route: '/app/engagement' },
+              ].map((x, i) => (
+                <motion.button
+                  key={x.label}
+                  initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.25 + i * 0.04 }}
+                  onClick={() => navigate(x.route)}
+                  className="text-sm font-medium text-ink-secondary hover:text-ink-primary underline underline-offset-4 transition-colors"
+                >
+                  {x.label}
+                </motion.button>
+              ))}
+            </div>
+          </section>
+        </aside>
       </div>
     </div>
   );

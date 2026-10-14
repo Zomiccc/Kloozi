@@ -1,7 +1,123 @@
-# Zomic CRM - Development Status & Codebase Documentation
+# Flazyn - Development Status & Codebase Documentation
+
+## UI Redesign, Templates & Interest Tracking — October 2026
+
+**Design: "The Dispatch Desk".** Warm paper canvas, near-black ink, volt (#D6F24B) for live/active and ember
+(#FF5A1F) for heat. Typography: Instrument Serif for headlines, Instrument Sans for UI, JetBrains Mono for every number.
+The tokens live in `web/src/index.css` and `web/tailwind.config.js`, and the shared primitives in `components/ui.jsx`.
+The dark "console" sidebar (`components/Layout.jsx`) always shows **Waiting on you**: the count of uncontacted leads and
+the oldest wait time. Lead rows carry a live heat stripe and wait timer (`leadHeat`, `HeatDot`).
+
+**Templates** (`/app/templates`, `templates` table, `controllers/templateController.js`): the library has built-in
+forms (5 designs), emails (4), WhatsApp (8) and SMS (4) templates (`backend/src/templates/library.js`, upserted by
+migration `016b`). Users can import .html, .txt or .flazyn.json files, export templates, duplicate them, write custom
+HTML or text with live preview, and *Use* a template. Using one creates a builder email, a quick reply or a live form
+page. Form pages render through `services/formRenderer.js`: values are escaped, every `<form>` is rewritten to post to
+Flazyn, and pages are served under a CSP sandbox so custom HTML can't reach the app origin.
+The email builder now has a raw **HTML** block.
+
+**Interest** (`services/interestService.js`, `controllers/trackingController.js`, `/app/engagement`, lead → Interest tab):
+- **Website tracking:** a script at `/api/track/t.js?k=<tracking_key>` sends text/plain beacons to `/api/track/hit`.
+  Visitors are identified by a signed `?fz=` link token, by a form submit, or by the `fz_vid` value carried into Flazyn form pages.
+- **Document tracking:** shared files open in a tracked pdf.js viewer that records seconds per page (`/api/track/doc/:id`).
+- **Score:** each lead gets a transparent 0–100 score in which every point is a listed signal, decaying after 14 quiet days.
+  `leads.score` now *is* this score, so lists, segments and flows use it.
+- **AI brief:** summary, what they care about, next action and a suggested WhatsApp message via OpenAI
+  (`OPENAI_MODEL`, default gpt-4o-mini). Without a key it falls back to a rule-based brief.
+- **Live alerts:** one alert per session, sent to the assignee or, if none, to the managers.
+
+**Fixes:** Dashboard crashed (hook order). Timestamps were read about 12h off (Postgres in LA time, Node in Karachi time):
+the pool now forces UTC, and migration `016a` shifted DB-generated times once. Leads created with no agents available
+went unassigned; they now go to the workspace owner. The Stripe webhook could never verify signatures (the body was
+already parsed); it now uses the raw body.
+
+**Setup checklist** (keys, webhooks, permissions): `docs/PLATFORM_APPROVALS.md` → Part 2.
+
+
+## Flazyn Rename + Automation Engine — October 2026
+
+**Rename:** the product is **Flazyn** (formerly Zomic / "CRM Final"). Code, UI, plugins, env values and the
+database (`flazyn_mail_*` tables, indexes, constraints — migration `011b_rename_legacy_brand_objects`) no longer
+use the old names. Unchangeable external IDs kept on purpose: Firebase project `zomic-crm`, S3 bucket
+`zomic-files`. Postgres database name `crm_final` is unchanged. Webhook verify tokens are now `flazyn_*`, so update them in Meta.
+
+**Lead pipeline** (`backend/src/services/leadPipeline.js`): every lead source (manual, CSV, phonebook,
+Facebook/TikTok/LinkedIn, embed forms, lead-form pages, Zapier/WordPress/Google Forms tokens, inbound
+WhatsApp, email parsing) goes through `createLead()`. New leads then run, in order:
+automation rules → lead distribution (round-robin / broadcast to team members, email, WhatsApp) →
+fallback assignment (territory → assignment strategy → creator) → assignee notification → outgoing webhooks.
+Lead edits, bulk actions and flow stage changes call `onLeadUpdated()` (stage_changed / deal_won / deal_lost /
+lead_updated webhooks, reassignment alerts).
+
+**Chat assistant** (`backend/src/services/chatAssistant.js`) runs on every inbound WhatsApp message
+(keywords / new number / no reply in 5 min). **Inbound WhatsApp** resolves the correct workspace, accepts
+both Meta Cloud API and Twilio payloads, de-duplicates retries, stores the sender phone, and applies the
+auto-responder settings from the WhatsApp page (all / new contacts / outside hours, delay, 60-min cooldown).
+
+**Schema alignment:** migration `015_align_automation_schema` adds the columns the automation code had
+always expected (webhooks, chat assistant, auto-responder, sequences, branding, embed forms) and repairs
+`leads.tags` to always be a JSONB array.
+
+**Connectors hardened:** OAuth `state` is a signed 20-minute token (`GET /api/integrations/oauth/state`).
+Facebook now requests `leads_retrieval` and the related lead-ads permissions, uses Graph `FACEBOOK_GRAPH_VERSION` (v25.0),
+exchanges for long-lived tokens, and verifies `X-Hub-Signature-256`. LinkedIn uses Lead Sync
+(`r_marketing_leadgen_automation`), with HMAC challenge and signature verification. TikTok routes leads only to the workspace
+that authorised the advertiser; previously it sent each lead to every workspace. Disconnecting wipes stored tokens.
+
+**Privacy / compliance:** public `/privacy`, `/terms`, `/data-deletion` pages (configure via `VITE_LEGAL_*`),
+Settings → Account → Delete account, and a purge job that permanently removes accounts 30 days after deletion.
+Notifications are now always stored in-app and pushed live over Socket.io, not only to phones.
+
+**Platform approvals:** step-by-step guide in `docs/PLATFORM_APPROVALS.md`.
+
+**Verified:** 31-check end-to-end API suite (rules, distribution, webhooks, duplicates, bulk, token webhook,
+Twilio inbound + chat assistant, notifications) plus 12 connector security checks, all passing. Frontend builds.
+LinkedIn/TikTok lead fetching follows their current docs but can only be tested after API approval.
+
+
+## Marketing Suite Rebuild (Klaviyo Model) — August 2026
+
+The legacy email feature (templates / sequences / flows / campaigns pages) was
+**removed** and replaced by a behavior-driven marketing suite:
+
+- **Segments** — dynamic, condition-based lead audiences (`segments` table).
+  Conditions compile to parameterized SQL against `leads`, `emails`,
+  `lead_activities`. Evaluated fresh on every query — never a snapshot.
+- **Flows** — visual node-graph automations (`flows`, `flow_enrollments`,
+  `flow_action_log`). Triggers: lead created, stage entered, segment entered,
+  tagged with, days inactive, source is, manual. Actions: send_email, wait,
+  condition (branch yes/no), add_tag, change_stage, notify_agent, whatsapp,
+  sms, exit. Engine ticks every 60 s via `startScheduledJobs()`
+  (`backend/src/queues/index.js`) — triggers are polled and due enrollment
+  steps execute through `backend/src/services/flowEngine.js`.
+- **Campaigns** — one-off sends to a segment or hand-picked leads; send now or
+  schedule (30 s scheduler). Multi-channel: email via the tracked SendGrid
+  chokepoint, plus WhatsApp/SMS reusing existing services.
+- **Email Builder** — drag-and-drop block editor producing responsive HTML;
+  documents stored in `marketing_emails`; used by campaigns AND flow
+  "Send Email" steps.
+- **Tracking** — open/click pixels + SendGrid event webhook feed a per-email
+  state machine (`handleEmailEvent`), which also powers segment conditions
+  like "opened but didn't reply".
+- **Analytics** — `/app/marketing/analytics`: per flow (entered / active /
+  completed / exited + step-level counts from `flow_action_log`), per campaign
+  (sent / opened / clicked), per segment sizes. Revenue attribution is NOT
+  shown because deal value is not stored on leads — no fabricated numbers.
+
+**End-to-end verification (real SendGrid account):** signup → create segment →
+create builder email → create flow (segment trigger → send → wait 1 min →
+condition opened? → tag) → live → real test lead created → scheduler enrolled
+the lead and SendGrid accepted the message (202 + message id logged in
+`emails`) → wait node scheduled next step correctly → open tracked via public
+pixel URL → condition branched YES → tag applied → enrollment completed.
+
+Legacy cleanup: migration `013_drop_legacy_email_feature` drops
+email_templates/sequences/flows/triggers tables while KEEPING the per-send
+`emails` log (lead timeline, engagement scoring and merge depend on it).
+
 
 ## Project Overview
-Zomic CRM is a full-stack customer relationship management system with WhatsApp Business integration, Facebook Lead Ads integration, and Meta Conversions API support.
+Flazyn is a full-stack customer relationship management system with WhatsApp Business integration, Facebook Lead Ads integration, and Meta Conversions API support.
 
 **Tech Stack:**
 - **Backend**: Node.js, Express, PostgreSQL, Socket.io, Redis (optional)
@@ -31,11 +147,11 @@ Zomic CRM is a full-stack customer relationship management system with WhatsApp 
    WHATSAPP_PHONE_NUMBER_ID=1145886271951817
    WHATSAPP_BUSINESS_ACCOUNT_ID=4313679592232288
    WHATSAPP_ACCESS_TOKEN=<token from Meta console>
-   WHATSAPP_VERIFY_TOKEN=zomic_wa_verify_2026
+   WHATSAPP_VERIFY_TOKEN=flazyn_wa_verify_2026
    ```
 3. Configure webhook (for receiving messages):
    - Callback URL: `https://<your-domain>/api/whatsapp/webhook`
-   - Verify Token: `zomic_wa_verify_2026`
+   - Verify Token: `flazyn_wa_verify_2026`
    - Subscribe to field: `messages`
 
 **Known Issue:**
@@ -65,13 +181,13 @@ Zomic CRM is a full-stack customer relationship management system with WhatsApp 
    ```
    FACEBOOK_APP_ID=<your app ID>
    FACEBOOK_APP_SECRET=<your app secret>
-   FACEBOOK_VERIFY_TOKEN=zomic_verify_2026
+   FACEBOOK_VERIFY_TOKEN=flazyn_verify_2026
    ```
 2. Configure OAuth redirect URI in Meta Console:
    - Add: `https://<your-domain>/api/integrations/oauth/facebook/callback`
 3. Configure webhook for leadgen:
    - Callback URL: `https://<your-domain>/api/integrations/webhook/facebook`
-   - Verify Token: `zomic_verify_2026`
+   - Verify Token: `flazyn_verify_2026`
    - Subscribe to field: `leadgen`
 
 **Recent Fixes:**
@@ -185,12 +301,12 @@ WHATSAPP_API_URL=https://graph.facebook.com/v25.0
 WHATSAPP_PHONE_NUMBER_ID=1145886271951817
 WHATSAPP_BUSINESS_ACCOUNT_ID=4313679592232288
 WHATSAPP_ACCESS_TOKEN=your_whatsapp_token
-WHATSAPP_VERIFY_TOKEN=zomic_wa_verify_2026
+WHATSAPP_VERIFY_TOKEN=flazyn_wa_verify_2026
 
 # Facebook
 FACEBOOK_APP_ID=your_facebook_app_id
 FACEBOOK_APP_SECRET=your_facebook_app_secret
-FACEBOOK_VERIFY_TOKEN=zomic_verify_2026
+FACEBOOK_VERIFY_TOKEN=flazyn_verify_2026
 
 # OpenAI
 OPENAI_API_KEY=your_openai_key
@@ -198,7 +314,7 @@ OPENAI_API_KEY=your_openai_key
 # SendGrid
 SENDGRID_API_KEY=your_sendgrid_key
 SENDGRID_FROM_EMAIL=noreply@yourdomain.com
-SENDGRID_FROM_NAME=Zomic CRM
+SENDGRID_FROM_NAME=Flazyn
 
 # Firebase
 FIREBASE_PROJECT_ID=your_project_id

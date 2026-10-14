@@ -1,4 +1,5 @@
 const db = require('../config/database');
+const logger = require('../utils/logger');
 const { sendWhatsAppMessage, sendWhatsAppToLead, handleWhatsAppWebhook } = require('../services/whatsappService');
 const { enqueueJob } = require('../queues');
 const crypto = require('crypto');
@@ -82,46 +83,62 @@ exports.getConversations = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+function isAuthenticWebhook(req, isTwilio, config) {
+  const crypto = require('crypto');
+  if (isTwilio) {
+    const token = config.twilio?.authToken;
+    if (!token) return true; // nothing to verify against
+    const sig = req.get('x-twilio-signature');
+    if (!sig) return false;
+    const twilio = require('twilio');
+    const host = req.get('x-forwarded-host') || req.get('host');
+    const urls = [
+      `${config.apiUrl}${req.originalUrl}`,
+      `https://${host}${req.originalUrl}`,
+      `${req.protocol}://${host}${req.originalUrl}`,
+    ];
+    return urls.some((u) => twilio.validateRequest(token, sig, u, req.body || {}));
+  }
+  const secret = process.env.WHATSAPP_APP_SECRET || config.facebook?.appSecret;
+  if (!secret) return true;
+  const sig = String(req.get('x-hub-signature-256') || '');
+  const expected = `sha256=${crypto.createHmac('sha256', secret).update(req.rawBody || Buffer.from('')).digest('hex')}`;
+  return sig.length === expected.length && crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected));
+}
+
 exports.webhook = async (req, res, next) => {
   try {
     const mode = req.query['hub.mode'];
     const token = req.query['hub.verify_token'];
     const challenge = req.query['hub.challenge'];
     const config = require('../config');
-    const expectedToken = config.whatsapp.verifyToken;
 
-    // Log everything for debugging
-    console.log('=== WHATSAPP WEBHOOK VERIFICATION ===');
-    console.log('Method:', req.method);
-    console.log('URL:', req.originalUrl);
-    console.log('Query:', JSON.stringify(req.query));
-    console.log('hub.mode:', mode);
-    console.log('hub.verify_token:', token);
-    console.log('hub.challenge:', challenge);
-    console.log('Expected token:', expectedToken);
-    console.log('Token match:', token === expectedToken);
-    console.log('Mode is subscribe:', mode === 'subscribe');
-    console.log('=====================================');
-
-    // Handle GET verification from Meta
+    // Meta verification handshake
     if (req.method === 'GET' && mode) {
-      if (mode === 'subscribe' && token === expectedToken) {
-        console.log('✅ VERIFICATION SUCCESS - returning challenge:', challenge);
+      if (mode === 'subscribe' && token === config.whatsapp.verifyToken) {
+        logger.info('WhatsApp webhook verified');
         return res.status(200).type('text/plain').send(String(challenge));
       }
-      console.log('❌ VERIFICATION FAILED - mode:', mode, 'token match:', token === expectedToken);
+      logger.warn('WhatsApp webhook verification failed (token mismatch)');
       return res.status(403).type('text/plain').send('Forbidden');
     }
 
-    // Handle POST webhook events from WhatsApp
     if (req.method === 'POST') {
-      await handleWhatsAppWebhook(req.body);
-      return res.status(200).json({ success: true });
+      const isTwilio = typeof req.body?.From === 'string' && req.body.From.startsWith('whatsapp:');
+      // Only Meta/Twilio may post here; a forged message would otherwise trigger auto-replies and lead creation.
+      if (process.env.WHATSAPP_WEBHOOK_VERIFY !== 'false' && !isAuthenticWebhook(req, isTwilio, config)) {
+        logger.warn(`WhatsApp webhook rejected: bad or missing ${isTwilio ? 'X-Twilio-Signature' : 'X-Hub-Signature-256'}`);
+        return res.status(403).send('Forbidden');
+      }
+      // Acknowledge first — Meta and Twilio retry slow webhooks.
+      if (isTwilio) res.status(200).type('text/xml').send('<Response></Response>');
+      else res.status(200).json({ success: true });
+      handleWhatsAppWebhook(req.body).catch((err) => logger.error('WhatsApp webhook processing error:', err.message));
+      return;
     }
 
     res.status(405).json({ error: 'Method not allowed' });
   } catch (err) {
-    console.error('WhatsApp webhook error:', err);
     next(err);
   }
 };
@@ -323,8 +340,9 @@ exports.sendOTP = async (req, res, next) => {
     attemptStore[normalizedPhone] = 0;
 
     const result = await sendWhatsAppMessage({
+      workspaceId: req.workspaceId,
       to: normalizedPhone,
-      message: `Your Zomic verification code is: ${otp}\nThis code expires in 10 minutes.\nDo not share this code with anyone.`,
+      message: `Your Flazyn verification code is: ${otp}\nThis code expires in 10 minutes.\nDo not share this code with anyone.`,
     });
 
     if (!result.success) {
@@ -362,8 +380,9 @@ exports.resendOTP = async (req, res, next) => {
     attemptStore[normalizedPhone] = 0;
 
     const result = await sendWhatsAppMessage({
+      workspaceId: req.workspaceId,
       to: normalizedPhone,
-      message: `Your Zomic verification code is: ${otp}\nThis code expires in 10 minutes.\nDo not share this code with anyone.`,
+      message: `Your Flazyn verification code is: ${otp}\nThis code expires in 10 minutes.\nDo not share this code with anyone.`,
     });
 
     if (!result.success) {
@@ -475,6 +494,7 @@ exports.getAutoResponderSettings = async (req, res, next) => {
       working_hours_end: '18:00',
       working_days: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat'],
       delay_seconds: 0,
+      timezone: process.env.DEFAULT_TIMEZONE || 'Australia/Sydney',
     };
     res.json({ settings: ar });
   } catch (err) { next(err); }
@@ -482,10 +502,12 @@ exports.getAutoResponderSettings = async (req, res, next) => {
 
 exports.updateAutoResponderSettings = async (req, res, next) => {
   try {
-    const { is_enabled, message_template, trigger_type, working_hours_start, working_hours_end, working_days, delay_seconds } = req.body;
+    const { is_enabled, message_template, trigger_type, working_hours_start, working_hours_end, working_days, delay_seconds, timezone } = req.body;
     const wsResult = await db.query('SELECT settings FROM workspaces WHERE id = $1', [req.workspaceId]);
     const rawSettings = wsResult.rows[0]?.settings;
     const settings = typeof rawSettings === 'string' ? JSON.parse(rawSettings) : (rawSettings || {});
+    let tz = timezone || settings.whatsapp_auto_responder?.timezone || process.env.DEFAULT_TIMEZONE || 'Australia/Sydney';
+    try { new Intl.DateTimeFormat('en-US', { timeZone: tz }); } catch { return res.status(400).json({ error: `Unknown timezone: ${tz}` }); }
     settings.whatsapp_auto_responder = {
       is_enabled: is_enabled ?? false,
       message_template: message_template || "Hi {{First_Name}}! 👋\nThank you for reaching out to {{Company_Name}}. We have received your message and one of our team members will get back to you shortly.\n\nOur working hours are 9 AM – 6 PM, Mon–Sat.",
@@ -493,7 +515,8 @@ exports.updateAutoResponderSettings = async (req, res, next) => {
       working_hours_start: working_hours_start || '09:00',
       working_hours_end: working_hours_end || '18:00',
       working_days: working_days || ['mon', 'tue', 'wed', 'thu', 'fri', 'sat'],
-      delay_seconds: delay_seconds || 0,
+      delay_seconds: Math.max(0, Math.min(3600, Number(delay_seconds) || 0)),
+      timezone: tz,
     };
 
     await db.query('UPDATE workspaces SET settings = $1, updated_at = NOW() WHERE id = $2', [JSON.stringify(settings), req.workspaceId]);

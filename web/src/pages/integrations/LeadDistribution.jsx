@@ -1,77 +1,180 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import API from '../../lib/api';
 import toast from 'react-hot-toast';
-import { ArrowLeft, Send, Save, Plus, Trash2 } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2 } from 'lucide-react';
+import useCreateRegistry from '../../stores/createStore';
+import { useAutomationOptions, memberLabel } from '../../lib/automationOptions';
+
+const RECIPIENT_TYPES = [{ v: 'team_member', l: 'Team member' }, { v: 'email', l: 'Email' }, { v: 'whatsapp', l: 'WhatsApp' }];
 
 export default function LeadDistribution() {
   const navigate = useNavigate();
   const [configs, setConfigs] = useState([]);
-  const [showConfig, setShowConfig] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(null); // null | {} (new) | config row
+  const options = useAutomationOptions();
+  const register = useCreateRegistry((s) => s.register);
+  const clearRegistry = useCreateRegistry((s) => s.clear);
+
+  useEffect(() => {
+    register([{ label: 'New distribution', icon: <Plus size={14} />, run: () => setEditing({}) }]);
+    return () => clearRegistry();
+  }, [register, clearRegistry]);
 
   useEffect(() => { loadConfigs(); }, []);
-  const loadConfigs = async () => { try { const res = await API.get('/automations/distribution'); setConfigs(res.data.configs || []); } catch {} };
+  const loadConfigs = async () => {
+    try { const res = await API.get('/automations/distribution'); setConfigs(res.data.configs || []); }
+    catch {}
+    finally { setLoading(false); }
+  };
+
+  const recipientName = (r) => {
+    if (r.type !== 'team_member') return r.value;
+    const m = options.members.find((x) => x.id === r.value || x.email === r.value);
+    return m ? [m.first_name, m.last_name].filter(Boolean).join(' ') || m.email : r.value;
+  };
+  const toggle = async (c) => {
+    try { await API.put(`/automations/distribution/${c.id}/toggle`); loadConfigs(); } catch { toast.error('Could not update'); }
+  };
+  const remove = async (c) => {
+    if (!confirm('Delete this distribution?')) return;
+    try { await API.delete(`/automations/distribution/${c.id}`); toast.success('Deleted'); loadConfigs(); } catch { toast.error('Could not delete'); }
+  };
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
-      <button onClick={() => navigate('/app/automations')} className="flex items-center gap-2 text-sm text-ink-secondary hover:text-ink-primary"><ArrowLeft size={16} /> Back to Automations</button>
+    <div className="max-w-3xl mx-auto space-y-8">
+      <button onClick={() => navigate('/app/automations')} className="btn-ghost text-sm font-medium flex items-center gap-1.5">
+        <ArrowLeft size={14} /> Automations
+      </button>
 
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 bg-surface-page rounded-xl flex items-center justify-center"><Send size={24} className="text-ink-secondary" /></div>
-          <div><h2 className="text-xl font-bold text-ink-primary">Lead Distribution</h2><p className="text-sm text-ink-secondary">Forward leads to recipients via WhatsApp/email</p></div>
+      <div className="flex items-end justify-between gap-4">
+        <div>
+          <h1 style={{ fontSize: '32px', fontWeight: 650, letterSpacing: '-0.01em' }}>Lead Distribution</h1>
+          <p className="text-ink-secondary mt-1" style={{ fontSize: '15px' }}>
+            Every new lead, relayed to the right people — round-robin or broadcast.
+          </p>
         </div>
-        <button onClick={() => setShowConfig(true)} className="px-4 py-2 rounded-lg btn btn-primary flex items-center gap-2 transition-colors"><Plus size={16} /> New Distribution</button>
+        <button onClick={() => setEditing({})} className="btn btn-primary flex-shrink-0"><Plus size={14} /> New</button>
       </div>
 
-      {configs.length === 0 ? (
-        <div className="card text-center py-12"><Send size={48} className="text-ink-tertiary mx-auto mb-3" /><p className="text-ink-secondary">No distribution configs yet</p></div>
+      {loading ? (
+        <div className="space-y-2">{[1, 2].map((i) => <div key={i} className="skeleton h-16" />)}</div>
+      ) : configs.length === 0 ? (
+        <div className="pt-16 max-w-[560px]">
+          <p style={{ fontSize: '22px', fontWeight: 600 }}>No distributions yet.</p>
+          <p className="text-ink-secondary mt-2" style={{ fontSize: '15px' }}>
+            Set one up and new leads get assigned to team members, or forwarded by email or WhatsApp, the moment they arrive.
+          </p>
+        </div>
       ) : (
-        <div className="space-y-3">
-          {configs.map(c => (
-            <div key={c.id} className="card flex items-center justify-between">
-              <div><p className="font-medium text-ink-primary capitalize">Type: {c.type}</p><p className="text-xs text-ink-tertiary">Recipients: {typeof c.config === 'string' ? JSON.parse(c.config).recipients?.length || 0 : c.config?.recipients?.length || 0}</p></div>
-            </div>
-          ))}
+        <div>
+          {configs.map((c, idx) => {
+            let cfg = {};
+            try { cfg = typeof c.config === 'string' ? JSON.parse(c.config) : (c.config || {}); } catch {}
+            const recipients = cfg.recipients || [];
+            const active = c.is_active !== false;
+            return (
+              <motion.div
+                key={c.id}
+                initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: Math.min(idx * 0.04, 0.3), duration: 0.2 }}
+                className="group hairline-b py-4 hover-accent-left"
+              >
+                <div className="flex items-center justify-between gap-4">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-3">
+                      <h3 className="font-semibold" style={{ fontSize: '15px' }}>
+                        {c.name || (c.type === 'all' ? 'Broadcast to everyone' : 'Round robin')}
+                      </h3>
+                      <span className={`badge ${active ? 'badge-success' : 'badge-neutral'}`}>{active ? 'Active' : 'Paused'}</span>
+                    </div>
+                    <p className="text-ink-secondary mt-1 truncate" style={{ fontSize: '13px' }}>
+                      {recipients.length ? recipients.map(recipientName).join(' · ') : 'No recipients'}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3 flex-shrink-0 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity" style={{ fontSize: '13px' }}>
+                    <button onClick={() => setEditing(c)} className="text-ink-primary hover:text-accent-deep">Edit</button>
+                    <button onClick={() => toggle(c)} className="text-ink-primary hover:text-accent-deep">{active ? 'Pause' : 'Resume'}</button>
+                    <button onClick={() => remove(c)} className="btn-danger"><Trash2 size={14} /></button>
+                  </div>
+                </div>
+              </motion.div>
+            );
+          })}
         </div>
       )}
 
-      {showConfig && <ConfigModal onClose={() => setShowConfig(false)} onSaved={() => { setShowConfig(false); loadConfigs(); }} />}
+      {editing && <ConfigModal existing={editing.id ? editing : null} options={options} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); loadConfigs(); }} />}
     </div>
   );
+}
 
-  function ConfigModal({ onClose, onSaved }) {
-    const [type, setType] = useState('round_robin');
-    const [recipients, setRecipients] = useState([{ type: 'email', value: '' }]);
+function ConfigModal({ existing, options, onClose, onSaved }) {
+  let existingCfg = {};
+  try { existingCfg = typeof existing?.config === 'string' ? JSON.parse(existing.config) : (existing?.config || {}); } catch {}
+  const [name, setName] = useState(existing?.name || '');
+  const [type, setType] = useState(existing?.type || 'round_robin');
+  const [recipients, setRecipients] = useState(existingCfg.recipients?.length ? existingCfg.recipients : [{ type: 'team_member', value: '' }]);
+  const update = (i, patch) => setRecipients(recipients.map((x, idx) => (idx === i ? { ...x, ...patch } : x)));
 
-    const handleSave = async () => {
-      try { await API.put('/automations/distribution', { type, config: { recipients } }); toast.success('Distribution saved'); onSaved(); } catch { toast.error('Failed'); }
-    };
+  const handleSave = async () => {
+    if (recipients.some((r) => !String(r.value).trim())) return toast.error('Fill in every recipient');
+    try {
+      await API.put('/automations/distribution', { id: existing?.id, name: name || null, type, config: { recipients } });
+      toast.success('Distribution saved');
+      onSaved();
+    } catch (err) { toast.error(err.response?.data?.error || 'Failed'); }
+  };
 
-    const recipientTypes = [{ v: 'email', l: 'Email' }, { v: 'whatsapp', l: 'WhatsApp' }, { v: 'team_member', l: 'Team Member' }];
-
-    return (
-      <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-        <div className="bg-white border border-surface-border rounded-2xl p-6 w-full max-w-md shadow-modal">
-          <div className="flex items-center justify-between mb-4"><h2 className="text-xl font-bold text-ink-primary">Distribution Config</h2><button onClick={onClose}>✕</button></div>
-          <div className="space-y-3">
-            <select className="input" value={type} onChange={e => setType(e.target.value)}>
-              <option value="round_robin">Round Robin</option><option value="all">All Recipients</option>
+  return (
+    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-0 sm:p-6 overflow-y-auto" style={{ background: 'rgba(28,25,23,0.25)' }} onClick={onClose}>
+      <div className="card-raised w-full max-w-md my-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-5">
+          <h2 style={{ fontSize: '18px', fontWeight: 600 }}>{existing ? 'Edit distribution' : 'New distribution'}</h2>
+          <button onClick={onClose} className="text-ink-tertiary hover:text-ink-primary transition-colors">✕</button>
+        </div>
+        <div className="space-y-4">
+          <div>
+            <p className="meta-label mb-1">Name (optional)</p>
+            <input className="input" placeholder="e.g. Karachi sales team" value={name} onChange={(e) => setName(e.target.value)} />
+          </div>
+          <div>
+            <p className="meta-label mb-1">Strategy</p>
+            <select className="input" value={type} onChange={(e) => setType(e.target.value)}>
+              <option value="round_robin">Round robin — one recipient per lead, in turn</option>
+              <option value="all">All recipients — everyone gets every lead</option>
             </select>
-            <div>
-              <label className="text-sm font-medium text-ink-secondary">Recipients:</label>
+            <p className="text-ink-tertiary mt-1" style={{ fontSize: '12px' }}>Team members are also assigned the lead if nobody owns it yet.</p>
+          </div>
+          <div>
+            <p className="meta-label mb-2">Recipients</p>
+            <div className="space-y-3">
               {recipients.map((r, i) => (
-                <div key={i} className="flex gap-2 mt-2">
-                  <select className="input w-32" value={r.type} onChange={e => setRecipients(recipients.map((x, idx) => idx === i ? { ...x, type: e.target.value } : x))}>{recipientTypes.map(t => <option key={t.v} value={t.v}>{t.l}</option>)}</select>
-                  <input className="input flex-1" placeholder="Email / WhatsApp number / User ID" value={r.value} onChange={e => setRecipients(recipients.map((x, idx) => idx === i ? { ...x, value: e.target.value } : x))} />
+                <div key={i} className="flex items-end gap-2">
+                  <select className="input flex-shrink-0" style={{ width: '132px' }} value={r.type} onChange={(e) => update(i, { type: e.target.value, value: '' })}>
+                    {RECIPIENT_TYPES.map((t) => <option key={t.v} value={t.v}>{t.l}</option>)}
+                  </select>
+                  {r.type === 'team_member' ? (
+                    <select className="input flex-1" value={r.value} onChange={(e) => update(i, { value: e.target.value })}>
+                      <option value="">Choose…</option>
+                      {options.members.map((m) => <option key={m.id} value={m.id}>{memberLabel(m)}</option>)}
+                    </select>
+                  ) : (
+                    <input className="input flex-1" placeholder={r.type === 'email' ? 'name@company.com' : '+92 300 1234567'} value={r.value} onChange={(e) => update(i, { value: e.target.value })} />
+                  )}
+                  {recipients.length > 1 && (
+                    <button onClick={() => setRecipients(recipients.filter((_, idx) => idx !== i))} className="btn-danger mb-1"><Trash2 size={14} /></button>
+                  )}
                 </div>
               ))}
-              <button onClick={() => setRecipients([...recipients, { type: 'email', value: '' }])} className="text-xs text-ink-secondary mt-2">+ Add Recipient</button>
             </div>
-            <button onClick={handleSave} className="w-full px-4 py-2.5 rounded-lg btn btn-primary transition-colors">Save</button>
+            <button onClick={() => setRecipients([...recipients, { type: 'team_member', value: '' }])} className="btn-ghost mt-3 text-sm font-medium">+ Add recipient</button>
           </div>
+          <button onClick={handleSave} className="btn btn-primary w-full">Save distribution</button>
         </div>
       </div>
-    );
-  }
+    </div>
+  );
 }

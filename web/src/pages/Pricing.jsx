@@ -1,9 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import {
-  Check, ChevronDown, ChevronUp, Star, ArrowRight, MessageCircle, Zap, Shield,
-  Smartphone, Users, Globe, Clock, Mail, BarChart3
-} from 'lucide-react';
+import { motion } from 'framer-motion';
 
 export default function Pricing() {
   const [billing, setBilling] = useState('monthly');
@@ -29,7 +26,7 @@ export default function Pricing() {
       ],
     },
     {
-      name: 'Zomic Pro',
+      name: 'Flazyn Pro',
       price: billing === 'monthly' ? '$19' : '$15',
       sub: 'per user, per month (billed annually)',
       highlight: 'Up to 20 team members',
@@ -49,11 +46,11 @@ export default function Pricing() {
       ],
     },
     {
-      name: 'Zomic Business',
+      name: 'Flazyn Business',
       price: 'Custom',
       sub: 'Contact sales for pricing',
       highlight: 'For 20+ team members',
-      desc: 'Unlock the full power of Zomic for larger teams and agencies.',
+      desc: 'Unlock the full power of Flazyn for larger teams and agencies.',
       cta: 'Contact Sales',
       ctaStyle: 'outline',
       features: [
@@ -93,7 +90,7 @@ export default function Pricing() {
   ];
 
   const faqs = [
-    { q: 'Do I need a credit card to start?', a: 'No. Zomic is free to try forever. No credit card or payment is required to create an account.' },
+    { q: 'Do I need a credit card to start?', a: 'No. Flazyn is free to try forever. No credit card or payment is required to create an account.' },
     { q: 'Is the Free Forever plan just a trial?', a: 'No. The Free Forever plan is not a trial. After a 14-day Pro trial, you automatically switch to the free plan and can keep using it.' },
     { q: 'What happens when I upgrade?', a: 'You unlock unlimited templates, sequences, view tracking, team assignment, bulk calling, and more.' },
     { q: 'Can I cancel anytime?', a: 'Yes. You can cancel your subscription anytime with no penalty. You keep access until the end of your billing period.' },
@@ -106,115 +103,113 @@ export default function Pricing() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans">
-      {/* Simple nav */}
-      <nav className="bg-white border-b border-slate-200 sticky top-0 z-50">
+    <div className="min-h-screen" style={{ background: '#FAFAF9', color: '#1C1917', fontFamily: 'Inter, system-ui, sans-serif' }}>
+      {/* Nav */}
+      <nav className="bg-white border-b border-surface-border sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #FF3B5C, #FF9500)' }}>
-              <Zap className="text-white" size={18} />
-            </div>
-            <span className="text-xl font-bold">Zomic</span>
+            <div className="w-8 h-8 flex items-center justify-center text-white font-bold" style={{ background: '#EDE9FF', borderRadius: '8px' }}>F</div>
+            <span className="text-xl font-bold tracking-tight">Flazyn</span>
           </Link>
           <div className="flex items-center gap-3">
-            <Link to="/login" className="text-sm font-medium text-slate-600 hover:text-[#FF3B5C] px-3 py-2">Login</Link>
-            <Link to="/signup" className="text-sm font-semibold text-white px-4 py-2 rounded-lg transition" style={{ background: 'linear-gradient(135deg, #FF3B5C, #FF9500)' }}>Sign Up</Link>
+            <Link to="/login" className="text-sm text-ink-secondary hover:text-ink-primary transition" style={{ fontWeight: 500 }}>Login</Link>
+            <Link to="/signup" className="text-sm text-white px-4 py-2 transition" style={{ background: '#EDE9FF', fontWeight: 600, borderRadius: '8px' }}>Sign Up</Link>
           </div>
         </div>
       </nav>
 
       {/* Hero */}
-      <section className="pt-20 pb-12 text-center bg-white">
+      <section className="pt-20 pb-12 text-center">
         <div className="max-w-4xl mx-auto px-4">
-          <h1 className="text-4xl sm:text-5xl font-bold mb-4">Flexible plans for teams of all sizes</h1>
-          <p className="text-lg text-slate-600 mb-2">Skyrocket your sales and productivity today 🚀</p>
-          <p className="text-slate-500 mb-8">Capture, engage, and manage every lead from your phone with Zomic.</p>
+          <h1 className="text-ink-primary mb-4" style={{ fontSize: '48px', fontWeight: 700, letterSpacing: '-0.02em' }}>Flexible plans for teams of all sizes</h1>
+          <p className="text-ink-secondary mb-2" style={{ fontSize: '18px' }}>Skyrocket your sales and productivity today</p>
+          <p className="text-ink-tertiary mb-8" style={{ fontSize: '15px' }}>Capture, engage, and manage every lead from your phone with Flazyn.</p>
 
-          <div className="inline-flex items-center bg-slate-900 rounded-xl p-1 mb-12">
+          <div className="inline-flex items-center bg-white border border-surface-border p-1 mb-12" style={{ borderRadius: '8px' }}>
             <button
               onClick={() => setBilling('monthly')}
-              className={`px-6 py-2 rounded-lg text-sm font-semibold transition ${billing === 'monthly' ? 'bg-white text-slate-900' : 'text-slate-300'}`}
+              className={`px-6 py-2 text-sm transition ${billing === 'monthly' ? 'text-white' : 'text-ink-secondary'}`}
+              style={{ fontWeight: 600, borderRadius: '8px', ...(billing === 'monthly' ? { background: '#EDE9FF' } : {}) }}
             >
               Monthly
             </button>
             <button
               onClick={() => setBilling('yearly')}
-              className={`px-6 py-2 rounded-lg text-sm font-semibold transition flex items-center gap-2 ${billing === 'yearly' ? 'bg-white text-slate-900' : 'text-slate-300'}`}
+              className={`px-6 py-2 text-sm transition flex items-center gap-2 ${billing === 'yearly' ? 'text-white' : 'text-ink-secondary'}`}
+              style={{ fontWeight: 600, borderRadius: '8px', ...(billing === 'yearly' ? { background: '#EDE9FF' } : {}) }}
             >
               Yearly
-              <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">🎁 2 months free</span>
+              <span className="text-xs px-2 py-0.5" style={{ background: billing === 'yearly' ? 'rgba(255,255,255,0.2)' : '#F5F5F4', color: billing === 'yearly' ? '#fff' : '#EDE9FF', borderRadius: '8px' }}>2 months free</span>
             </button>
           </div>
         </div>
       </section>
 
       {/* Plans */}
-      <section className="pb-20 bg-white">
+      <section className="pb-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid lg:grid-cols-3 gap-6">
-            {plans.map((plan) => (
-              <div key={plan.name} className={`relative rounded-2xl border p-6 flex flex-col ${plan.ctaStyle === 'primary' ? 'border-[#FF3B5C] shadow-xl bg-white' : 'border-slate-200 bg-white'}`}>
+            {plans.map((plan, i) => (
+              <motion.div key={plan.name} initial={{ opacity: 0, y: 8, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ delay: Math.min(i * 0.08, 0.3), duration: 0.2 }} className={`relative bg-white border p-6 flex flex-col ${plan.ctaStyle === 'primary' ? 'border-accent' : 'border-surface-border'}`} style={{ borderRadius: '8px' }}>
                 {plan.badge && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 text-white text-xs font-bold px-3 py-1 rounded-full" style={{ background: 'linear-gradient(135deg, #FF3B5C, #FF9500)' }}>
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 text-white text-xs px-3 py-1" style={{ background: '#EDE9FF', fontWeight: 600, borderRadius: '8px' }}>
                     {plan.badge}
                   </div>
                 )}
-                <div className={`text-xs font-bold inline-block px-3 py-1 rounded-full mb-4 w-fit ${plan.name === 'Free Forever' ? 'bg-blue-100 text-blue-700' : plan.name === 'Zomic Pro' ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'}`}>
-                  {plan.name}
+                <div className="text-sm font-semibold text-ink-tertiary mb-4">{plan.name}</div>
+                <div className="mono text-ink-primary mb-1" style={{ fontSize: '36px', fontWeight: 700 }}>{plan.price} {plan.price !== 'Custom' && <span className="text-ink-tertiary" style={{ fontSize: '14px', fontWeight: 400 }}>/mo</span>}</div>
+                <div className="text-sm text-ink-tertiary mb-4">{plan.sub}</div>
+                <div className="bg-surface-page p-3 mb-4" style={{ borderRadius: '8px' }}>
+                  <div className="text-sm font-semibold text-ink-primary">{plan.highlight}</div>
                 </div>
-                <div className="text-4xl font-bold mb-1">{plan.price} <span className="text-lg font-normal text-slate-500">USD</span></div>
-                <div className="text-sm text-slate-500 mb-4">{plan.sub}</div>
-                <div className="bg-slate-50 rounded-lg p-3 mb-4">
-                  <div className="text-sm font-semibold text-slate-900">{plan.highlight}</div>
-                </div>
-                <p className="text-sm text-slate-600 mb-6">{plan.desc}</p>
+                <p className="text-sm text-ink-secondary mb-6">{plan.desc}</p>
                 <Link
                   to="/signup"
-                  className={`block text-center font-semibold py-3 rounded-lg mb-6 transition ${plan.ctaStyle === 'primary' ? 'text-white' : 'bg-white border-2 border-[#FF3B5C] text-[#FF3B5C] hover:bg-red-50'}`}
-                  style={plan.ctaStyle === 'primary' ? { background: 'linear-gradient(135deg, #FF3B5C, #FF9500)' } : {}}
+                  className={`block text-center py-3 mb-6 transition ${plan.ctaStyle === 'primary' ? 'text-white' : 'bg-white border border-surface-border text-ink-primary hover:border-ink-tertiary'}`}
+                  style={{ fontSize: '14px', fontWeight: 600, borderRadius: '8px', ...(plan.ctaStyle === 'primary' ? { background: '#EDE9FF' } : {}) }}
                 >
                   {plan.cta}
                 </Link>
-                <div className="text-xs text-slate-500 mb-4">
-                  {plan.name === 'Free Forever' ? 'Free forever. No credit card required.' : plan.name === 'Zomic Pro' ? '14 day free trial. No credit card required.' : 'Get a custom demo based on your requirements.'}
+                <div className="text-xs text-ink-tertiary mb-4">
+                  {plan.name === 'Free Forever' ? 'Free forever. No credit card required.' : plan.name === 'Flazyn Pro' ? '14 day free trial. No credit card required.' : 'Get a custom demo based on your requirements.'}
                 </div>
                 <div className="mt-auto">
-                  <div className="text-xs font-bold text-slate-500 uppercase mb-3">Key Features</div>
+                  <div className="text-xs font-semibold text-ink-tertiary uppercase mb-3" style={{ letterSpacing: '0.05em' }}>Key Features</div>
                   <ul className="space-y-2">
                     {plan.features.map((f) => (
-                      <li key={f} className="flex items-start gap-2 text-sm text-slate-700">
-                        <Check size={16} className="text-green-500 mt-0.5 shrink-0" /> {f}
+                      <li key={f} className="flex items-start gap-2 text-sm text-ink-secondary">
+                        <span className="w-1 h-1 rounded-full mt-2 shrink-0" style={{ background: '#EDE9FF' }} /> {f}
                       </li>
                     ))}
                   </ul>
                 </div>
-              </div>
+              </motion.div>
             ))}
           </div>
         </div>
       </section>
 
       {/* Comparison */}
-      <section className="py-20 bg-slate-50">
+      <section className="py-20 bg-white border-y border-surface-border">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl font-bold text-center mb-12">Compare plans</h2>
+          <h2 className="text-ink-primary text-center mb-12" style={{ fontSize: '36px', fontWeight: 700, letterSpacing: '-0.01em' }}>Compare plans</h2>
           <div className="overflow-x-auto">
-            <table className="w-full bg-white rounded-2xl shadow-sm border border-slate-200">
+            <table className="w-full">
               <thead>
-                <tr className="border-b border-slate-200">
-                  <th className="text-left p-4 font-semibold text-slate-900">Feature</th>
-                  <th className="p-4 text-center font-semibold text-slate-900">Free Forever</th>
-                  <th className="p-4 text-center font-semibold" style={{ color: '#FF3B5C' }}>Zomic Pro</th>
-                  <th className="p-4 text-center font-semibold text-orange-600">Zomic Business</th>
+                <tr className="border-b border-surface-border">
+                  <th className="text-left py-4 pr-4 font-semibold text-ink-primary" style={{ fontSize: '14px' }}>Feature</th>
+                  <th className="py-4 px-4 text-center font-semibold text-ink-primary" style={{ fontSize: '14px' }}>Free Forever</th>
+                  <th className="py-4 px-4 text-center font-semibold" style={{ fontSize: '14px', color: '#4A2FD6' }}>Flazyn Pro</th>
+                  <th className="py-4 px-4 text-center font-semibold text-ink-primary" style={{ fontSize: '14px' }}>Flazyn Business</th>
                 </tr>
               </thead>
               <tbody>
                 {comparison.map((row, idx) => (
-                  <tr key={row.feature} className={idx % 2 === 0 ? 'bg-slate-50/50' : ''}>
-                    <td className="p-4 text-sm font-medium text-slate-700">{row.feature}</td>
-                    <td className="p-4 text-center text-sm text-slate-600">{row.free}</td>
-                    <td className="p-4 text-center text-sm text-slate-900 font-medium">{row.pro}</td>
-                    <td className="p-4 text-center text-sm text-slate-900 font-medium">{row.business}</td>
+                  <tr key={row.feature} className="border-b border-surface-border">
+                    <td className="py-3 pr-4 text-sm font-medium text-ink-primary">{row.feature}</td>
+                    <td className="py-3 px-4 text-center text-sm text-ink-tertiary">{row.free}</td>
+                    <td className="py-3 px-4 text-center text-sm text-ink-primary" style={{ fontWeight: 500 }}>{row.pro}</td>
+                    <td className="py-3 px-4 text-center text-sm text-ink-primary" style={{ fontWeight: 500 }}>{row.business}</td>
                   </tr>
                 ))}
               </tbody>
@@ -224,45 +219,44 @@ export default function Pricing() {
       </section>
 
       {/* Sales contact form */}
-      <section className="py-20" style={{ background: 'linear-gradient(135deg, #FF3B5C, #FF9500)' }}>
+      <section className="py-20">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            <div className="text-white">
-              <h2 className="text-3xl font-bold mb-4">Talk to our Sales Team</h2>
-              <p className="mb-6" style={{ color: 'rgba(255,255,255,0.85)' }}>Book your personalised consultation with our experts to:</p>
-              <ul className="space-y-3">
+          <div className="grid lg:grid-cols-2 gap-12 items-start">
+            <div>
+              <h2 className="text-ink-primary mb-4" style={{ fontSize: '36px', fontWeight: 700, letterSpacing: '-0.01em' }}>Talk to our sales team</h2>
+              <p className="text-ink-secondary mb-6" style={{ fontSize: '18px' }}>Book your personalised consultation with our experts to:</p>
+              <ul className="space-y-3 mb-8">
                 {[
-                  'Explore how Zomic solves your most critical business challenges',
+                  'Explore how Flazyn solves your most critical business challenges',
                   'Discover the best setup and tailored pricing for your team',
                   'Boost your team sales and productivity',
                 ].map((item) => (
-                  <li key={item} className="flex items-start gap-3">
-                    <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center shrink-0 mt-0.5"><Check size={14} /></div>
-                    <span style={{ color: 'rgba(255,255,255,0.9)' }}>{item}</span>
+                  <li key={item} className="flex items-start gap-3 text-ink-secondary" style={{ fontSize: '15px' }}>
+                    <span className="w-1.5 h-1.5 rounded-full mt-2 shrink-0" style={{ background: '#EDE9FF' }} /> {item}
                   </li>
                 ))}
               </ul>
-              <div className="mt-8 flex items-center gap-2 text-sm" style={{ color: 'rgba(255,255,255,0.7)' }}>
-                <Star size={16} fill="currentColor" /> Trusted by 500,000+ businesses worldwide
+              <div className="text-sm text-ink-tertiary">
+                Trusted by 500,000+ businesses worldwide
               </div>
             </div>
-            <form onSubmit={handleSalesSubmit} className="bg-white rounded-2xl p-6 shadow-lg">
+            <form onSubmit={handleSalesSubmit} className="bg-white border border-surface-border p-6" style={{ borderRadius: '8px' }}>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Name *</label>
-                  <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400" placeholder="Your name" />
+                  <p className="meta-label mb-1">Name</p>
+                  <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="input" placeholder="Your name" />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Email *</label>
-                  <input type="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400" placeholder="name@company.com" />
+                  <p className="meta-label mb-1">Email</p>
+                  <input type="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="input" placeholder="name@company.com" />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Phone Number *</label>
-                  <input type="tel" required value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400" placeholder="+1 201-555-0123" />
+                  <p className="meta-label mb-1">Phone number</p>
+                  <input type="tel" required value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="input mono" placeholder="+1 201-555-0123" />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">How big is your sales team? *</label>
-                  <select required value={form.teamSize} onChange={(e) => setForm({ ...form, teamSize: e.target.value })} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400">
+                  <p className="meta-label mb-1">How big is your sales team?</p>
+                  <select required value={form.teamSize} onChange={(e) => setForm({ ...form, teamSize: e.target.value })} className="input">
                     <option value="">Select option...</option>
                     <option>Just me</option>
                     <option>2–5</option>
@@ -272,8 +266,8 @@ export default function Pricing() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Which best describes your business? *</label>
-                  <select required value={form.business} onChange={(e) => setForm({ ...form, business: e.target.value })} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400">
+                  <p className="meta-label mb-1">Which best describes your business?</p>
+                  <select required value={form.business} onChange={(e) => setForm({ ...form, business: e.target.value })} className="input">
                     <option value="">Select option...</option>
                     <option>Real Estate</option>
                     <option>Marketing Agency</option>
@@ -284,8 +278,8 @@ export default function Pricing() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">How do you primarily engage leads? *</label>
-                  <select required value={form.method} onChange={(e) => setForm({ ...form, method: e.target.value })} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400">
+                  <p className="meta-label mb-1">How do you primarily engage leads?</p>
+                  <select required value={form.method} onChange={(e) => setForm({ ...form, method: e.target.value })} className="input">
                     <option value="">Select option...</option>
                     <option>WhatsApp</option>
                     <option>Email</option>
@@ -294,7 +288,7 @@ export default function Pricing() {
                     <option>Multiple channels</option>
                   </select>
                 </div>
-                <button type="submit" className="w-full text-white font-semibold py-3 rounded-lg transition" style={{ background: 'linear-gradient(135deg, #FF3B5C, #FF9500)' }}>
+                <button type="submit" className="btn btn-primary w-full">
                   Submit
                 </button>
               </div>
@@ -304,76 +298,77 @@ export default function Pricing() {
       </section>
 
       {/* FAQ */}
-      <section className="py-20 bg-white">
+      <section className="py-20 bg-white border-y border-surface-border">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl font-bold text-center mb-10">FAQ: Free vs Pro</h2>
-          <div className="space-y-3">
+          <h2 className="text-ink-primary text-center mb-10" style={{ fontSize: '36px', fontWeight: 700, letterSpacing: '-0.01em' }}>FAQ: Free vs Pro</h2>
+          <div className="space-y-0">
             {faqs.map((faq, idx) => (
-              <div key={idx} className="border border-slate-200 rounded-xl overflow-hidden">
-                <button onClick={() => setOpenFaq(openFaq === idx ? null : idx)} className="w-full flex items-center justify-between p-4 text-left font-semibold text-slate-900 bg-slate-50 hover:bg-slate-100 transition">
+              <motion.div key={idx} initial={{ opacity: 0, y: 8 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: '-20px' }} transition={{ delay: Math.min(idx * 0.04, 0.3), duration: 0.2 }} className="border-b border-surface-border">
+                <button onClick={() => setOpenFaq(openFaq === idx ? null : idx)} className="w-full flex items-center justify-between py-4 text-left text-ink-primary transition" style={{ fontSize: '15px', fontWeight: 600 }}>
                   {faq.q}
-                  {openFaq === idx ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                  <span className="text-ink-tertiary ml-4" style={{ fontSize: '14px' }}>{openFaq === idx ? '−' : '+'}</span>
                 </button>
                 {openFaq === idx && (
-                  <div className="p-4 text-sm text-slate-600 leading-relaxed">{faq.a}</div>
+                  <div className="pb-4 text-ink-secondary leading-relaxed" style={{ fontSize: '14px' }}>{faq.a}</div>
                 )}
-              </div>
+              </motion.div>
             ))}
           </div>
         </div>
       </section>
 
       {/* CTA */}
-      <section className="py-16 bg-slate-900 text-white text-center">
+      <section className="py-16 text-center" style={{ background: 'linear-gradient(135deg, #7C5CFF 0%, #5B3DF5 100%)' }}>
         <div className="max-w-3xl mx-auto px-4">
-          <h2 className="text-3xl font-bold mb-4">Ready to try?</h2>
-          <p className="text-slate-300 mb-6">Start using Zomic for free. No credit card required.</p>
-          <Link to="/signup" className="inline-flex items-center gap-2 text-white font-bold px-6 py-3 rounded-xl transition" style={{ background: 'linear-gradient(135deg, #FF3B5C, #FF9500)' }}>
-            Get Started Free <ArrowRight size={18} />
+          <h2 className="text-white mb-4" style={{ fontSize: '36px', fontWeight: 700, letterSpacing: '-0.01em' }}>Ready to try?</h2>
+          <p className="mb-6" style={{ fontSize: '18px', color: 'rgba(255,255,255,0.7)' }}>Start using Flazyn for free. No credit card required.</p>
+          <Link to="/signup" className="inline-flex items-center gap-2 text-white px-8 py-4 transition" style={{ background: '#EDE9FF', fontWeight: 600, borderRadius: '8px' }}>
+            Get Started Free →
           </Link>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="bg-slate-900 text-slate-400 py-12 border-t border-slate-800">
+      <footer className="bg-white border-t border-surface-border py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid md:grid-cols-4 gap-8 mb-8">
             <div>
-              <div className="flex items-center gap-2 text-white mb-3">
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #FF3B5C, #FF9500)' }}><Zap size={18} className="text-white" /></div>
-                <span className="text-xl font-bold">Zomic</span>
+              <div className="flex items-center gap-2 text-ink-primary mb-3">
+                <div className="w-8 h-8 flex items-center justify-center text-white" style={{ background: '#EDE9FF', borderRadius: '8px' }}>F</div>
+                <span className="text-xl font-bold">Flazyn</span>
               </div>
-              <p className="text-sm">The mobile-first CRM for modern sales teams.</p>
+              <p className="text-sm text-ink-tertiary">The mobile-first CRM for modern sales teams.</p>
             </div>
             <div>
-              <div className="font-semibold text-white mb-3">Product</div>
+              <div className="font-semibold text-ink-primary mb-3">Product</div>
               <ul className="space-y-2 text-sm">
-                <li><Link to="/landing#features" className="hover:text-white">Features</Link></li>
-                <li><Link to="/landing#integrations" className="hover:text-white">Integrations</Link></li>
-                <li><Link to="/pricing" className="hover:text-white">Pricing</Link></li>
-                <li><Link to="/" className="hover:text-white">Mobile App</Link></li>
+                <li><Link to="/landing#features" className="text-ink-tertiary hover:text-accent-deep transition">Features</Link></li>
+                <li><Link to="/landing#integrations" className="text-ink-tertiary hover:text-accent-deep transition">Integrations</Link></li>
+                <li><Link to="/pricing" className="text-ink-tertiary hover:text-accent-deep transition">Pricing</Link></li>
+                <li><Link to="/" className="text-ink-tertiary hover:text-accent-deep transition">Mobile App</Link></li>
               </ul>
             </div>
             <div>
-              <div className="font-semibold text-white mb-3">Resources</div>
+              <div className="font-semibold text-ink-primary mb-3">Resources</div>
               <ul className="space-y-2 text-sm">
-                <li><a href="#" className="hover:text-white">Help Center</a></li>
-                <li><a href="#" className="hover:text-white">Blog</a></li>
-                <li><a href="#" className="hover:text-white">API Docs</a></li>
-                <li><a href="#" className="hover:text-white">Status</a></li>
+                <li><a href="#" className="text-ink-tertiary hover:text-accent-deep transition">Help Center</a></li>
+                <li><a href="#" className="text-ink-tertiary hover:text-accent-deep transition">Blog</a></li>
+                <li><a href="#" className="text-ink-tertiary hover:text-accent-deep transition">API Docs</a></li>
+                <li><a href="#" className="text-ink-tertiary hover:text-accent-deep transition">Status</a></li>
               </ul>
             </div>
             <div>
-              <div className="font-semibold text-white mb-3">Company</div>
+              <div className="font-semibold text-ink-primary mb-3">Company</div>
               <ul className="space-y-2 text-sm">
-                <li><a href="#" className="hover:text-white">About</a></li>
-                <li><a href="#" className="hover:text-white">Careers</a></li>
-                <li><a href="#" className="hover:text-white">Privacy</a></li>
-                <li><a href="#" className="hover:text-white">Terms</a></li>
+                <li><a href="#" className="text-ink-tertiary hover:text-accent-deep transition">About</a></li>
+                <li><a href="#" className="text-ink-tertiary hover:text-accent-deep transition">Careers</a></li>
+                <li><Link to="/privacy" className="text-ink-tertiary hover:text-accent-deep transition">Privacy</Link></li>
+                <li><Link to="/terms" className="text-ink-tertiary hover:text-accent-deep transition">Terms</Link></li>
+                <li><Link to="/data-deletion" className="text-ink-tertiary hover:text-accent-deep transition">Data deletion</Link></li>
               </ul>
             </div>
           </div>
-          <div className="text-sm text-slate-500">© 2026 Zomic. All rights reserved.</div>
+          <div className="text-sm text-ink-tertiary">© 2026 Flazyn. All rights reserved.</div>
         </div>
       </footer>
     </div>

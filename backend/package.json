@@ -1,14 +1,16 @@
 {
-  "name": "crm-final-backend",
+  "name": "flazyn-backend",
   "version": "1.0.0",
-  "description": "CRM Final Backend API",
+  "description": "Flazyn Backend API",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "migrate": "node src/migrations/run.js",
     "seed": "node src/seeders/index.js",
-    "worker": "node src/workers/index.js"
+    "worker": "node src/workers/index.js",
+    "test:automations": "node scripts/test-automations.js",
+    "test:intelligence": "node scripts/test-intelligence.js"
   },
   "dependencies": {
     "@sendgrid/mail": "^7.7.0",

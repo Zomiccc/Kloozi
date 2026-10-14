@@ -1,8 +1,8 @@
 {
-  "name": "crm-final",
+  "name": "flazyn",
   "version": "1.0.0",
   "private": true,
-  "description": "CRM Final - Full-featured CRM SaaS platform with Email Marketing System",
+  "description": "Flazyn - Full-featured CRM SaaS platform with Email Marketing System",
   "scripts": {
     "dev:server": "cd backend && npm run dev",
     "dev:web": "cd web && npm run dev",
